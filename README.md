@@ -1,10 +1,13 @@
-# Plataforma de Análisis Financiero
+# HORIZON V2
 
-Sitio estático simple para visualizar tendencias de activos e inversiones mediante gráficos.
+Terminal web de inteligencia cuantitativa y geopolítica con autenticación de Supabase, perfiles de usuario y registro de niveles `normal`, `premium` y `elite`.
 
 ## Estructura
 
-- `index.html` — página principal
+- `index.html` — aplicación estática completa
+- `supabase-config.js` — URL y clave pública del proyecto Supabase
+- `schema.sql` — tablas, trigger de perfiles y políticas RLS
+- `logo_algorithm.svg` — isotipo geométrico de la plataforma
 
 ## Uso local
 
@@ -20,9 +23,32 @@ Luego entrar a:
 http://localhost:8000
 ```
 
-## Preparado para Cloud Pages
+## Configurar Supabase
 
-Este repositorio está diseñado como sitio estático básico para ser conectado a Salesforce Cloud Pages o a un despliegue desde GitHub.
+1. Crea un proyecto en [Supabase](https://supabase.com/).
+2. Abre **SQL Editor** y ejecuta `schema.sql`.
+3. Copia la URL del proyecto y la clave `anon` en `supabase-config.js`.
+4. En **Authentication > URL Configuration**, añade la URL local y la URL final de Cloudflare Pages.
+
+La clave `anon` puede estar en el frontend. Nunca publiques una `service_role` key. El espacio normal permite una entrada rápida local con nombre y correo; las funciones premium/elite y el registro de usuarios requieren una sesión autenticada. Las políticas RLS protegen la tabla.
+
+El panel de control consulta los perfiles de todos los usuarios autenticados porque se solicitó un único rol de cuenta. Si el panel debe ser privado para el propietario, habrá que añadir una autorización administrativa separada mediante Edge Function o una política basada en una lista de correos.
+
+## Acceso administrativo demo
+
+El backoffice está oculto. Abre el modal con `Ctrl + Shift + A` y utiliza el usuario bloqueado `gov` y la contraseña demo `mode`. Estas credenciales están escritas en el JavaScript del navegador y, por tanto, no protegen producción. Antes de usar datos reales, reemplaza este flujo por Supabase Auth con una columna de rol protegida por RLS y una Edge Function para las operaciones administrativas.
+
+El catálogo y las proyecciones actuales son una base visual demostrativa. Para precios y noticias en vivo se debe conectar un proveedor de datos mediante una función de servidor; no se deben colocar claves privadas de APIs en Cloudflare Pages.
+
+## Despliegue en Cloudflare Pages
+
+En Cloudflare Pages crea un proyecto conectado al repositorio de GitHub. Usa estos valores:
+
+- **Framework preset:** None
+- **Build command:** dejar vacío
+- **Build output directory:** `/`
+
+Después de publicar, registra el dominio de Pages en Supabase Authentication.
 
 ## Subir a GitHub
 

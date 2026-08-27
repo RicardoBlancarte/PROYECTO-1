@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1.05 -1.05 2.1 2.1" role="img" aria-labelledby="title desc">
+  <title id="title">Algorithm Isotipo</title>
+  <desc id="desc">Flor geométrica cian con conexiones centrales y núcleo blanco.</desc>
+  <g fill="none" stroke="#00f3ff" stroke-width="0.012" stroke-linecap="round">
+    <circle cx="0" cy="0" r="0.4" opacity=".9"/>
+    <circle cx="0.4" cy="0" r="0.4" opacity=".9"/>
+    <circle cx="0.2" cy="0.34641" r="0.4" opacity=".9"/>
+    <circle cx="-0.2" cy="0.34641" r="0.4" opacity=".9"/>
+    <circle cx="-0.4" cy="0" r="0.4" opacity=".9"/>
+    <circle cx="-0.2" cy="-0.34641" r="0.4" opacity=".9"/>
+    <circle cx="0.2" cy="-0.34641" r="0.4" opacity=".9"/>
+  </g>
+  <g stroke="#00f3ff" stroke-width="0.008" opacity=".48">
+    <path d="M0 0L.4 0M0 0L.2 .34641M0 0L-.2 .34641M0 0L-.4 0M0 0L-.2 -.34641M0 0L.2 -.34641M.4 0L.2 .34641M.2 .34641L-.2 .34641M-.2 .34641L-.4 0M-.4 0L-.2 -.34641M-.2 -.34641L.2 -.34641M.2 -.34641L.4 0M.2 .34641L-.2 -.34641M-.2 .34641L.2 -.34641M.4 0L-.4 0M.2 .34641L-.2 -.34641M-.2 .34641L.2 -.34641"/>
+  </g>
+  <circle cx="0" cy="0" r="0.035" fill="#fff"/>
+</svg>
