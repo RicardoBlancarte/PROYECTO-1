@@ -1,0 +1,13 @@
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Dependencias locales
+node_modules/
+
+# Archivos temporales
+*.tmp
+*.bak

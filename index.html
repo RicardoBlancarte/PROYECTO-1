@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plataforma de Análisis Financiero</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f8fafc; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 40px 20px; }
+    .container { max-width: 900px; margin: auto; }
+    header { text-align: center; margin-bottom: 30px; }
+    header h1 { color: var(--accent); margin-bottom: 5px; }
+    .card { background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 25px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; }
+    textarea, select { width: 100%; background: #0f172a; border: 1px solid #475569; color: var(--accent); padding: 12px; border-radius: 6px; box-sizing: border-box; }
+    button { background: var(--accent); color: #0f172a; border: none; padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; font-size: 1rem; }
+    button:hover { background: #7dd3fc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Plataforma de Análisis Financiero</h1>
+      <p>Genera y visualiza la evolución de tus activos e inversiones</p>
+    </header>
+
+    <div class="card">
+      <div class="form-group">
+        <label>Tipo de Gráfica:</label>
+        <select id="chartType">
+          <option value="line">Línea (Tendencia/Crecimiento)</option>
+          <option value="bar">Barras (Comparativa)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Datos (separados por comas):</label>
+        <textarea id="dataInput">1200, 1800, 2400, 3100, 4200, 5800</textarea>
+      </div>
+
+      <button onclick="renderChart()">Actualizar Visualización</button>
+    </div>
+
+    <div class="card">
+      <canvas id="myChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let chart;
+    function renderChart() {
+      const rawData = document.getElementById('dataInput').value.split(',').map(Number);
+      const type = document.getElementById('chartType').value;
+      const ctx = document.getElementById('myChart').getContext('2d');
+      
+      if(chart) chart.destroy();
+      
+      chart = new Chart(ctx, {
+        type: type,
+        data: {
+          labels: ['Mes 1', 'Mes 2', 'Mes 3', 'Mes 4', 'Mes 5', 'Mes 6'],
+          datasets: [{ 
+            label: 'Valor del Portafolio ($USD)', 
+            data: rawData, 
+            borderColor: '#38bdf8', 
+            backgroundColor: 'rgba(56, 189, 248, 0.3)', 
+            fill: true 
+          }]
+        },
+        options: { responsive: true }
+      });
+    }
+    renderChart();
+  </script>
+</body>
+</html>
