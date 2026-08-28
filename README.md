@@ -4,11 +4,12 @@ Terminal web de inteligencia cuantitativa y geopolítica con autenticación de S
 
 ## Estructura
 
-- `index.html` — aplicación estática completa
+- `index.html` — aplicación estática completa, incluye el explorador de activos
 - `supabase-config.js` — URL y clave pública del proyecto Supabase
-- `schema.sql` — tablas, trigger de perfiles y políticas RLS
+- `schema.sql` — tablas, trigger de perfiles, políticas RLS y la tabla `asset_history` (caché histórica)
 - `logo_algorithm.svg` — isotipo geométrico de la plataforma
-- `functions/api/market.js` — proxy server-side para históricos de FMP
+- `functions/api/market.js` — proxy server-side para históricos de FMP con caché dura en Supabase
+- `functions/api/assets.js` — proxy server-side que agrega el catálogo completo de activos de FMP (acciones, ETFs, índices, futuros/commodities, forex, cripto)
 
 ## Uso local
 
@@ -50,6 +51,25 @@ npx wrangler pages secret put FMP_API_KEY --project-name <NOMBRE_DEL_PROYECTO>
 ```
 
 GDELT se consulta desde el navegador porque su endpoint es público. Si no se configura FMP, el frontend conserva los datos demostrativos y no se rompe.
+
+## Explorador de activos e histórico con caché dura
+
+La sección **Explorador de activos** de `index.html` consulta `/api/assets` para traer el catálogo completo de FMP (acciones, ETFs, índices, futuros/commodities, forex y cripto) con la bolsa y el tipo de cada instrumento. El catálogo se cachea 24h en `localStorage` del navegador para no repetir esa llamada pesada en cada visita, y además queda cacheado 12h en el borde (Cache-Control) para todos los visitantes.
+
+Al elegir un activo se puede ver su histórico en tres resoluciones (Diario, Semanal, Anual · 5 años) desde `/api/market/SYMBOL?interval=daily|weekly|yearly`. Esa función persiste los datos como un hecho duro en la tabla `asset_history` de Supabase (usando la `service_role` key, nunca expuesta al navegador):
+
+- Solo se llama a FMP cuando faltan barras nuevas (no en cada refresh ni cada vez que se consulta el mismo activo).
+- Se conservan como máximo 500 barras diarias, 500 semanales y 5 anuales por símbolo.
+- Cualquier símbolo sin consultas en los últimos 3 meses se elimina por completo de la caché y se refresca desde cero la próxima vez que se pida.
+
+Para habilitar la caché dura, configura además estos secretos de Cloudflare Pages y ejecuta la sección de `asset_history` de `schema.sql` en Supabase:
+
+```bash
+npx wrangler pages secret put SUPABASE_URL --project-name <NOMBRE_DEL_PROYECTO>
+npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name <NOMBRE_DEL_PROYECTO>
+```
+
+La `service_role` key nunca debe usarse en `supabase-config.js` ni en ningún archivo servido al navegador; solo vive como secreto de la función de Cloudflare Pages. Si estos secretos no están configurados, `/api/market` sigue funcionando igual que antes (sin persistencia, llamando a FMP directamente).
 
 ## Despliegue en Cloudflare Pages
 

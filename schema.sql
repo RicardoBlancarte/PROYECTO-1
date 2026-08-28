@@ -58,3 +58,43 @@ using ((select auth.uid()) = id)
 with check ((select auth.uid()) = id);
 
 create index if not exists profiles_last_login_idx on public.profiles (last_login desc);
+
+-- Hard historical cache for the market explorer. Populated and pruned exclusively by the
+-- Cloudflare Function using the service role key; RLS blocks anon/authenticated access entirely.
+create table if not exists public.asset_history (
+  symbol text not null,
+  interval text not null check (interval in ('daily', 'weekly', 'yearly')),
+  price_date date not null,
+  close numeric not null,
+  exchange text,
+  asset_type text,
+  last_queried_at timestamptz not null default timezone('utc', now()),
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, interval, price_date)
+);
+
+alter table public.asset_history enable row level security;
+
+create index if not exists asset_history_symbol_interval_idx on public.asset_history (symbol, interval, price_date desc);
+create index if not exists asset_history_last_queried_idx on public.asset_history (last_queried_at);
+
+-- Retention policy: 500 daily bars, 500 weekly bars, 5 yearly bars per symbol.
+-- Any symbol untouched for 3 months is dropped entirely so it is refetched fresh on next request.
+create or replace function public.prune_asset_history()
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.asset_history where last_queried_at < timezone('utc', now()) - interval '3 months';
+
+  delete from public.asset_history a
+  using (
+    select symbol, interval, price_date,
+           row_number() over (partition by symbol, interval order by price_date desc) as rn
+    from public.asset_history
+  ) ranked
+  where a.symbol = ranked.symbol and a.interval = ranked.interval and a.price_date = ranked.price_date
+    and ranked.rn > case a.interval when 'daily' then 500 when 'weekly' then 500 when 'yearly' then 5 else 500 end;
+end;
+$$;

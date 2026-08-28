@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>ALGORITHM | Backoffice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <style>
+    :root { --ink:#0b1117; --panel:#121b23; --panel-2:#18242d; --line:#293844; --muted:#8495a2; --paper:#e7edf0; --mint:#56e0b1; --amber:#f5bd65; --red:#f47e78; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--ink); color:var(--paper); font-family:Manrope, sans-serif; min-height:100vh; }
+    button,input { font:inherit; } button { cursor:pointer; } .mono { font-family:'DM Mono', monospace; } .hidden { display:none !important; }
+    .shell { min-height:100vh; background:radial-gradient(circle at 8% 0%, #18332e 0, transparent 27rem), radial-gradient(circle at 95% 95%, #342719 0, transparent 24rem), var(--ink); }
+    .btn { border:0; padding:12px 16px; border-radius:2px; font-weight:700; font-size:13px; transition:.2s; } .btn-primary { background:var(--mint); color:#07120f; } .btn-primary:hover { background:#8af1ce; }
+    .btn-ghost { color:var(--paper); background:transparent; border:1px solid var(--line); } .btn-ghost:hover { border-color:var(--mint); color:var(--mint); }
+    .login-screen { min-height:100vh; display:grid; place-items:center; padding:24px; } .login-box { width:min(100%, 380px); padding:28px; background:rgba(13,23,29,.75); border:1px solid #6a7b83aa; box-shadow:0 24px 80px #0009; }
+    label { display:block; color:#bdc9ce; font-size:12px; margin:14px 0 7px; } input { width:100%; color:var(--paper); background:#0c141acc; border:1px solid var(--line); outline:0; padding:12px 13px; border-radius:2px; } input:focus { border-color:var(--mint); }
+    .error-text { color:var(--red); font-size:11px; min-height:15px; margin-top:8px; }
+    .topbar { height:72px; display:flex; align-items:center; justify-content:space-between; padding:0 32px; border-bottom:1px solid var(--line); background:#0b1117dd; backdrop-filter:blur(16px); position:sticky; top:0; z-index:5; }
+    .brand strong { display:block; font-size:13px; letter-spacing:1px; } .brand small { color:var(--muted); font:9px 'DM Mono'; }
+    .top-actions { display:flex; gap:8px; }
+    main { width:min(1500px,100%); margin:auto; padding:34px 32px 60px; }
+    .panel { background:#121b23cc; border:1px solid var(--line); padding:22px; margin-bottom:18px; } .panel-head { display:flex; justify-content:space-between; gap:15px; align-items:flex-start; border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:16px; }
+    .eyebrow { color:var(--mint); font:11px 'DM Mono'; letter-spacing:1.5px; text-transform:uppercase; }
+    .subtle { color:var(--muted); font-size:13px; line-height:1.6; }
+    .table-scroll { overflow-x:auto; } table { border-collapse:collapse; width:100%; font-size:12px; min-width:720px; } th { text-align:left; color:var(--muted); font:10px 'DM Mono'; text-transform:uppercase; padding:11px 8px; border-bottom:1px solid var(--line); } td { padding:13px 8px; border-bottom:1px solid #29384488; }
+    .level { font:10px 'DM Mono'; padding:4px 7px; text-transform:uppercase; } .normal { color:var(--muted); background:#8495a21c; } .premium { color:var(--amber); background:#f5bd651c; } .elite { color:var(--mint); background:#56e0b11c; }
+    .admin-charts { display:grid; grid-template-columns:repeat(2,1fr); gap:18px; } .admin-charts .panel { min-height:260px; } .admin-charts canvas { max-height:210px; }
+    @media (max-width:800px) { .admin-charts { grid-template-columns:1fr; } main { padding:24px 16px 45px; } .topbar { padding:0 18px; } }
+  </style>
+</head>
+<body class="shell">
+  <section id="login-screen" class="login-screen">
+    <div class="login-box">
+      <div class="eyebrow">Private backoffice</div>
+      <h1 style="font-size:22px;margin:8px 0">Acceso administrador</h1>
+      <p class="subtle">Credenciales del System de control (demo).</p>
+      <label for="admin-user">Usuario</label><input id="admin-user" value="gov" readonly>
+      <label for="admin-password">Contraseña</label><input id="admin-password" type="password" placeholder="Contraseña">
+      <div id="admin-error" class="error-text"></div>
+      <button id="admin-go" class="btn btn-primary" style="width:100%;margin-top:8px">GO <i class="fa-solid fa-rocket"></i></button>
+      <a href="index.html" class="btn btn-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:12px"><i class="fa-solid fa-house"></i> Volver al inicio</a>
+    </div>
+  </section>
+
+  <div id="admin-app" class="hidden">
+    <header class="topbar">
+      <div class="brand"><strong>ALGORITHM</strong><small>BACKOFFICE / ADMIN</small></div>
+      <div class="top-actions">
+        <a href="index.html" class="btn btn-ghost"><i class="fa-solid fa-house"></i> Inicio</a>
+        <button id="admin-logout" class="btn btn-ghost"><i class="fa-solid fa-arrow-right-from-bracket"></i> Cerrar sesión</button>
+      </div>
+    </header>
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Account registry</div><h2 style="margin:8px 0 4px">Control de usuarios</h2><p class="subtle" style="margin:0">Perfiles registrados, último acceso y nivel de suscripción.</p></div>
+          <button id="refresh-users" class="btn btn-ghost"><i class="fa-solid fa-arrows-rotate"></i> Actualizar</button>
+        </div>
+        <div id="users-notice" class="subtle">Cargando registros autorizados...</div>
+        <div class="table-scroll"><table id="users-table" class="hidden"><thead><tr><th>Folio</th><th>Nombre</th><th>Correo</th><th>Último login</th><th>Comentarios</th><th>Nivel</th></tr></thead><tbody id="users-body"></tbody></table></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Backoffice / gov</div><h2>Control general de administración</h2><p class="subtle">Usuarios, actividad, rendimiento y activos consultados.</p></div>
+        </div>
+        <div class="table-scroll"><table><thead><tr><th>Folio Único</th><th>Usuario</th><th>Correo Electrónico</th><th>Fecha de Última Visita</th><th>Sugerencias</th></tr></thead><tbody>
+          <tr><td class="mono">#ALG-00941</td><td>CarlosM_Trader</td><td>carlos.m@example.com</td><td>2026-08-27 14:32</td><td>2 Mensajes</td></tr>
+          <tr><td class="mono">#ALG-00942</td><td>ElenaR_Quant</td><td>elena.r@example.com</td><td>2026-08-27 16:05</td><td>Sin sugerencias</td></tr>
+        </tbody></table></div>
+      </section>
+      <div class="admin-charts">
+        <div class="panel"><h3>Uso por día</h3><canvas id="chartUsage"></canvas></div>
+        <div class="panel"><h3>Latencia y errores HTTP 500</h3><canvas id="chartPerformance"></canvas></div>
+        <div class="panel"><h3>Assets más consultados</h3><canvas id="chartAssets"></canvas></div>
+        <div class="panel"><h3>Nuevos registros por semana</h3><canvas id="chartGrowth"></canvas></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const config = window.HORIZON_SUPABASE || {};
+    const supabaseReady = config.url && config.anonKey && !config.url.includes('YOUR_PROJECT_ID') && !config.anonKey.includes('YOUR_SUPABASE');
+    const supabaseClient = supabaseReady ? window.supabase.createClient(config.url, config.anonKey) : null;
+    const $ = id => document.getElementById(id);
+    const SESSION_KEY = 'algorithm_admin_session';
+
+    function showAdminApp() {
+      $('login-screen').classList.add('hidden');
+      $('admin-app').classList.remove('hidden');
+      initAdminCharts();
+      loadUsers();
+    }
+
+    $('admin-go').onclick = () => {
+      if ($('admin-user').value !== 'gov' || $('admin-password').value !== 'mode') { $('admin-error').textContent = 'Credenciales incorrectas.'; return; }
+      $('admin-error').textContent = ''; $('admin-password').value = '';
+      sessionStorage.setItem(SESSION_KEY, '1');
+      showAdminApp();
+    };
+    $('admin-password').addEventListener('keydown', event => { if (event.key === 'Enter') $('admin-go').click(); });
+    $('admin-logout').onclick = () => { sessionStorage.removeItem(SESSION_KEY); location.href = 'index.html'; };
+
+    let adminChartsReady = false;
+    function initAdminCharts() {
+      if (adminChartsReady) return; adminChartsReady = true;
+      const common = { responsive:true, plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8495a2'}},y:{ticks:{color:'#8495a2'},grid:{color:'#293844'}}} };
+      new Chart($('chartUsage'), { type:'bar', data:{ labels:['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'], datasets:[{data:[1200,1500,1800,2100,1950,900,750],backgroundColor:'#00f3ff'}] }, options:common });
+      new Chart($('chartPerformance'), { type:'line', data:{ labels:['00:00','04:00','08:00','12:00','16:00','20:00'], datasets:[{label:'Latencia (ms)',data:[45,42,38,55,120,85],borderColor:'#00f3ff'},{label:'HTTP 500',data:[0,0,1,4,12,2],borderColor:'#f47e78'}] }, options:{...common,plugins:{legend:{display:true,labels:{color:'#e7edf0'}}}} });
+      new Chart($('chartAssets'), { type:'doughnut', data:{ labels:['Oro','Petróleo','Bitcoin','S&P 500'], datasets:[{data:[35,25,25,15],backgroundColor:['#00f3ff','#3b82f6','#f47e78','#56e0b1']}] }, options:{responsive:true,plugins:{legend:{display:true,labels:{color:'#e7edf0'}}}} });
+      new Chart($('chartGrowth'), { type:'line', data:{ labels:['Sem 1','Sem 2','Sem 3','Sem 4'], datasets:[{label:'Registros',data:[320,450,600,800],borderColor:'#56e0b1'}] }, options:common });
+    }
+
+    async function loadUsers() {
+      if (!supabaseClient) { $('users-notice').textContent = 'Configura supabase-config.js para ver el registro de usuarios.'; return; }
+      const { data, error } = await supabaseClient.from('profiles').select('folio,full_name,email,last_login,comments,user_level').order('last_login', { ascending:false });
+      if (error) { $('users-notice').textContent = 'El registro está protegido. Configura la política de lectura del panel en Supabase.'; return; }
+      $('users-notice').classList.add('hidden'); $('users-table').classList.remove('hidden');
+      $('users-body').innerHTML = data.map(user => `<tr><td class="mono">${user.folio || '-'}</td><td>${user.full_name || '-'}</td><td>${user.email}</td><td class="mono">${user.last_login ? new Date(user.last_login).toLocaleString('es-MX') : '-'}</td><td>${user.comments || '-'}</td><td><span class="level ${user.user_level}">${user.user_level}</span></td></tr>`).join('');
+    }
+    $('refresh-users').onclick = loadUsers;
+
+    if (sessionStorage.getItem(SESSION_KEY) === '1') showAdminApp();
+  </script>
+</body>
+</html>
