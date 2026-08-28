@@ -8,6 +8,7 @@ Terminal web de inteligencia cuantitativa y geopolítica con autenticación de S
 - `supabase-config.js` — URL y clave pública del proyecto Supabase
 - `schema.sql` — tablas, trigger de perfiles y políticas RLS
 - `logo_algorithm.svg` — isotipo geométrico de la plataforma
+- `functions/api/market.js` — proxy server-side para históricos de FMP
 
 ## Uso local
 
@@ -39,6 +40,16 @@ El panel de control consulta los perfiles de todos los usuarios autenticados por
 El backoffice está oculto. Abre el modal con `Ctrl + Shift + A` y utiliza el usuario bloqueado `gov` y la contraseña demo `mode`. Estas credenciales están escritas en el JavaScript del navegador y, por tanto, no protegen producción. Antes de usar datos reales, reemplaza este flujo por Supabase Auth con una columna de rol protegida por RLS y una Edge Function para las operaciones administrativas.
 
 El catálogo y las proyecciones actuales son una base visual demostrativa. Para precios y noticias en vivo se debe conectar un proveedor de datos mediante una función de servidor; no se deben colocar claves privadas de APIs en Cloudflare Pages.
+
+## Datos reales con FMP y GDELT
+
+El frontend consulta precios mediante `/api/market/SYMBOL`. La función de Cloudflare Pages lee el secreto `FMP_API_KEY` y entrega los últimos 250 registros. Configura el secreto en el proyecto de Pages, no en GitHub:
+
+```bash
+npx wrangler pages secret put FMP_API_KEY --project-name <NOMBRE_DEL_PROYECTO>
+```
+
+GDELT se consulta desde el navegador porque su endpoint es público. Si no se configura FMP, el frontend conserva los datos demostrativos y no se rompe.
 
 ## Despliegue en Cloudflare Pages
 
