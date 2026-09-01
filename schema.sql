@@ -8,11 +8,26 @@ create table if not exists public.profiles (
   email text not null unique,
   comments text not null default '',
   user_level text not null default 'normal' check (user_level in ('normal', 'premium', 'elite')),
+  privacy_accepted_at timestamptz,
   last_login timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
 
 alter table public.profiles enable row level security;
+
+alter table public.profiles add column if not exists privacy_accepted_at timestamptz;
+
+create table if not exists public.privacy_consents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  timestamp_aceptacion timestamptz not null default timezone('utc', now()),
+  version_aviso_privacidad text not null,
+  ip_origen text not null,
+  hash_consentimiento text not null unique
+);
+
+alter table public.privacy_consents enable row level security;
+create index if not exists privacy_consents_user_idx on public.privacy_consents (user_id, timestamp_aceptacion desc);
 
 create or replace function public.handle_new_user()
 returns trigger

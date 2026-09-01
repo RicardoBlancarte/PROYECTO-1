@@ -1,7 +1,8 @@
 // Serves historical prices for a symbol with a hard cache in Supabase (asset_history table).
 // Historical bars are treated as immutable facts: once a day/week/year is stored it is only
 // re-fetched from FMP when new bars are actually needed, keeping API usage to a minimum.
-const RETENTION = { daily: 500, weekly: 500, yearly: 5 };
+// Daily series are capped at roughly six market months to bound API and database usage.
+const RETENTION = { daily: 126, weekly: 500, yearly: 5 };
 // How stale the newest cached bar must be before we bother calling FMP again.
 const STALE_MS = {
   daily: 1000 * 60 * 60 * 20,        // ~20h: at most one refetch per trading day
