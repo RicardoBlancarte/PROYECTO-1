@@ -141,7 +141,7 @@ alter table public.asset_news_scores enable row level security;
 alter table public.asset_pattern_snapshots enable row level security;
 alter table public.asset_prediction_audit enable row level security;
 
--- Retention policy: 500 daily bars, 500 weekly bars, 5 yearly bars per symbol.
+-- Retention policy: 126 daily bars (~6 market months), 500 weekly bars, 5 yearly bars per symbol.
 -- Any symbol untouched for 3 months is dropped entirely so it is refetched fresh on next request.
 create or replace function public.prune_asset_history()
 returns void
@@ -158,6 +158,6 @@ begin
     from public.asset_history
   ) ranked
   where a.symbol = ranked.symbol and a.interval = ranked.interval and a.price_date = ranked.price_date
-    and ranked.rn > case a.interval when 'daily' then 500 when 'weekly' then 500 when 'yearly' then 5 else 500 end;
+    and ranked.rn > case a.interval when 'daily' then 126 when 'weekly' then 500 when 'yearly' then 5 else 126 end;
 end;
 $$;
