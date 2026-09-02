@@ -1,0 +1,6 @@
+# Copy to .dev.vars for `npm run dev`. Do not commit .dev.vars.
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEWS_API_KEY=
+FMP_API_KEY=

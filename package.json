@@ -1,0 +1,16 @@
+{
+  "name": "algorithm-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static Cloudflare Pages application with Pages Functions.",
+  "scripts": {
+    "build": "npm run check:functions",
+    "check:functions": "node --check functions/api/assets.js && node --check functions/api/market.js && node --check functions/api/news.js && node --check functions/api/patterns.js && node --check functions/api/privacy-consent.js && node --check functions/api/public-config.js && node --check functions/api/health.js",
+    "lint": "npm run check:functions",
+    "dev": "wrangler pages dev .",
+    "deploy": "wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "wrangler": "^3.100.0"
+  }
+}

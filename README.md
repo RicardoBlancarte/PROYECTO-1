@@ -76,10 +76,14 @@ La `service_role` key nunca debe usarse en `supabase-config.js` ni en ningún ar
 En Cloudflare Pages crea un proyecto conectado al repositorio de GitHub. Usa estos valores:
 
 - **Framework preset:** None
-- **Build command:** dejar vacío
+- **Build command:** `npm run build`
 - **Build output directory:** `/`
 
 Después de publicar, registra el dominio de Pages en Supabase Authentication.
+
+Configura estos secretos o variables de entorno en **Settings > Environment variables** de Cloudflare Pages: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEWS_API_KEY` y `FMP_API_KEY`. Las Functions bajo `functions/api/` los leen mediante `context.env`; el navegador recibe exclusivamente `SUPABASE_URL` y `SUPABASE_ANON_KEY` desde `/api/public-config`. Comprueba bindings sin revelar valores con `/api/health`.
+
+Para desarrollo local, copia `.dev.vars.example` como `.dev.vars`, completa las variables y ejecuta `npm install` seguido de `npm run dev`. El archivo `.dev.vars` está ignorado por Git.
 
 ## Subir a GitHub
 

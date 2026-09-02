@@ -7,6 +7,8 @@ Thumbs.db
 
 # Dependencias locales
 node_modules/
+.dev.vars
+.env
 
 # Archivos temporales
 *.tmp
