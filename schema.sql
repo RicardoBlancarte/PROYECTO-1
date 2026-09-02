@@ -78,7 +78,7 @@ create index if not exists profiles_last_login_idx on public.profiles (last_logi
 -- Cloudflare Function using the service role key; RLS blocks anon/authenticated access entirely.
 create table if not exists public.asset_history (
   symbol text not null,
-  interval text not null check (interval in ('daily', 'weekly', 'yearly')),
+  interval text not null check (interval in ('daily', 'weekly', 'monthly', 'yearly')),
   price_date date not null,
   close numeric not null,
   exchange text,
@@ -89,6 +89,10 @@ create table if not exists public.asset_history (
 );
 
 alter table public.asset_history enable row level security;
+
+alter table public.asset_history drop constraint if exists asset_history_interval_check;
+alter table public.asset_history add constraint asset_history_interval_check
+  check (interval in ('daily', 'weekly', 'monthly', 'yearly'));
 
 create index if not exists asset_history_symbol_interval_idx on public.asset_history (symbol, interval, price_date desc);
 create index if not exists asset_history_last_queried_idx on public.asset_history (last_queried_at);
@@ -141,7 +145,7 @@ alter table public.asset_news_scores enable row level security;
 alter table public.asset_pattern_snapshots enable row level security;
 alter table public.asset_prediction_audit enable row level security;
 
--- Retention policy: 126 daily bars (~6 market months), 500 weekly bars, 5 yearly bars per symbol.
+-- Retention policy: 126 daily bars (~6 market months), 500 weekly bars, 60 monthly bars and 5 yearly bars per symbol.
 -- Any symbol untouched for 3 months is dropped entirely so it is refetched fresh on next request.
 create or replace function public.prune_asset_history()
 returns void
@@ -158,6 +162,6 @@ begin
     from public.asset_history
   ) ranked
   where a.symbol = ranked.symbol and a.interval = ranked.interval and a.price_date = ranked.price_date
-    and ranked.rn > case a.interval when 'daily' then 126 when 'weekly' then 500 when 'yearly' then 5 else 126 end;
+    and ranked.rn > case a.interval when 'daily' then 126 when 'weekly' then 500 when 'monthly' then 60 when 'yearly' then 5 else 126 end;
 end;
 $$;

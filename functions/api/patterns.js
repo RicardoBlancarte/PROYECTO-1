@@ -8,7 +8,7 @@ export async function onRequestGet(context) {
   if (!symbol || !context.env.SUPABASE_URL || !context.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Pattern cache is unavailable.' }, 503);
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
   const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_history`);
-  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, interval: `eq.${horizon === 'monthly' ? 'yearly' : horizon}`, order: 'price_date.asc', select: 'close,price_date' }).toString();
+  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, interval: `eq.${horizon}`, order: 'price_date.asc', select: 'close,price_date' }).toString();
   const pricesResponse = await fetch(pricesUrl, { headers });
   const rows = pricesResponse.ok ? await pricesResponse.json() : [];
   if (rows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
