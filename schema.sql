@@ -93,6 +93,54 @@ alter table public.asset_history enable row level security;
 create index if not exists asset_history_symbol_interval_idx on public.asset_history (symbol, interval, price_date desc);
 create index if not exists asset_history_last_queried_idx on public.asset_history (last_queried_at);
 
+-- Derived research cache, written only by Cloudflare Functions with the service role.
+create table if not exists public.asset_news_scores (
+  id bigint generated always as identity primary key,
+  symbol text not null,
+  published_at timestamptz,
+  headline text not null,
+  source text,
+  impact_score numeric not null check (impact_score between -10 and 10),
+  conservative_summary text,
+  liberal_summary text,
+  neutral_summary text,
+  content_hash text not null unique,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists asset_news_scores_symbol_date_idx on public.asset_news_scores (symbol, published_at desc);
+
+create table if not exists public.asset_pattern_snapshots (
+  symbol text not null,
+  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  window_size smallint not null check (window_size in (3, 5)),
+  pattern text not null check (pattern ~ '^[01]+$'),
+  next_up_probability numeric not null check (next_up_probability between 0 and 1),
+  sample_size integer not null,
+  news_adjustment numeric not null default 0 check (news_adjustment between -10 and 10),
+  computed_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, horizon, window_size, pattern)
+);
+
+create table if not exists public.asset_prediction_audit (
+  id bigint generated always as identity primary key,
+  symbol text not null,
+  tier text not null check (tier in ('normal', 'premium', 'elite')),
+  horizon_days smallint not null check (horizon_days between 1 and 30),
+  pattern_3 text,
+  pattern_5 text,
+  probability_up numeric not null check (probability_up between 0 and 1),
+  news_adjustment numeric not null check (news_adjustment between -10 and 10),
+  model_notes jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists asset_prediction_audit_symbol_date_idx on public.asset_prediction_audit (symbol, created_at desc);
+
+alter table public.asset_news_scores enable row level security;
+alter table public.asset_pattern_snapshots enable row level security;
+alter table public.asset_prediction_audit enable row level security;
+
 -- Retention policy: 500 daily bars, 500 weekly bars, 5 yearly bars per symbol.
 -- Any symbol untouched for 3 months is dropped entirely so it is refetched fresh on next request.
 create or replace function public.prune_asset_history()

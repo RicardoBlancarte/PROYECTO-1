@@ -1,7 +1,6 @@
-// Public browser configuration. The anon key is safe to expose when RLS is enabled.
+// Browser code obtains only public Supabase settings from the Pages Function.
 window.HORIZON_SUPABASE = {
-  url: 'https://YOUR_PROJECT_ID.supabase.co',
-  anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  configProxy: '/api/public-config',
   marketDataProxy: '/api/market',
   assetsCatalogProxy: '/api/assets'
 };
