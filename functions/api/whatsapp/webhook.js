@@ -4,7 +4,7 @@ export async function onRequestGet(context) {
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === context.env.WHATSAPP_VERIFY_TOKEN) {
+  if (mode === "subscribe" && token === "algorithm_secret_2026") {
     return new Response(challenge, { status: 200 });
   }
   return new Response("Forbidden", { status: 403 });
