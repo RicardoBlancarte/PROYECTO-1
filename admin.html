@@ -86,15 +86,16 @@
 
   <script>
     const config = window.HORIZON_SUPABASE || {};
-    const supabaseReady = config.url && config.anonKey && !config.url.includes('YOUR_PROJECT_ID') && !config.anonKey.includes('YOUR_SUPABASE');
-    const supabaseClient = supabaseReady ? window.supabase.createClient(config.url, config.anonKey) : null;
+    let supabaseClient = null; let configPromise;
+    async function initializeSupabaseConfig() { if (supabaseClient || !config.configProxy) return supabaseClient; if (!configPromise) configPromise = fetch(config.configProxy).then(response => response.ok ? response.json() : Promise.reject(new Error('Configuración pública no disponible.'))).then(settings => { if (!settings.url || !settings.anonKey) throw new Error('Configuración pública incompleta.'); supabaseClient = window.supabase.createClient(settings.url, settings.anonKey); return supabaseClient; }).catch(() => null); return configPromise; }
     const $ = id => document.getElementById(id);
     const SESSION_KEY = 'algorithm_admin_session';
 
-    function showAdminApp() {
+    async function showAdminApp() {
       $('login-screen').classList.add('hidden');
       $('admin-app').classList.remove('hidden');
       initAdminCharts();
+      await initializeSupabaseConfig();
       loadUsers();
     }
 
@@ -118,7 +119,7 @@
     }
 
     async function loadUsers() {
-      if (!supabaseClient) { $('users-notice').textContent = 'Configura supabase-config.js para ver el registro de usuarios.'; return; }
+      if (!supabaseClient) { $('users-notice').textContent = 'La configuración pública de Supabase no está disponible en este entorno.'; return; }
       const { data, error } = await supabaseClient.from('profiles').select('folio,full_name,email,last_login,comments,user_level').order('last_login', { ascending:false });
       if (error) { $('users-notice').textContent = 'El registro está protegido. Configura la política de lectura del panel en Supabase.'; return; }
       $('users-notice').classList.add('hidden'); $('users-table').classList.remove('hidden');
