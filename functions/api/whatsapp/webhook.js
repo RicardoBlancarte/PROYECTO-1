@@ -23,78 +23,81 @@ export async function onRequestPost(context) {
     const body = await context.request.json();
 
     // Verificamos si el evento contiene un mensaje de WhatsApp válido
-    if (
-      body.object === "whatsapp_business_account" &&
-      body.entry &&
-      body.entry[0].changes &&
-      body.entry[0].changes[0].value.messages
-    ) {
-      const change = body.entry[0].changes[0].value;
-      const message = change.messages[0];
-      
-      const senderPhone = message.from; // Número de teléfono del remitente
-      const messageText = message.text ? message.text.body.trim() : ""; // Texto enviado por el usuario
-      const recipientId = change.metadata.phone_number_id; // ID del número de WhatsApp Business que recibe
+    const entry = body.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+    const message = value?.messages?.[0];
 
-      // Token de acceso de Meta (asegúrate de configurarlo en las variables de entorno de Cloudflare Pages como WHATSAPP_TOKEN)
-      const WHATSAPP_TOKEN = context.env.WHATSAPP_TOKEN;
+    if (message && message.type === "text") {
+      const senderPhone = message.from; // Número del remitente (ej: 52155...)
+      const userText = message.text.body;
 
-      if (messageText && WHATSAPP_TOKEN) {
-        // 1. Identificar al usuario en tu plataforma/base de datos usando su número (senderPhone)
-        // const userData = await fetchUserFromDatabase(senderPhone);
+      // 1. Consultar Supabase utilizando el teléfono del remitente
+      const responseText = await querySupabaseByPhone(senderPhone, userText, context.env);
 
-        // 2. Generar la respuesta del Asistente de IA aplicando las limitaciones de seguridad:
-        // "Solo dar información exclusiva del usuario que está enviando el mensaje."
-        let aiResponseText = "";
-
-        if (messageText.toLowerCase().includes("perfil") || messageText.toLowerCase().includes("cuenta")) {
-          // Ejemplo aplicando la restricción de seguridad estricta
-          aiResponseText = `Hola. Validando tu número (${senderPhone}), tu acceso a Algorithm Private Intelligence Terminal se encuentra activo. (Nota de seguridad: Solo mostramos datos correspondientes a esta línea).`;
-        } else {
-          aiResponseText = `Hola, soy tu asistente de Algorithm. He recibido tu mensaje: "${messageText}". ¿En qué puedo ayudarte hoy dentro de tu espacio de análisis cuantitativo y geopolítico?`;
-        }
-
-        // 3. Enviar la respuesta de vuelta a WhatsApp mediante la API oficial de Meta
-        await sendWhatsAppMessage(recipientId, senderPhone, aiResponseText, WHATSAPP_TOKEN);
-      }
+      // 2. Enviar la respuesta de vuelta a WhatsApp
+      await sendWhatsAppResponse(value, senderPhone, responseText, context.env.WHATSAPP_TOKEN);
     }
 
-    // Meta siempre exige un código 200 rápido para confirmar la recepción del webhook
-    return new Response(JSON.stringify({ status: "success" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-
+    return new Response("EVENT_RECEIVED", { status: 200 });
   } catch (error) {
-    console.error("Error procesando el webhook POST:", error);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("Error en webhook POST:", error);
+    return new Response("Error procesando webhook", { status: 500 });
   }
 }
 
-// Función auxiliar para enviar mensajes a través de la API Graph de Meta
-async function sendWhatsAppMessage(phoneNumberId, recipientPhone, messageText, token) {
-  const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
+async function querySupabaseByPhone(phone, userQuery, env) {
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseKey = env.SUPABASE_ANON_KEY;
 
-  const response = await fetch(url, {
+  if (!supabaseUrl || !supabaseKey) {
+    return "Error de configuración en el servidor.";
+  }
+
+  // Filtramos la tabla de clientes o usuarios por el número de teléfono
+  const url = `${supabaseUrl}/rest/v1/clients?phone=eq.${phone}&select=*`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await response.json();
+
+    if (data && data.length > 0) {
+      // Usuario encontrado, puedes personalizar la respuesta con sus datos
+      const userData = data[0];
+      return `Hola ${userData.name || ""}. Tu consulta fue recibida. Información asociada: ${userData.details || "Sin detalles adicionales"}`;
+    } else {
+      return "Lo sentimos, tu número no se encuentra registrado en nuestro sistema autorizado.";
+    }
+  } catch (err) {
+    console.error("Error consultando Supabase:", err);
+    return "Ocurrió un error al consultar tus datos.";
+  }
+}
+
+async function sendWhatsAppResponse(value, recipientPhone, messageText, whatsappToken) {
+  // Extraemos dinámicamente el Phone Number ID desde el payload de Meta
+  const phoneNumberId = value.metadata?.phone_number_id;
+  if (!phoneNumberId) return;
+
+  const url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+
+  await fetch(url, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
+      "Authorization": `Bearer ${whatsappToken}`,
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      recipient_type: "individual",
       to: recipientPhone,
-      type: "text",
-      text: { body: messageText },
-    }),
+      text: { body: messageText }
+    })
   });
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error("Error al enviar mensaje a Meta:", errorData);
-  }
 }
