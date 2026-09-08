@@ -18,7 +18,25 @@ export const ASSET_CATALOG = [
   { symbol: '^GSPC', name: 'S&P 500', assetType: 'indice', aliases: ['sp500', 's&p 500', 's&p'] },
   { symbol: '^DJI', name: 'Dow Jones Industrial Average', assetType: 'indice', aliases: ['dow jones'] },
   { symbol: 'EWZ', name: 'iShares MSCI Brazil ETF (Bovespa proxy)', assetType: 'etf', aliases: ['bovespa', 'brasil'] },
-  { symbol: 'EWJ', name: 'iShares MSCI Japan ETF (Nikkei proxy)', assetType: 'etf', aliases: ['nikkei', 'japon', 'japón'] }
+  { symbol: 'EWJ', name: 'iShares MSCI Japan ETF (Nikkei proxy)', assetType: 'etf', aliases: ['nikkei', 'japon', 'japón'] },
+  { symbol: 'META', name: 'Meta Platforms, Inc.', assetType: 'accion', aliases: ['meta', 'facebook'] },
+  { symbol: 'NFLX', name: 'Netflix, Inc.', assetType: 'accion', aliases: ['netflix'] },
+  { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', assetType: 'accion', aliases: ['amd'] },
+  { symbol: 'INTC', name: 'Intel Corporation', assetType: 'accion', aliases: ['intel'] },
+  { symbol: 'JPM', name: 'JPMorgan Chase & Co.', assetType: 'accion', aliases: ['jpmorgan', 'jp morgan'] },
+  { symbol: 'V', name: 'Visa Inc.', assetType: 'accion', aliases: ['visa'] },
+  { symbol: 'MA', name: 'Mastercard Incorporated', assetType: 'accion', aliases: ['mastercard'] },
+  { symbol: 'JNJ', name: 'Johnson & Johnson', assetType: 'accion', aliases: ['johnson & johnson', 'johnson y johnson'] },
+  { symbol: 'WMT', name: 'Walmart Inc.', assetType: 'accion', aliases: ['walmart'] },
+  { symbol: 'PG', name: 'The Procter & Gamble Company', assetType: 'accion', aliases: ['procter & gamble', 'procter and gamble'] },
+  { symbol: 'DIS', name: 'The Walt Disney Company', assetType: 'accion', aliases: ['disney'] },
+  { symbol: 'ASML', name: 'ASML Holding N.V.', assetType: 'accion', aliases: ['asml'] },
+  { symbol: 'TSM', name: 'Taiwan Semiconductor Manufacturing Company', assetType: 'accion', aliases: ['tsmc', 'taiwan semiconductor'] },
+  { symbol: 'KO', name: 'The Coca-Cola Company', assetType: 'accion', aliases: ['coca cola', 'coca-cola'] },
+  { symbol: 'ZC=F', name: 'Corn', assetType: 'futuro', aliases: ['maiz', 'maíz', 'corn'] },
+  { symbol: 'ZW=F', name: 'Wheat', assetType: 'futuro', aliases: ['trigo', 'wheat'] },
+  { symbol: 'ZS=F', name: 'Soybean', assetType: 'futuro', aliases: ['soya', 'soybean'] },
+  { symbol: 'KC=F', name: 'Coffee', assetType: 'futuro', aliases: ['cafe', 'café', 'coffee'] }
 ];
 
 export function displayLabel(entry) { return `${entry.symbol} (${entry.name})`; }
