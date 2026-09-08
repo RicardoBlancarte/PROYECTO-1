@@ -25,7 +25,13 @@ export async function onRequestPost(context) {
     return new Response('Invalid payload', { status: 400 });
   }
 
-  const messages = payload.entry?.flatMap(entry => entry.changes || []).flatMap(change => change.value?.messages || []) || [];
+  // Soporta tanto eventos reales de producción como pruebas manuales desde el panel de Meta
+  let messages = [];
+  if (payload.entry) {
+    messages = payload.entry.flatMap(entry => entry.changes || []).flatMap(change => change.value?.messages || []);
+  } else if (payload.value?.messages) {
+    messages = payload.value.messages;
+  }
 
   for (const message of messages) {
     try {
