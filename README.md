@@ -85,6 +85,12 @@ Configura estos secretos o variables de entorno en **Settings > Environment vari
 
 Para desarrollo local, copia `.dev.vars.example` como `.dev.vars`, completa las variables y ejecuta `npm install` seguido de `npm run dev`. El archivo `.dev.vars` está ignorado por Git.
 
+## WhatsApp Cloud API
+
+Configura en Cloudflare Pages los secretos `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`, `WHATSAPP_TEST_RECIPIENT` y `WHATSAPP_TEST_TRIGGER_TOKEN`. En Meta configura el webhook como `https://algorithm-global-engine.pages.dev/api/whatsapp/webhook` y suscribe el campo `messages`. La Function valida la firma de Meta, busca `clients.phone` en formato E.164 sin `+`, evita duplicados por `meta_message_id` y registra eventos en `whatsapp_events`.
+
+Para enviar una prueba al destinatario sandbox configurado, ejecuta una petición `POST` a `/api/whatsapp/test` con el encabezado `X-WhatsApp-Test-Token`. Nunca coloques ese token, números de prueba ni el token de Meta en el navegador o Git.
+
 ## Subir a GitHub
 
 ```bash

@@ -29,6 +29,19 @@ create table if not exists public.privacy_consents (
 alter table public.privacy_consents enable row level security;
 create index if not exists privacy_consents_user_idx on public.privacy_consents (user_id, timestamp_aceptacion desc);
 
+create table if not exists public.whatsapp_events (
+  id bigint generated always as identity primary key,
+  meta_message_id text unique,
+  phone text not null,
+  direction text not null check (direction in ('inbound', 'outbound')),
+  event_type text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.whatsapp_events enable row level security;
+create index if not exists whatsapp_events_phone_date_idx on public.whatsapp_events (phone, created_at desc);
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
