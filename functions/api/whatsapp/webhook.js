@@ -11,13 +11,36 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.META_APP_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'WhatsApp bindings are incomplete.' }, 503);
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.META_APP_SECRET || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return json({ error: 'WhatsApp bindings are incomplete.' }, 503);
+  }
   const rawBody = await request.text();
-  if (!await signatureIsValid(rawBody, request.headers.get('X-Hub-Signature-256'), env.META_APP_SECRET)) return new Response('Unauthorized', { status: 401 });
+  if (!await signatureIsValid(rawBody, request.headers.get('X-Hub-Signature-256'), env.META_APP_SECRET)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
   let payload;
-  try { payload = JSON.parse(rawBody); } catch { return new Response('Invalid payload', { status: 400 }); }
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return new Response('Invalid payload', { status: 400 });
+  }
+
   const messages = payload.entry?.flatMap(entry => entry.changes || []).flatMap(change => change.value?.messages || []) || [];
-  await Promise.all(messages.map(message => handleMessage(env, message).catch(error => logEvent(env, { meta_message_id: message.id || null, phone: String(message.from || '').replace(/\D/g, ''), direction: 'inbound', event_type: 'processing_error', payload: { error: error.message } }))));
+
+  for (const message of messages) {
+    try {
+      await handleMessage(env, message);
+    } catch (error) {
+      await logEvent(env, {
+        meta_message_id: message.id || null,
+        phone: String(message.from || '').replace(/\D/g, ''),
+        direction: 'inbound',
+        event_type: 'processing_error',
+        payload: { error: error.message }
+      });
+    }
+  }
+
   return json({ received: messages.length });
 }
 
