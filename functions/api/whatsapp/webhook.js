@@ -17,7 +17,7 @@ export async function onRequestPost(context) {
   let payload;
   try { payload = JSON.parse(rawBody); } catch { return new Response('Invalid payload', { status: 400 }); }
   const messages = payload.entry?.flatMap(entry => entry.changes || []).flatMap(change => change.value?.messages || []) || [];
-  await Promise.all(messages.map(message => handleMessage(env, message).catch(error => logEvent(env, { meta_message_id: message.id || null, phone: String(message.from || '').replace(/\D/g, ''), direction: 'inbound', event_type: 'processing_error', payload: { error: error.message } })));
+  await Promise.all(messages.map(message => handleMessage(env, message).catch(error => logEvent(env, { meta_message_id: message.id || null, phone: String(message.from || '').replace(/\D/g, ''), direction: 'inbound', event_type: 'processing_error', payload: { error: error.message } }))));
   return json({ received: messages.length });
 }
 
