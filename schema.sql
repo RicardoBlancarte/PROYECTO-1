@@ -110,6 +110,25 @@ alter table public.asset_history add constraint asset_history_interval_check
 create index if not exists asset_history_symbol_interval_idx on public.asset_history (symbol, interval, price_date desc);
 create index if not exists asset_history_last_queried_idx on public.asset_history (last_queried_at);
 
+-- Source of truth for daily OHLCV bars. Populated once a day by the external GitHub Actions
+-- pipeline (service role). Cloudflare Functions only READ this table for bulk/historical
+-- analytics; they must never bulk-fetch history from the market data API again.
+create table if not exists public.asset_historical_prices (
+  symbol text not null,
+  asset_type text,
+  date date not null,
+  open numeric,
+  high numeric,
+  low numeric,
+  close numeric not null,
+  volume bigint,
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, date)
+);
+
+alter table public.asset_historical_prices enable row level security;
+create index if not exists asset_historical_prices_symbol_date_idx on public.asset_historical_prices (symbol, date desc);
+
 -- Derived research cache, written only by Cloudflare Functions with the service role.
 create table if not exists public.asset_news_scores (
   id bigint generated always as identity primary key,

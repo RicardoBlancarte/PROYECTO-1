@@ -6,10 +6,12 @@ Terminal web de inteligencia cuantitativa y geopolítica con autenticación de S
 
 - `index.html` — aplicación estática completa, incluye el explorador de activos
 - `supabase-config.js` — URL y clave pública del proyecto Supabase
-- `schema.sql` — tablas, trigger de perfiles, políticas RLS y la tabla `asset_history` (caché histórica)
+- `schema.sql` — tablas, trigger de perfiles, políticas RLS, `asset_historical_prices` (fuente de verdad OHLCV poblada por GitHub Actions) y `asset_history` (caché heredada por intervalo)
 - `logo_algorithm.svg` — isotipo geométrico de la plataforma
-- `functions/api/market.js` — proxy server-side para históricos de FMP con caché dura en Supabase
-- `functions/api/assets.js` — proxy server-side que agrega el catálogo completo de activos de FMP (acciones, ETFs, índices, futuros/commodities, forex, cripto)
+- `functions/_shared/asset-catalog.js` — catálogo curado de alias ("apple", "oro", "petróleo") a tickers oficiales
+- `functions/api/assets/resolve.js` — resuelve texto libre a `TICKER (Nombre)` usando el catálogo curado
+- `functions/api/market/[symbol].js` — lee históricos exclusivamente de `asset_historical_prices`; solo usa FMP para una cotización puntual de "hoy"
+- `functions/api/assets.js` — proxy server-side que agrega el catálogo de símbolos de FMP (acciones, ETFs, índices, futuros/commodities, forex, cripto)
 
 ## Uso local
 
@@ -52,24 +54,22 @@ npx wrangler pages secret put FMP_API_KEY --project-name <NOMBRE_DEL_PROYECTO>
 
 GDELT se consulta desde el navegador porque su endpoint es público. Si no se configura FMP, el frontend conserva los datos demostrativos y no se rompe.
 
-## Explorador de activos e histórico con caché dura
+## Explorador de activos e histórico (fuente Supabase, sin descargas masivas)
 
-La sección **Explorador de activos** de `index.html` consulta `/api/assets` para traer el catálogo completo de FMP (acciones, ETFs, índices, futuros/commodities, forex y cripto) con la bolsa y el tipo de cada instrumento. El catálogo se cachea 24h en `localStorage` del navegador para no repetir esa llamada pesada en cada visita, y además queda cacheado 12h en el borde (Cache-Control) para todos los visitantes.
+La sección **Explorador de activos** de `index.html` consulta `/api/assets` para traer el catálogo de símbolos de FMP (acciones, ETFs, índices, futuros/commodities, forex y cripto) con la bolsa y el tipo de cada instrumento. Es solo un directorio de símbolos, se cachea 24h en `localStorage` y 12h en el borde, y no descarga precios.
 
-Al elegir un activo se puede ver su histórico en tres resoluciones (Diario, Semanal, Anual · 5 años) desde `/api/market/SYMBOL?interval=daily|weekly|yearly`. Esa función persiste los datos como un hecho duro en la tabla `asset_history` de Supabase (usando la `service_role` key, nunca expuesta al navegador):
+`/api/assets/resolve?q=texto` traduce nombres comunes ("apple", "oro", "petróleo") a su ticker oficial usando el catálogo curado de `functions/_shared/asset-catalog.js`, mostrando el formato `TICKER (Nombre)` en selectores y buscadores.
 
-- Solo se llama a FMP cuando faltan barras nuevas (no en cada refresh ni cada vez que se consulta el mismo activo).
-- Se conservan como máximo 500 barras diarias, 500 semanales y 5 anuales por símbolo.
-- Cualquier símbolo sin consultas en los últimos 3 meses se elimina por completo de la caché y se refresca desde cero la próxima vez que se pida.
+**La fuente de verdad de precios históricos es la tabla `public.asset_historical_prices` de Supabase** (`symbol`, `asset_type`, `date`, `open`, `high`, `low`, `close`, `volume`), poblada una vez al día por un pipeline externo de GitHub Actions. Queda **prohibido** que las Cloudflare Functions hagan descargas masivas/históricas al proveedor de mercado; `/api/market/SYMBOL?interval=daily|weekly|yearly|monthly` lee siempre `asset_historical_prices` y agrega semanas/meses/años en el propio Function. La API externa (`FMP_API_KEY`) se reserva exclusivamente para una cotización puntual de "hoy" cuando el pipeline diario aún no corrió — nunca para historia completa.
 
-Para habilitar la caché dura, configura además estos secretos de Cloudflare Pages y ejecuta la sección de `asset_history` de `schema.sql` en Supabase:
+Para operar el histórico, configura estos secretos de Cloudflare Pages y ejecuta `schema.sql` en Supabase:
 
 ```bash
 npx wrangler pages secret put SUPABASE_URL --project-name <NOMBRE_DEL_PROYECTO>
 npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name <NOMBRE_DEL_PROYECTO>
 ```
 
-La `service_role` key nunca debe usarse en `supabase-config.js` ni en ningún archivo servido al navegador; solo vive como secreto de la función de Cloudflare Pages. Si estos secretos no están configurados, `/api/market` sigue funcionando igual que antes (sin persistencia, llamando a FMP directamente).
+La `service_role` key nunca debe usarse en `supabase-config.js` ni en ningún archivo servido al navegador; solo vive como secreto de la función de Cloudflare Pages. Si `asset_historical_prices` aún no tiene filas para un símbolo (pipeline no ha corrido), `/api/market` responde 404 en vez de intentar poblarla con una descarga masiva.
 
 ## Despliegue en Cloudflare Pages
 

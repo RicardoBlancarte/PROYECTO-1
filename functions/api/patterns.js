@@ -7,11 +7,14 @@ export async function onRequestGet(context) {
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';
   if (!symbol || !context.env.SUPABASE_URL || !context.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Pattern cache is unavailable.' }, 503);
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
-  const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_history`);
-  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, interval: `eq.${horizon}`, order: 'price_date.asc', select: 'close,price_date' }).toString();
+  // Bulk prices always come from the daily-synced asset_historical_prices table (never a live API pull).
+  const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
+  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date' }).toString();
   const pricesResponse = await fetch(pricesUrl, { headers });
-  const rows = pricesResponse.ok ? await pricesResponse.json() : [];
-  if (rows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
+  const dailyRows = pricesResponse.ok ? await pricesResponse.json() : [];
+  if (dailyRows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
+  const rows = horizon === 'weekly' ? toWeekly(dailyRows) : horizon === 'monthly' ? toMonthly(dailyRows) : dailyRows;
+  if (rows.length < 8) return json({ error: 'Not enough cached history for this horizon.' }, 422);
   const bits = rows.slice(1).map((row, index) => Number(row.close) >= Number(rows[index].close) ? '1' : '0');
   const newsUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_news_scores`);
   newsUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'published_at.desc', limit: '20', select: 'impact_score' }).toString();
@@ -36,6 +39,10 @@ function estimate(bits, windowSize, newsAdjustment) {
   const adjusted = Math.max(.05, Math.min(.95, empirical + newsAdjustment / 100));
   return { windowSize, pattern, sampleSize: matches, empiricalProbability: Number(empirical.toFixed(3)), probabilityUp: Number(adjusted.toFixed(3)) };
 }
+
+function isoWeekKey(dateString) { const date = new Date(`${dateString}T00:00:00Z`), target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())), day = target.getUTCDay() || 7; target.setUTCDate(target.getUTCDate() + 4 - day); const start = new Date(Date.UTC(target.getUTCFullYear(), 0, 1)); return `${target.getUTCFullYear()}-W${Math.ceil((((target - start) / 86400000) + 1) / 7)}`; }
+function toWeekly(rows) { const map = new Map(); rows.forEach(row => map.set(isoWeekKey(row.date), row)); return [...map.values()]; }
+function toMonthly(rows) { const map = new Map(); rows.forEach(row => map.set(row.date.slice(0, 7), row)); return [...map.values()]; }
 
 async function upsertSnapshot(env, headers, symbol, horizon, snapshot, newsAdjustment) {
   await fetch(`${env.SUPABASE_URL}/rest/v1/asset_pattern_snapshots?on_conflict=symbol,horizon,window_size,pattern`, {
