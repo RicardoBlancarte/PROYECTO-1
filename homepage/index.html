@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thalgorithm | Matemática financiera innegable</title>
+  <meta name="description" content="Thalgorithm transforma algoritmos cuantitativos complejos en decisiones financieras humanas. Gratis.">
+  <link rel="icon" href="../favicon.png">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <style>
+    :root { --void:#0B0B0C; --green:#00FF66; --white:#FFFFFF; --muted:#9CA3AF; --glass:rgba(255,255,255,.055); --line:rgba(255,255,255,.14); --red:#FF385C; --amber:#FFD166; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; background:var(--void); }
+    body { margin:0; min-height:100vh; overflow-x:hidden; color:var(--white); background:radial-gradient(circle at 70% 10%, #0b3a22 0, transparent 28rem), #0B0B0C; font-family:'Arial Narrow','Helvetica Neue',Arial,sans-serif; letter-spacing:0; }
+    a { color:inherit; text-decoration:none; }
+    .mono { font-family:'JetBrains Mono','Cascadia Mono','SFMono-Regular',monospace; }
+    .nav { position:fixed; inset:18px 18px auto; z-index:20; display:flex; justify-content:space-between; align-items:center; gap:18px; padding:10px 12px; border:1px solid var(--line); border-radius:18px; background:rgba(11,11,12,.58); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .brand img { width:34px; height:34px; filter:drop-shadow(0 0 16px #00ff6688); }
+    .nav-actions { display:flex; gap:10px; align-items:center; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 18px; border:1px solid var(--line); border-radius:999px; background:var(--glass); color:var(--white); font-weight:900; text-transform:uppercase; font-size:12px; letter-spacing:.08em; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); transition:transform .25s ease, border-color .25s ease, box-shadow .25s ease, background .25s ease; }
+    .btn:hover { transform:translateY(-2px); border-color:#00ff66aa; box-shadow:0 0 34px #00ff6655; background:rgba(0,255,102,.12); }
+    .btn-primary { color:#06140b; background:linear-gradient(135deg,#00FF66,#B7FFCF); border-color:#00ff66; box-shadow:0 0 34px #00ff6644; }
+    .section { position:relative; min-height:100vh; padding:120px 6vw; }
+    .hero { display:grid; align-items:center; isolation:isolate; }
+    #hero-canvas { position:absolute; inset:0; z-index:-2; width:100%; height:100%; display:block; }
+    .hero::after { content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,#0b0b0cf2 0%,#0b0b0caa 42%,#0b0b0c20 100%); pointer-events:none; }
+    .hero-copy { max-width:920px; padding-top:8vh; }
+    .sigil { width:94px; height:94px; margin-bottom:24px; filter:drop-shadow(0 0 34px #00ff66aa); }
+    .eyebrow { color:var(--green); font:700 12px 'JetBrains Mono','Cascadia Mono',monospace; text-transform:uppercase; letter-spacing:.18em; }
+    h1 { margin:18px 0 18px; max-width:980px; font-size:clamp(44px,8vw,112px); line-height:.91; letter-spacing:0; text-transform:uppercase; font-weight:950; }
+    .lead { max-width:720px; color:#D7DEE0; font-size:clamp(18px,2.3vw,27px); line-height:1.35; }
+    .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:34px; }
+    .metrics-strip { position:absolute; left:6vw; right:6vw; bottom:32px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .metric { padding:14px; min-height:88px; border:1px solid var(--line); border-radius:16px; background:rgba(255,255,255,.04); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+    .metric span { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; }
+    .metric strong { display:block; margin-top:10px; color:var(--green); font:800 24px 'JetBrains Mono','Cascadia Mono',monospace; }
+    .how { display:grid; grid-template-columns:minmax(280px,.85fr) minmax(0,1.15fr); gap:6vw; align-items:start; background:linear-gradient(180deg,#0B0B0C,#07100B 50%,#0B0B0C); }
+    .sticky-copy { position:sticky; top:120px; }
+    .sticky-copy h2 { margin:16px 0; font-size:clamp(34px,5vw,76px); line-height:.95; text-transform:uppercase; }
+    .step { margin:34vh 0; padding:22px; border:1px solid var(--line); border-radius:20px; background:rgba(255,255,255,.045); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+    .step:first-child { margin-top:10vh; }
+    .step h3 { margin:0 0 10px; color:var(--green); text-transform:uppercase; }
+    .step p { margin:0; color:#CCD5D7; line-height:1.55; }
+    .machine-wrap { position:sticky; top:92px; min-height:calc(100vh - 120px); border:1px solid var(--line); border-radius:28px; background:radial-gradient(circle at 50% 40%,#082315,transparent 36rem), rgba(255,255,255,.035); overflow:hidden; }
+    #machine-canvas { width:100%; height:100%; min-height:680px; display:block; }
+    .machine-ui { position:absolute; left:24px; right:24px; bottom:24px; display:grid; grid-template-columns:1fr 1fr; gap:12px; opacity:.92; }
+    .status-card { padding:16px; border-radius:14px; border:1px solid var(--line); background:rgba(11,11,12,.58); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    .status-card span { color:var(--muted); font-size:11px; text-transform:uppercase; }
+    .status-card strong { display:block; margin-top:8px; color:var(--green); font-size:24px; }
+    .manifesto { min-height:120vh; display:grid; place-items:center; background:#000; overflow:hidden; }
+    .manifesto-text { width:min(1100px,94vw); font-size:clamp(36px,7vw,108px); line-height:.92; font-weight:950; text-transform:uppercase; text-align:left; }
+    .manifesto-text span { opacity:.08; display:inline-block; transform:translateY(18px); }
+    .footer-demo { min-height:92vh; display:grid; place-items:center; padding:90px 6vw; background:radial-gradient(circle at 50% 20%,#06351c 0,transparent 26rem),#0B0B0C; }
+    .terminal { width:min(920px,100%); min-height:420px; padding:28px; border:1px solid #00ff663d; border-radius:24px; background:rgba(0,255,102,.06); box-shadow:0 0 70px #00ff6618,inset 0 1px 0 #ffffff16; backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+    .terminal-head { display:flex; justify-content:space-between; gap:12px; color:var(--muted); font-size:12px; text-transform:uppercase; }
+    .calc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:28px 0; }
+    .calc { min-height:112px; padding:16px; border-radius:14px; background:#07110b; border:1px solid #00ff6626; }
+    .calc span { display:block; color:var(--muted); font-size:11px; text-transform:uppercase; }
+    .calc strong { display:block; margin-top:14px; color:var(--green); font-size:clamp(22px,4vw,38px); text-shadow:0 0 18px #00ff66aa; }
+    .inevitable { margin-top:24px; color:var(--white); text-align:center; font-size:clamp(22px,3vw,38px); text-transform:uppercase; opacity:0; }
+    .footer-cta { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin-top:28px; }
+    @media (max-width:900px) { .nav { inset:12px; } .nav-actions .btn:not(.btn-primary) { display:none; } .section { padding:104px 18px; } .metrics-strip { position:relative; left:auto; right:auto; bottom:auto; margin-top:42px; grid-template-columns:1fr 1fr; } .how { grid-template-columns:1fr; } .sticky-copy,.machine-wrap { position:relative; top:auto; } #machine-canvas { min-height:520px; } .step { margin:24px 0; } .machine-ui { grid-template-columns:1fr; } .calc-grid { grid-template-columns:1fr; } }
+    @media (max-width:520px) { h1 { font-size:42px; } .metrics-strip { grid-template-columns:1fr; } .hero-actions .btn { width:100%; } .terminal { padding:18px; } }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="https://thalgorithm.com" aria-label="Ir a Thalgorithm"><img src="../logo_algorithm.svg" alt="Thalgorithm"><span>Thalgorithm</span></a>
+    <div class="nav-actions"><a class="btn" href="#how">Cómo funciona</a><a class="btn btn-primary" href="https://thalgorithm.com">Entrar gratis</a></div>
+  </nav>
+
+  <main>
+    <section class="section hero">
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <img class="sigil" src="../logo_algorithm.svg" alt="Isotipo Thalgorithm">
+        <div class="eyebrow">Motor financiero cuantitativo</div>
+        <h1>Thalgorithm. El poder de Wall Street, ahora en tus manos. Gratis.</h1>
+        <p class="lead">Un nuevo motor matemático que transforma algoritmos complejos en decisiones financieras humanas.</p>
+        <div class="hero-actions"><a class="btn btn-primary" href="https://thalgorithm.com">Abrir plataforma</a><a class="btn" href="#manifesto">Leer manifiesto</a></div>
+      </div>
+      <div class="metrics-strip mono"><div class="metric"><span>Sharpe engine</span><strong>1.84</strong></div><div class="metric"><span>Risk state</span><strong>LOW</strong></div><div class="metric"><span>Monte Carlo</span><strong>90%</strong></div><div class="metric"><span>Latency target</span><strong>60 FPS</strong></div></div>
+    </section>
+
+    <section id="how" class="section how">
+      <div class="sticky-copy">
+        <div class="eyebrow">Cómo funciona</div>
+        <h2>De caja negra a forma humana.</h2>
+        <p class="lead">El mercado entra como ruido. Thalgorithm lo procesa como estructura. Tú lo recibes como una decisión legible.</p>
+        <div class="hero-actions"><a class="btn btn-primary" href="https://thalgorithm.com">Probar Thalgorithm</a></div>
+      </div>
+      <div class="machine-wrap">
+        <canvas id="machine-canvas" aria-label="Máquina abstracta de datos financieros"></canvas>
+        <div class="machine-ui"><div class="status-card"><span>Riesgo</span><strong id="risk-label">Bajo</strong></div><div class="status-card"><span>Potencial</span><strong id="potential-label">Alto</strong></div></div>
+      </div>
+      <div></div>
+      <div class="steps">
+        <article class="step" data-phase="0"><h3>Paso 1</h3><p>El mercado aparece como un gráfico 3D rojo y verde lleno de ruido, impulsos y contradicciones.</p></article>
+        <article class="step" data-phase="1"><h3>Paso 2</h3><p>El caos entra al Motor Thalgorithm. El cubo de datos se ilumina y procesa señales a alta velocidad.</p></article>
+        <article class="step" data-phase="2"><h3>Paso 3</h3><p>La caja negra se abre y entrega indicadores humanos: Riesgo bajo, potencial alto, acción clara.</p></article>
+      </div>
+    </section>
+
+    <section id="manifesto" class="section manifesto">
+      <div class="manifesto-text" id="manifesto-text">Nuestra meta es innegable: Romper la brecha entre los fondos de cobertura millonarios y tú. Creemos que el acceso a la verdad matemática no debería costar una suscripción mensual. El mercado es complejo. Tus herramientas ahora son Innegables.</div>
+    </section>
+
+    <footer class="footer-demo">
+      <div class="terminal mono">
+        <div class="terminal-head"><span>THALGORITHM LIVE ENGINE</span><span id="clock">00:00:00</span></div>
+        <div class="calc-grid"><div class="calc"><span>Retorno esperado</span><strong id="ret">+12.40%</strong></div><div class="calc"><span>Volatilidad</span><strong id="vol">8.92%</strong></div><div class="calc"><span>Peso óptimo</span><strong id="weight">37.5%</strong></div></div>
+        <div class="inevitable" id="inevitable">Resultados innegables.</div>
+        <div class="footer-cta"><a class="btn btn-primary" href="https://thalgorithm.com">Entrar a la plataforma</a><a class="btn" href="https://thalgorithm.com">Crear acceso gratis</a></div>
+      </div>
+    </footer>
+  </main>
+
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+    import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
+    import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js';
+    gsap.registerPlugin(ScrollTrigger);
+
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const makeRenderer = (canvas) => { const renderer = new THREE.WebGLRenderer({ canvas, antialias:false, alpha:true, powerPreference:'high-performance' }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75)); return renderer; };
+
+    function heroScene() {
+      const canvas = document.getElementById('hero-canvas'), renderer = makeRenderer(canvas), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(62, 1, .1, 80); camera.position.z = 18;
+      const count = innerWidth < 700 ? 900 : 1700, positions = new Float32Array(count * 3), base = new Float32Array(count * 3), trend = new Float32Array(count * 3);
+      for (let i=0;i<count;i++) { const ix=i*3, x=(Math.random()-.5)*34, y=(Math.random()-.5)*18, z=(Math.random()-.5)*20; base[ix]=positions[ix]=x; base[ix+1]=positions[ix+1]=y; base[ix+2]=positions[ix+2]=z; const t=i/(count-1); trend[ix]=(t-.5)*26; trend[ix+1]=Math.sin(t*5.5)*2.6+(t-.5)*6; trend[ix+2]=Math.cos(t*9)*1.2; }
+      const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({ color:0x00ff66, size:.045, transparent:true, opacity:.86 }); const points = new THREE.Points(geometry, material); scene.add(points);
+      const mouse = { x:0, y:0, force:0 }; addEventListener('pointermove', e => { mouse.x=(e.clientX/innerWidth-.5)*2; mouse.y=-(e.clientY/innerHeight-.5)*2; mouse.force=1; }, { passive:true }); addEventListener('pointerleave', () => mouse.force=0, { passive:true });
+      function resize(){ const w=canvas.clientWidth||innerWidth,h=canvas.clientHeight||innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); } resize(); addEventListener('resize', resize);
+      function frame(){ mouse.force*=.94; const p=geometry.attributes.position.array; for(let i=0;i<count;i++){ const ix=i*3, pull=mouse.force; p[ix]+=((base[ix]*(1-pull)+trend[ix]*pull)-p[ix])*.055; p[ix+1]+=((base[ix+1]*(1-pull)+trend[ix+1]*pull)-p[ix+1])*.055; p[ix+2]+=((base[ix+2]*(1-pull)+trend[ix+2]*pull)-p[ix+2])*.055; } geometry.attributes.position.needsUpdate=true; points.rotation.y+=.0015; points.rotation.x+=.0007; renderer.render(scene,camera); if(!reduceMotion) requestAnimationFrame(frame); } frame();
+    }
+
+    function machineScene() {
+      const canvas = document.getElementById('machine-canvas'), renderer = makeRenderer(canvas), scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(48, 1, .1, 100); camera.position.set(0,0,12);
+      const group = new THREE.Group(); scene.add(group); const box = new THREE.Mesh(new THREE.BoxGeometry(4,4,4,5,5,5), new THREE.MeshBasicMaterial({ color:0x00ff66, wireframe:true, transparent:true, opacity:.55 })); group.add(box);
+      const lineMat = new THREE.LineBasicMaterial({ color:0xff385c, transparent:true, opacity:.75 }); const lineGeo = new THREE.BufferGeometry().setFromPoints(Array.from({length:90},(_,i)=>new THREE.Vector3((i/89-.5)*8, (Math.random()-.5)*5, (Math.random()-.5)*2))); const noisy = new THREE.Line(lineGeo,lineMat); group.add(noisy);
+      const light = new THREE.PointLight(0x00ff66, 2, 30); light.position.set(0,0,4); scene.add(light);
+      function resize(){ const rect=canvas.getBoundingClientRect(); renderer.setSize(rect.width, rect.height, false); camera.aspect=rect.width/rect.height; camera.updateProjectionMatrix(); } resize(); addEventListener('resize', resize);
+      gsap.timeline({ scrollTrigger:{ trigger:'#how', start:'top top', end:'bottom bottom', scrub:true } }).to(noisy.rotation,{z:2.4},0).to(box.rotation,{x:1.7,y:2.6},0).to(box.scale,{x:1.35,y:1.35,z:1.35},.35).to(lineMat,{opacity:.15},.58).to(box.material,{opacity:.9},.7);
+      document.querySelectorAll('.step').forEach((step,i)=>ScrollTrigger.create({ trigger:step, start:'top center', onEnter:()=>setLabels(i), onEnterBack:()=>setLabels(i) }));
+      function setLabels(i){ document.getElementById('risk-label').textContent = ['Alto','Medio','Bajo'][i]; document.getElementById('potential-label').textContent = ['Ruidoso','Procesando','Alto'][i]; }
+      function frame(){ group.rotation.y+=.004; renderer.render(scene,camera); if(!reduceMotion) requestAnimationFrame(frame); } frame();
+    }
+
+    function manifesto() { const node=document.getElementById('manifesto-text'); node.innerHTML=node.textContent.split(' ').map(word=>`<span>${word}&nbsp;</span>`).join(''); gsap.to('#manifesto-text span',{ opacity:1, y:0, stagger:.018, ease:'power2.out', scrollTrigger:{ trigger:'#manifesto', start:'top 65%', end:'bottom 65%', scrub:true }}); }
+    function footerLoop(){ const ids=['ret','vol','weight']; setInterval(()=>{ document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-MX',{hour12:false}); document.getElementById('ret').textContent=`+${(9+Math.random()*8).toFixed(2)}%`; document.getElementById('vol').textContent=`${(6+Math.random()*6).toFixed(2)}%`; document.getElementById('weight').textContent=`${(24+Math.random()*42).toFixed(1)}%`; gsap.fromTo(ids.map(id=>`#${id}`),{opacity:.35},{opacity:1,duration:.35,stagger:.05}); gsap.to('#inevitable',{opacity:1,duration:.35,delay:.25}); },2200); }
+    heroScene(); machineScene(); manifesto(); footerLoop();
+  </script>
+</body>
+</html>
