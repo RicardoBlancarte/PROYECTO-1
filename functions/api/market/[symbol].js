@@ -6,17 +6,16 @@
 // (Paso B) so repeated clicks within the hour never spend an extra API call (Paso C).
 const RETENTION = { daily: 504, weekly: 500, monthly: 60, yearly: 5 };
 const LIVE_QUOTE_TTL_SECONDS = 60 * 60;
-const FALLBACK_CLOSE = { AAPL:224.18, MSFT:415.20, GOOGL:166.40, AMZN:178.75, NVDA:118.32, META:505.00, TSLA:255.00, NFLX:635.00, AMD:152.45, INTC:34.10, JPM:202.15, V:275.00, MA:465.40, JNJ:154.80, WMT:68.45, PG:169.30, DIS:91.25, ASML:910.00, TSM:172.60, KO:62.45, 'GC=F':4400.00, 'SI=F':29.40, 'CL=F':82.46, 'BZ=F':85.10, 'NG=F':2.65, 'HG=F':4.18, 'ZC=F':455.25, 'ZW=F':598.50, 'ZS=F':1185.75, 'KC=F':224.80, 'BTC-USD':68420, '^GSPC':5042.02, EWZ:34.20, EWJ:71.80, '^DJI':38920 };
 
 export async function onRequestGet(context) {
-  const symbol = context.params.symbol || 'GC=F';
+  const symbol = decodeURIComponent(context.params.symbol || 'GC=F');
   const url = new URL(context.request.url);
   const interval = ['daily', 'weekly', 'monthly', 'yearly'].includes(url.searchParams.get('interval')) ? url.searchParams.get('interval') : 'daily';
   const wantsLive = ['1', 'true'].includes((url.searchParams.get('live') || '').toLowerCase());
   if (!context.env.SUPABASE_URL || !context.env.SUPABASE_SERVICE_ROLE_KEY) return Response.json({ error: 'Supabase historical store is not configured.' }, { status: 503 });
   try {
     const daily = await readDailyRows(context.env, symbol);
-    if (!daily.length) return jsonResponse(symbol, interval, fallbackRows(symbol), false, true);
+    if (!daily.length) return Response.json({ error: 'No historical close rows found for this symbol.' }, { status: 404 });
     const { rows: withToday, live } = wantsLive ? await appendTodayQuoteCached(context, symbol, daily) : { rows: daily, live: false };
     const series = interval === 'daily' ? withToday.slice(-RETENTION.daily)
       : interval === 'weekly' ? toWeekly(withToday).slice(-RETENTION.weekly)
@@ -26,27 +25,14 @@ export async function onRequestGet(context) {
   } catch (error) { return Response.json({ error: 'Unable to load market data.' }, { status: 502 }); }
 }
 
-function jsonResponse(symbol, interval, rows, live, fallback = false) { const ordered = rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))); const close = ordered.map(row => Number(row.close)); return Response.json({ symbol, interval, live, fallback, dates: ordered.map(row => row.date), close, prices: close }, { headers: { 'Cache-Control': 'public, max-age=300' } }); }
+function jsonResponse(symbol, interval, rows, live) { const ordered = rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))); const close = ordered.map(row => Number(row.close)); return Response.json({ symbol, interval, live, dates: ordered.map(row => row.date), open: ordered.map(row => row.open == null ? null : Number(row.open)), high: ordered.map(row => row.high == null ? null : Number(row.high)), low: ordered.map(row => row.low == null ? null : Number(row.low)), close, prices: close }, { headers: { 'Cache-Control': 'public, max-age=300' } }); }
 function headers(env) { return { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }; }
 
 async function readDailyRows(env, symbol) {
   const endpoint = new URL(`${env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,close', limit: '1826' }).toString();
+  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,open,high,low,close', limit: '1826' }).toString();
   const response = await fetch(endpoint, { headers: headers(env) });
   return response.ok ? response.json() : [];
-}
-
-function fallbackRows(symbol) {
-  const base = FALLBACK_CLOSE[symbol] || 100;
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  return Array.from({ length: 80 }, (_, index) => {
-    const date = new Date(start);
-    date.setUTCDate(start.getUTCDate() - (79 - index));
-    const drift = (index - 79) * base * 0.0009;
-    const wave = Math.sin(index / 4) * base * 0.006;
-    return { date: date.toISOString().slice(0, 10), close: Number((base + drift + wave).toFixed(2)) };
-  });
 }
 
 // Explicit, user-triggered point-in-time quote only (never a bulk historical pull).
