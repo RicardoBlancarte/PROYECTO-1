@@ -1,5 +1,6 @@
-// KPI de eficacia predictiva: back-test walk-forward del modelo de patrones binarios (ventanas 3 y 5)
-// contra los precios reales cacheados en asset_historical_prices. Sin llamadas a APIs externas.
+// KPI de eficacia predictiva: back-test walk-forward del motor estocástico real (Markov + Monte Carlo,
+// mismas fórmulas que el frontend) contra los precios reales cacheados en asset_historical_prices.
+// Requiere solo 5 sesiones previas para estimar sigma, por lo que opera desde bloques de ~8-10 sesiones.
 const CATALOG = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'AMD', 'INTC', 'JPM', 'V', 'MA', 'JNJ', 'WMT', 'PG', 'DIS', 'ASML', 'TSM', 'KO', 'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZW=F', 'ZS=F', 'KC=F'];
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=1800' } });
@@ -16,7 +17,9 @@ export async function onRequestGet(context) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
     const items = (await Promise.all(CATALOG.map(symbol => computeWinRate(context.env, headers, symbol)))).filter(Boolean).sort((a, b) => b.winRate - a.winRate);
-    const response = json({ items, computedAt: new Date().toISOString() });
+    const totalSamples = items.reduce((sum, item) => sum + item.sampleSize, 0);
+    const globalWinRate = totalSamples ? Number((items.reduce((sum, item) => sum + item.winRate * item.sampleSize, 0) / totalSamples).toFixed(1)) : 0;
+    const response = json({ items, globalWinRate, totalSamples, computedAt: new Date().toISOString() });
     context.waitUntil(cache.put(cacheKey, response.clone()));
     return response;
   }
@@ -32,32 +35,31 @@ async function computeWinRate(env, headers, symbol) {
   const response = await fetch(endpoint, { headers });
   if (!response.ok) return null;
   const rows = await response.json();
-  if (rows.length < 20) return null;
-  const bits = rows.slice(1).map((row, index) => Number(row.close) >= Number(rows[index].close) ? 1 : 0);
-  const scores = [3, 5].map(windowSize => backtestWindow(bits, windowSize));
-  const valid = scores.filter(item => item.total > 0);
-  if (!valid.length) return null;
-  const hits = valid.reduce((sum, item) => sum + item.hits, 0);
-  const total = valid.reduce((sum, item) => sum + item.total, 0);
-  return { symbol, winRate: Number((hits / total * 100).toFixed(1)), sampleSize: total, lastClose: Number(rows.at(-1).close), asOf: rows.at(-1).date };
-}
-
-// Walk-forward: la frecuencia de cada patrón solo usa observaciones estrictamente anteriores (sin lookahead).
-function backtestWindow(bits, windowSize) {
-  const freq = new Map();
-  const warmup = windowSize * 4;
-  let hits = 0; let total = 0;
-  for (let index = windowSize; index < bits.length; index += 1) {
-    const pattern = bits.slice(index - windowSize, index).join('');
-    const stat = freq.get(pattern);
-    if (index >= warmup && stat && stat.matches >= 5) {
-      const predictedUp = stat.ups / stat.matches >= 0.5;
-      const actualUp = bits[index] === 1;
-      if (predictedUp === actualUp) hits += 1;
-      total += 1;
-    }
-    if (!stat) freq.set(pattern, { matches: 1, ups: bits[index] });
-    else { stat.matches += 1; stat.ups += bits[index]; }
+  const MIN_WINDOW = 5; // sesiones previas mínimas para estimar sigma realizada
+  if (rows.length < MIN_WINDOW + 2) return null;
+  const closes = rows.map(row => Number(row.close));
+  const dates = rows.map(row => row.date);
+  const history = [];
+  for (let t = MIN_WINDOW; t < closes.length - 1; t += 1) {
+    const known = closes.slice(0, t + 1);
+    const returns = known.slice(1).map((close, index) => Math.log(close / known[index]));
+    const mean = returns.reduce((sum, value) => sum + value, 0) / returns.length;
+    const variance = returns.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(returns.length - 1, 1);
+    const sigma = Math.sqrt(Math.max(variance, 0)) || 0.01;
+    const spot = closes[t];
+    // Misma fórmula que el frontend (Markov 1D + banda Monte Carlo P10/P90).
+    const markov = spot * (1 + sigma * .21);
+    const p10 = markov * Math.exp(-1.2816 * sigma * .21);
+    const p90 = markov * Math.exp(1.2816 * sigma * .21);
+    const actual = closes[t + 1];
+    const inBand = actual >= p10 && actual <= p90 ? 1 : 0;
+    const proximity = Math.max(0, 1 - Math.abs(actual - markov) / (spot * Math.max(sigma, .01)));
+    const score = inBand * 70 + proximity * 30;
+    history.push({ date: dates[t + 1], inBand, proximity: Number(proximity.toFixed(3)), score: Number(score.toFixed(1)) });
   }
-  return { hits, total };
+  if (!history.length) return null;
+  const winRate = Number((history.reduce((sum, day) => sum + day.score, 0) / history.length).toFixed(1));
+  const bandCoverage = Number((history.reduce((sum, day) => sum + day.inBand, 0) / history.length * 100).toFixed(1));
+  const proximityAvg = Number((history.reduce((sum, day) => sum + day.proximity, 0) / history.length * 100).toFixed(1));
+  return { symbol, winRate, bandCoverage, proximity: proximityAvg, sampleSize: history.length, lastClose: closes.at(-1), asOf: dates.at(-1), history: history.slice(-30) };
 }
