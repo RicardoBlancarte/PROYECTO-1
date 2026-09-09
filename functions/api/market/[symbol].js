@@ -4,7 +4,7 @@
 // A live "today" quote is only fetched when the caller explicitly asks for it (?live=1,
 // e.g. a refresh button), and even then it goes through a 60-minute edge cache first
 // (Paso B) so repeated clicks within the hour never spend an extra API call (Paso C).
-const RETENTION = { daily: 126, weekly: 500, monthly: 60, yearly: 5 };
+const RETENTION = { daily: 504, weekly: 500, monthly: 60, yearly: 5 };
 const LIVE_QUOTE_TTL_SECONDS = 60 * 60;
 
 export async function onRequestGet(context) {
