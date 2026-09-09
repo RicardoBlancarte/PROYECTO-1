@@ -26,10 +26,12 @@ export async function onRequestGet(context) {
 }
 
 function jsonResponse(symbol, interval, rows, live) { const ordered = rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))); const close = ordered.map(row => Number(row.close)); return Response.json({ symbol, interval, live, dates: ordered.map(row => row.date), open: ordered.map(row => row.open == null ? null : Number(row.open)), high: ordered.map(row => row.high == null ? null : Number(row.high)), low: ordered.map(row => row.low == null ? null : Number(row.low)), close, prices: close }, { headers: { 'Cache-Control': 'public, max-age=300' } }); }
+function supabaseUrl(env) { const ref = jwtRef(env.SUPABASE_ANON_KEY); return ref ? `https://${ref}.supabase.co` : env.SUPABASE_URL; }
+function jwtRef(token) { try { const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); return payload.ref || ''; } catch (error) { return ''; } }
 function headers(env) { return { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }; }
 
 async function readDailyRows(env, symbol) {
-  const endpoint = new URL(`${env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
+  const endpoint = new URL(`${supabaseUrl(env)}/rest/v1/asset_historical_prices`);
   endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,open,high,low,close', limit: '1826' }).toString();
   const response = await fetch(endpoint, { headers: headers(env) });
   return response.ok ? response.json() : [];
