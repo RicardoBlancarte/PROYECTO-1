@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
   } catch (error) { return Response.json({ error: 'Unable to load market data.' }, { status: 502 }); }
 }
 
-function jsonResponse(symbol, interval, rows, live) { return Response.json({ symbol, interval, live, dates: rows.map(row => row.date), prices: rows.map(row => Number(row.close)) }, { headers: { 'Cache-Control': 'public, max-age=300' } }); }
+function jsonResponse(symbol, interval, rows, live) { const ordered = rows.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))); const close = ordered.map(row => Number(row.close)); return Response.json({ symbol, interval, live, dates: ordered.map(row => row.date), close, prices: close }, { headers: { 'Cache-Control': 'public, max-age=300' } }); }
 function headers(env) { return { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` }; }
 
 async function readDailyRows(env, symbol) {
