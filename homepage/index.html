@@ -1,50 +1,404 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Thalgorithm | In the name of Mankind</title>
-  <meta name="description" content="Thalgorithm lleva precisión de riesgo bancario, proyecciones estocásticas y optimización cuantitativa a decisiones financieras humanas.">
-  <link rel="icon" href="../favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <style>
-    :root{--bg:#09090B;--deep:#0B2E21;--panel:rgba(255,255,255,.03);--panel2:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#F8FAFC;--muted:#94A3B8;--soft:#CBD5E1;--green:#00FF66;--green2:#10B981;--red:#FB7185;--amber:#FBBF24}
-    *{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;overflow-x:hidden;color:var(--text);font-family:Inter,system-ui,sans-serif;letter-spacing:-.01em;background:radial-gradient(circle at 18% 12%,rgba(11,46,33,.72),transparent 28rem),radial-gradient(circle at 82% 32%,rgba(16,185,129,.12),transparent 26rem),linear-gradient(180deg,#09090B,#0A0F0D 46%,#09090B)}a{color:inherit;text-decoration:none}.mono{font-family:'JetBrains Mono','Cascadia Mono',monospace;letter-spacing:0}
-    .nav{position:fixed;z-index:40;inset:16px 18px auto;width:min(1120px,calc(100% - 36px));margin:auto;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 12px;border:1px solid var(--line);border-radius:16px;background:rgba(9,9,11,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 18px 60px rgba(0,0,0,.28)}.brand{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}.brand img{width:30px;height:30px;filter:drop-shadow(0 0 14px rgba(0,255,102,.28))}.wordmark{font-family:Inter,system-ui,sans-serif;font-weight:700;letter-spacing:.28em;text-transform:lowercase}.brand .wordmark{font-size:14px}.wordmark-inline{font-family:Inter,system-ui,sans-serif;font-weight:650;letter-spacing:.08em;text-transform:lowercase}.hero-sigil-bg{position:absolute;right:4vw;top:13vh;width:min(520px,52vw);opacity:.12;filter:drop-shadow(0 0 42px rgba(0,243,255,.25));animation:brand-spin 38s linear infinite;pointer-events:none}@keyframes brand-spin{to{transform:rotate(360deg)}}.nav-actions,.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.btn{display:inline-flex;min-height:38px;align-items:center;justify-content:center;padding:0 15px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--soft);font-size:13px;font-weight:600;transition:transform .22s ease,border-color .22s ease,background .22s ease,box-shadow .22s ease}.btn:hover{transform:translateY(-1px);border-color:rgba(0,255,102,.42);background:rgba(16,185,129,.07);box-shadow:0 0 22px rgba(0,255,102,.12)}.btn-primary{color:#04130A;background:linear-gradient(180deg,#7CFFB1,#10B981);border-color:rgba(0,255,102,.65);box-shadow:0 0 28px rgba(0,255,102,.18)}
-    .section{position:relative;padding:118px 24px}.inner{width:min(1120px,100%);margin:0 auto}.hero{min-height:100vh;min-height:100svh;display:grid;align-items:center;isolation:isolate;overflow:hidden;background:#09090B}#hero-video{position:absolute;inset:0;z-index:-3;width:100%;height:100%;object-fit:cover;background:#09090B;pointer-events:none}#hero-canvas{position:absolute;inset:0;z-index:-2;width:100%;height:100%;display:block;opacity:.45}.hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#09090B 0%,rgba(9,9,11,.86) 42%,rgba(9,9,11,.56) 74%,rgba(9,9,11,.7)),linear-gradient(180deg,rgba(9,9,11,.32),rgba(9,9,11,.18) 42%,rgba(9,9,11,.78));pointer-events:none}.hero-grid{display:grid;grid-template-columns:minmax(0,.95fr) minmax(340px,.82fr);gap:44px;align-items:center}.sigil{width:62px;height:62px;margin-bottom:24px;filter:drop-shadow(0 0 18px rgba(0,255,102,.26))}.eyebrow{color:var(--green);font:600 12px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em}h1,h2,h3,p{margin-top:0}h1{max-width:700px;margin:14px 0 16px;font-size:clamp(35px,5vw,56px);line-height:1.04;font-weight:600;letter-spacing:-.045em}h2{max-width:720px;margin:12px 0 14px;font-size:clamp(28px,4vw,46px);line-height:1.1;font-weight:600;letter-spacing:-.04em}h3{margin-bottom:8px;font-size:18px;line-height:1.25;font-weight:600;letter-spacing:-.025em}.lead{max-width:650px;color:var(--muted);font-size:clamp(16px,2vw,19px);line-height:1.65}.glass{border:1px solid var(--line);border-radius:22px;background:var(--panel);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 20px 70px rgba(0,0,0,.24)}.hero-card{padding:22px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:28px}.metric{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}.metric span,.calc span,.shot-label{display:block;color:var(--muted);font:600 11px 'JetBrains Mono',monospace;text-transform:uppercase}.metric strong,.calc strong,.shot-value{display:block;margin-top:8px;color:var(--green);font:600 14px 'JetBrains Mono',monospace}
-    .product{background:linear-gradient(180deg,rgba(9,9,11,.3),rgba(11,46,33,.2) 48%,rgba(9,9,11,.4))}.story-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:42px;align-items:start}.story-copy{display:grid;gap:22vh;padding:8vh 0 18vh}.story-card{min-height:44vh;padding:22px;border:1px solid var(--line);border-radius:20px;background:var(--panel);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:grid;align-content:center}.story-card p{margin:0;color:var(--muted);line-height:1.65}.story-card:nth-child(even){margin-left:8%}.story-visual{position:sticky;top:104px;min-height:620px;display:grid;align-content:center}.product-shot{overflow:hidden}.frame-top{display:flex;gap:7px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}.dot{width:8px;height:8px;border-radius:50%;background:#334155}.shot-body{padding:18px}.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}.mini-card{padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}.chart{height:240px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015));position:relative;overflow:hidden}.chart svg{position:absolute;inset:0;width:100%;height:100%}.asset-cloud{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.asset-pill{padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.028);color:var(--soft);font-size:13px;animation:float 5s ease-in-out infinite}.asset-pill:nth-child(2n){animation-delay:-1.2s}.asset-pill:nth-child(3n){animation-delay:-2.4s}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}.weights{display:grid;gap:10px}.weight-row{display:grid;grid-template-columns:92px 1fr 54px;gap:10px;align-items:center;color:var(--soft);font-size:13px}.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--green),#7CFFB1)}.tabs{display:flex;justify-content:center;gap:8px;margin-top:14px}.tab{padding:8px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font:600 11px 'JetBrains Mono',monospace}.tab.active{color:#04130A;background:var(--green);border-color:var(--green)}.privacy-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.privacy-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}
-    .manifesto{background:linear-gradient(180deg,#09090B,#050506)}.manifesto-box{width:min(780px,100%);margin:0 auto;padding:38px}.manifesto-text{color:#E5E7EB;font-size:clamp(21px,3vw,34px);line-height:1.32;font-weight:500;letter-spacing:-.035em}.manifesto-text span{opacity:.14;display:inline-block;transform:translateY(10px)}.footer{min-height:74vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 10%,rgba(16,185,129,.12),transparent 22rem),#09090B}.terminal{width:min(860px,100%);padding:26px;border-color:rgba(0,255,102,.16)}.terminal-head{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px}.calc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}.calc{padding:16px;min-height:94px;border-radius:14px;background:rgba(9,9,11,.66);border:1px solid var(--line)}.result{text-align:center;color:var(--text);opacity:0;font-size:22px;font-weight:600;letter-spacing:-.03em}.vectors{position:relative;height:90px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.02);margin-top:12px}.vector{position:absolute;color:var(--green);font:600 12px 'JetBrains Mono',monospace;animation:scan 3.4s linear infinite}.vector:nth-child(1){left:10%;top:20%;animation-delay:-.2s}.vector:nth-child(2){left:42%;top:58%;animation-delay:-1.3s}.vector:nth-child(3){left:68%;top:30%;animation-delay:-2.1s}@keyframes scan{0%{opacity:.12;transform:translateX(-18px)}45%{opacity:1}100%{opacity:.16;transform:translateX(28px)}}
-    @media (max-width:900px){.nav-actions .btn:not(.btn-primary){display:none}.section{padding:104px 18px}.hero-grid,.story-grid{grid-template-columns:1fr}.story-copy{gap:18px;padding:24px 0}.story-card,.story-card:nth-child(even){min-height:auto;margin-left:0}.story-visual{position:relative;top:auto;min-height:auto}.metrics,.mini-grid,.calc-grid,.privacy-grid{grid-template-columns:1fr 1fr}.showcase-mobile{order:-1}}
-    @media (max-width:540px){h1{font-size:34px}h2{font-size:28px}.metrics,.mini-grid,.calc-grid,.asset-cloud,.privacy-grid{grid-template-columns:1fr}.manifesto-box,.terminal,.hero-card{padding:20px}.actions .btn{width:100%}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thalgorithm | In the name of Mankind</title>
+<meta name="description" content="Thalgorithm lleva precisión de riesgo bancario, proyecciones estocásticas y optimización cuantitativa a decisiones financieras humanas, de forma gratuita.">
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#09090B;--panel:rgba(18,22,28,.55);--panel-solid:#12161C;--panel2:#181D24;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.16);--text:#F3F4F6;--muted:#9CA3AF;--soft:#CBD5E1;--green:#10B981;--green-bright:#00FF88;--red:#EF4444;--blue:#3B82F6;--amber:#F59E0B}
+*{box-sizing:border-box}
+html{background:var(--bg);scroll-behavior:smooth}
+body{margin:0;overflow-x:hidden;color:var(--text);font-family:Inter,system-ui,sans-serif;letter-spacing:-.01em;background:radial-gradient(circle at 16% 8%,rgba(16,185,129,.10),transparent 30rem),radial-gradient(circle at 84% 26%,rgba(59,130,246,.07),transparent 28rem),linear-gradient(180deg,#09090B,#0A0E0C 46%,#09090B)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;cursor:pointer}
+.mono{font-family:'JetBrains Mono','Cascadia Mono',monospace;letter-spacing:0}
+img{max-width:100%;display:block}
+.glass{border:1px solid var(--line);border-radius:20px;background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 70px rgba(0,0,0,.3)}
+.eyebrow{display:inline-block;color:var(--green-bright);font:600 12px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.14em}
+h1,h2,h3,p{margin-top:0}
+.lead{color:var(--muted);font-size:clamp(15px,1.8vw,18px);line-height:1.65}
+.btn{display:inline-flex;min-height:40px;align-items:center;justify-content:center;gap:6px;padding:0 18px;border:1px solid var(--line2);border-radius:999px;background:var(--panel);color:var(--soft);font-size:13px;font-weight:600;transition:transform .22s ease,border-color .22s ease,background .22s ease,box-shadow .22s ease;white-space:nowrap}
+.btn:hover{transform:translateY(-1px);border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.08);box-shadow:0 0 24px rgba(16,185,129,.14)}
+.btn-primary{color:#04130A;background:linear-gradient(180deg,#7CFFB1,#10B981);border-color:rgba(0,255,136,.65);box-shadow:0 0 30px rgba(0,255,136,.2)}
+.btn-primary:hover{box-shadow:0 0 40px rgba(0,255,136,.32)}
+.btn.big{min-height:52px;padding:0 30px;font-size:15px;border-radius:999px}
+
+/* ---------- NAV ---------- */
+.navbar{position:fixed;z-index:60;inset:14px 16px auto;margin:auto;width:min(1180px,calc(100% - 28px));display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px 8px 14px;border:1px solid var(--line);border-radius:18px;background:rgba(9,9,11,.62);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 18px 60px rgba(0,0,0,.32);transition:background .3s ease,border-color .3s ease}
+.navbar.scrolled{background:rgba(9,9,11,.86);border-color:var(--line2)}
+.brand-mark{display:flex;align-items:center;gap:9px;font-weight:700;flex:0 0 auto}
+.brand-mark img{width:26px;height:26px;filter:drop-shadow(0 0 12px rgba(16,185,129,.35))}
+.brand-mark span{font-size:13px;letter-spacing:.26em;text-transform:lowercase;color:var(--soft)}
+.nav-links{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 auto;padding:2px 6px}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-link{flex:0 0 auto;border:1px solid transparent;background:transparent;color:var(--muted);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;transition:color .2s ease,background .2s ease,border-color .2s ease}
+.nav-link:hover{color:var(--text);background:rgba(255,255,255,.05);border-color:var(--line)}
+.nav-cta{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 16px 9px 10px;border-radius:999px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:var(--text);font:700 12px 'JetBrains Mono',monospace;letter-spacing:.08em;transition:box-shadow .2s ease,background .2s ease}
+.nav-cta img{width:20px;height:20px}
+.nav-cta:hover{background:rgba(16,185,129,.16);box-shadow:0 0 22px rgba(16,185,129,.22)}
+
+/* ---------- MODAL ---------- */
+.modal-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,5,6,.72);backdrop-filter:blur(6px);opacity:0;visibility:hidden;transition:opacity .25s ease;}
+.modal-overlay.open{opacity:1;visibility:visible}
+.modal-panel{position:relative;width:min(640px,100%);max-height:82vh;overflow-y:auto;padding:34px 30px;border-radius:24px;background:var(--panel-solid);border:1px solid var(--line2);transform:translateY(16px) scale(.98);transition:transform .28s ease}
+.modal-overlay.open .modal-panel{transform:translateY(0) scale(1)}
+.modal-close{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--muted);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{color:var(--text);border-color:var(--line2)}
+.modal-panel h2{font-size:clamp(22px,3vw,28px);font-weight:700;letter-spacing:-.03em;margin:6px 0 16px}
+.modal-body p{color:var(--soft);line-height:1.7;font-size:15px;margin:0 0 14px}
+.modal-body ul{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.modal-body li{padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);color:var(--soft);line-height:1.65;font-size:14px}
+.modal-body li strong{color:var(--green-bright);display:block;margin-bottom:4px;font-size:14px}
+
+/* ---------- HERO ---------- */
+.hero{position:relative;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding:150px 20px 60px;overflow:hidden}
+.hero:before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(circle at 50% 0%,rgba(16,185,129,.14),transparent 45rem),#09090B}
+.hero-inner{width:min(1180px,100%);margin:0 auto;display:grid;gap:36px}
+.hero-head{max-width:780px}
+.hero-head h1{font-size:clamp(32px,5.4vw,58px);line-height:1.05;font-weight:700;letter-spacing:-.04em;margin:14px 0 14px}
+.hero-carousel{position:relative}
+.carousel-track{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 18px;scrollbar-width:none}
+.carousel-track::-webkit-scrollbar{display:none}
+.hero-slide{scroll-snap-align:center;flex:0 0 min(320px,78vw);border-radius:22px;padding:26px 22px;display:flex;flex-direction:column;gap:14px;min-height:210px}
+.slide-dot{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.hero-slide h3{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.hero-slide p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0}
+.carousel-arrow{position:absolute;top:50%;translate:0 -50%;width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);background:rgba(9,9,11,.7);backdrop-filter:blur(10px);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;z-index:5}
+.carousel-arrow.prev{left:-6px}
+.carousel-arrow.next{right:-6px}
+.carousel-arrow:hover{border-color:var(--green);box-shadow:0 0 18px rgba(16,185,129,.25)}
+.carousel-dots{display:flex;justify-content:center;gap:7px;margin-top:-6px}
+.carousel-dots button{width:7px;height:7px;border-radius:50%;background:var(--line2);border:none;padding:0;transition:background .2s ease,transform .2s ease}
+.carousel-dots button.active{background:var(--green-bright);transform:scale(1.3)}
+.hero-cta-row{display:flex;justify-content:center}
+.glass-cta{display:inline-flex;align-items:center;gap:9px;padding:12px 22px;border-radius:999px;border:1px solid rgba(16,185,129,.4);background:rgba(255,255,255,.03);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--text);font:700 12px 'JetBrains Mono',monospace;letter-spacing:.14em;box-shadow:0 0 26px rgba(16,185,129,.14)}
+.glass-cta:hover{border-color:var(--green-bright);box-shadow:0 0 34px rgba(0,255,136,.24)}
+.glass-cta img{width:18px;height:18px}
+
+/* ---------- SCROLL BLOCKS ---------- */
+.scrollblock{position:relative;padding:100px 20px;min-height:78vh;display:flex;align-items:center}
+.block-inner{width:min(1140px,100%);margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:52px;align-items:center}
+.scrollblock[data-align="right"] .block-inner{grid-template-columns:.9fr 1.1fr}
+.scrollblock[data-align="right"] .sb-media{order:2}
+.scrollblock[data-align="right"] .sb-copy{order:1}
+.sb-media{position:relative;border-radius:22px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 90px rgba(0,0,0,.42);aspect-ratio:16/11;background:#0d1013}
+.sb-media img{width:100%;height:100%;object-fit:cover;will-change:transform}
+.sb-badge{position:absolute;bottom:14px;right:14px;width:min(210px,42%);border-radius:14px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.sb-badge img{width:100%;display:block}
+.sb-copy{padding:30px;display:grid;gap:14px}
+.sb-copy p{color:var(--text);font-size:clamp(18px,2.4vw,24px);line-height:1.4;font-weight:600;letter-spacing:-.02em;margin:0}
+.sb-tag{color:var(--green-bright)!important;font-size:13px!important;font-weight:700!important;letter-spacing:.14em;text-transform:uppercase}
+
+.block-logo{min-height:100vh;justify-content:center;overflow:hidden;background:#000}
+.stars-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+.logo-style{position:relative;z-index:1;width:min(60vw,560px);filter:grayscale(1) invert(1) contrast(1.2) brightness(1.1) drop-shadow(0 0 34px rgba(16,185,129,.32));opacity:.94}
+
+.block-final{min-height:92vh;flex-direction:column;justify-content:center;text-align:center;gap:0}
+.final-inner{width:min(760px,100%);margin:0 auto;display:grid;gap:30px;justify-items:center}
+.final-frame{width:100%;border-radius:26px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 34px 100px rgba(0,0,0,.5)}
+.final-frame img{width:100%;height:280px;object-fit:cover;object-position:top}
+.final-tag{color:var(--muted);font-size:13px;letter-spacing:.06em}
+
+footer{padding:34px 20px 46px;text-align:center;color:var(--muted);font-size:12.5px}
+footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(--line2)}
+
+@media (max-width:900px){
+  .block-inner{grid-template-columns:1fr!important}
+  .scrollblock[data-align="right"] .sb-media,.scrollblock[data-align="right"] .sb-copy{order:0}
+  .sb-copy{padding:22px}
+  .brand-mark span{display:none}
+  .nav-cta span.cta-label{display:none}
+}
+@media (max-width:540px){
+  .hero{padding-top:130px}
+  .scrollblock{padding:70px 16px}
+  .sb-badge{display:none}
+  .logo-style{width:82vw}
+}
+</style>
 </head>
 <body>
-  <nav class="nav"><a class="brand" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt="Thalgorithm"><span class="wordmark">algorithm</span></a><div class="nav-actions"><a class="btn" href="#product">Producto</a><a class="btn btn-primary" href="https://thalgorithm.com">Entrar gratis</a></div></nav>
-  <main>
-<section class="section hero" style="position: relative; min-height: 100vh; width: 100%; background: url('../shanghai-hero.jpg') no-repeat center center / cover !important;">
-    <div class="hero-content" style="position: relative; z-index: 2; padding: 150px 50px; color: #fff;">
-        <h1 style="font-size: 48px; font-weight: 700; margin-bottom: 20px;">The algorithm reached the goal, it's time... send the order</h1>
-        <p style="font-size: 20px; color: #ccc; max-width: 600px; margin-bottom: 30px;">算法已经达成目标，该是时候了...下达指令</p>
+
+<nav class="navbar" id="navbar">
+  <a class="brand-mark" href="https://thalgorithm.com" aria-label="Ir a Thalgorithm"><img src="../logo_algorithm.svg" alt=""><span>algorithm</span></a>
+  <div class="nav-links">
+    <button class="nav-link" data-panel="mision">Nuestra Misión</button>
+    <button class="nav-link" data-panel="vision">Nuestra Visión</button>
+    <button class="nav-link" data-panel="valores">Valores</button>
+    <button class="nav-link" data-panel="algorithm">Qué es The Algorithm</button>
+  </div>
+  <a class="nav-cta" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt=""><span class="cta-label">THALGORITHM</span></a>
+</nav>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-panel glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="modal-close" id="modalClose" aria-label="Cerrar">&times;</button>
+    <span class="eyebrow" id="modalEyebrow">Thalgorithm</span>
+    <h2 id="modalTitle"></h2>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<main>
+
+<section class="hero" id="hero">
+  <div class="hero-inner">
+    <div class="hero-head">
+      <span class="eyebrow">In the name of mankind</span>
+      <h1>El motor cuantitativo que trabaja para ti</h1>
+      <p class="lead">Matemáticas de nivel institucional, gratis, para cualquier persona. Esto es lo que hay dentro de The Algorithm.</p>
     </div>
+    <div class="hero-carousel">
+      <button class="carousel-arrow prev" id="carPrev" aria-label="Anterior">&lsaquo;</button>
+      <div class="carousel-track glass" id="carouselTrack" style="background:transparent;border:none;box-shadow:none">
+        <article class="hero-slide glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#10B981">Σ</div><h3>Motor Estocástico</h3><p>Simulaciones tipo Markov y Monte Carlo para anticipar escenarios de precio con rigor científico.</p></article>
+        <article class="hero-slide glass" style="border-color:rgba(59,130,246,.28)"><div class="slide-dot" style="background:rgba(59,130,246,.14);color:#3B82F6">W</div><h3>Optimización Markowitz</h3><p>Portafolios óptimos calculados en segundos, sin comisiones ni intermediarios de por medio.</p></article>
+        <article class="hero-slide glass" style="border-color:rgba(245,158,11,.28)"><div class="slide-dot" style="background:rgba(245,158,11,.14);color:#F59E0B">AI</div><h3>Inteligencia Geopolítica</h3><p>Debates de IA conservadora y liberal que ponderan cada noticia dentro del cálculo de probabilidad.</p></article>
+        <article class="hero-slide glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#00FF88">◎</div><h3>Mapa de Correlaciones</h3><p>Visualiza en tiempo real dónde en el mundo se mueven realmente tus activos.</p></article>
+        <article class="hero-slide glass" style="border-color:rgba(239,68,68,.28)"><div class="slide-dot" style="background:rgba(239,68,68,.14);color:#EF4444">±</div><h3>Perfil de Riesgo</h3><p>Calibra tu sesgo conservador o abierto y deja que el motor se adapte a ti.</p></article>
+        <article class="hero-slide glass" style="border-color:rgba(0,255,136,.3)"><div class="slide-dot" style="background:rgba(0,255,136,.14);color:#00FF88">★</div><h3>Top Portfolio</h3><p>El top 3 de activos recomendados hoy, directo desde el motor analítico.</p></article>
+      </div>
+      <button class="carousel-arrow next" id="carNext" aria-label="Siguiente">&rsaquo;</button>
+    </div>
+    <div class="carousel-dots" id="carouselDots"></div>
+    <div class="hero-cta-row">
+      <a class="glass-cta" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt="">THALGORITHM</a>
+    </div>
+  </div>
 </section>
-    <section class="section manifesto"><div class="manifesto-box glass"><div class="eyebrow">In the name of mankind</div><p class="manifesto-text" id="manifesto-text">Diez años administrando riesgos en la banca nos enseñaron que las herramientas de protección institucional no son magia, son matemáticas aplicadas. Decidimos romper el molde corporativo y abrir las puertas bajo una premisa innegable: tecnología de punta al servicio de las personas, construida in the name of mankind.</p></div></section>
-    <footer class="section footer"><div class="terminal glass mono"><div class="terminal-head"><span>THALGORITHM LIVE ENGINE</span><span id="clock">00:00:00</span></div><div class="calc-grid"><div class="calc"><span>Retorno esperado</span><strong id="ret">+12.40%</strong></div><div class="calc"><span>Volatilidad</span><strong id="vol">8.92%</strong></div><div class="calc"><span>Peso óptimo</span><strong id="weight">37.5%</strong></div></div><div class="vectors"><span class="vector">Σw = 1.000</span><span class="vector">P90 → 0.74</span><span class="vector">VaR ↓ 12.8%</span></div><div class="result" id="inevitable">Resultados innegables.</div><div class="actions" style="justify-content:center;margin-top:22px"><a class="btn btn-primary" href="https://thalgorithm.com">Entrar a la plataforma</a><a class="btn" href="https://thalgorithm.com">Crear acceso gratis</a></div></div></footer>
-  </main>
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
-    import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
-    import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js';
-    gsap.registerPlugin(ScrollTrigger);
-    const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    // Si el video de fondo no está disponible, el hero vuelve al campo de partículas sobre #09090B.
-    function heroVideo(){const video=document.getElementById('hero-video');if(!video)return;const canvas=document.getElementById('hero-canvas');const fallback=()=>{video.remove();if(canvas)canvas.style.opacity='.72'};video.addEventListener('error',fallback,true);video.querySelector('source')?.addEventListener('error',fallback);if(reduceMotion){video.pause();return}const play=()=>video.play().catch(()=>{});play();document.addEventListener('visibilitychange',()=>document.hidden?video.pause():play())}
-    heroVideo();
-    function heroScene(){const canvas=document.getElementById('hero-canvas'),renderer=new THREE.WebGLRenderer({canvas,antialias:false,alpha:true,powerPreference:'high-performance'}),scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(58,1,.1,70);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));camera.position.z=18;const count=innerWidth<700?520:980,positions=new Float32Array(count*3),base=new Float32Array(count*3),trend=new Float32Array(count*3);for(let i=0;i<count;i++){const ix=i*3,x=(Math.random()-.5)*34,y=(Math.random()-.5)*18,z=(Math.random()-.5)*18;base[ix]=positions[ix]=x;base[ix+1]=positions[ix+1]=y;base[ix+2]=positions[ix+2]=z;const t=i/(count-1);trend[ix]=(t-.5)*24;trend[ix+1]=Math.sin(t*5)*2+(t-.5)*4;trend[ix+2]=Math.cos(t*7)*.8}const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));const points=new THREE.Points(geometry,new THREE.PointsMaterial({color:0x10b981,size:.035,transparent:true,opacity:.5}));scene.add(points);const mouse={force:0};addEventListener('pointermove',()=>{mouse.force=1},{passive:true});function resize(){const w=canvas.clientWidth||innerWidth,h=canvas.clientHeight||innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}resize();addEventListener('resize',resize);function frame(){mouse.force*=.94;const p=geometry.attributes.position.array;for(let i=0;i<count;i++){const ix=i*3,pull=mouse.force*.45;p[ix]+=((base[ix]*(1-pull)+trend[ix]*pull)-p[ix])*.035;p[ix+1]+=((base[ix+1]*(1-pull)+trend[ix+1]*pull)-p[ix+1])*.035;p[ix+2]+=((base[ix+2]*(1-pull)+trend[ix+2]*pull)-p[ix+2])*.035}geometry.attributes.position.needsUpdate=true;points.rotation.y+=.0008;renderer.render(scene,camera);if(!reduceMotion)requestAnimationFrame(frame)}frame()}
-    const shots={chart:`<div class="mini-grid mono"><div class="mini-card"><span class="shot-label">Último precio</span><strong class="shot-value">USD 4,400.90</strong></div><div class="mini-card"><span class="shot-label">Más probable</span><strong class="shot-value">USD 4,447.05</strong></div><div class="mini-card"><span class="shot-label">P90</span><strong class="shot-value">USD 4,612.30</strong></div></div><div class="chart"><svg viewBox="0 0 600 260" preserveAspectRatio="none"><path d="M0 210 C85 135 170 160 245 118 S365 132 430 72" fill="none" stroke="#CBD5E1" stroke-width="3"/><path d="M430 72 C490 45 548 30 600 18" fill="none" stroke="#FBBF24" stroke-width="2" stroke-dasharray="8 8"/><path d="M430 72 C500 95 552 125 600 154" fill="none" stroke="#FB7185" stroke-width="2" stroke-dasharray="8 8"/><path d="M430 72 C485 66 545 54 600 42" fill="none" stroke="#10B981" stroke-width="4"/><circle cx="430" cy="72" r="9" fill="#00FF66"/></svg></div>`,markowitz:`<div class="weights mono"><div class="weight-row"><span>AAPL</span><div class="bar"><i style="width:34%"></i></div><strong>34%</strong></div><div class="weight-row"><span>TSLA</span><div class="bar"><i style="width:66%"></i></div><strong>66%</strong></div><div class="weight-row"><span>GC=F</span><div class="bar"><i style="width:42%"></i></div><strong>42%</strong></div></div><p class="lead" style="font-size:14px;margin-top:18px">Distribución óptima por covarianza, retorno esperado y volatilidad.</p>`,assets:`<div class="asset-cloud mono"><div class="asset-pill">AAPL</div><div class="asset-pill">MSFT</div><div class="asset-pill">NVDA</div><div class="asset-pill">META</div><div class="asset-pill">TSLA</div><div class="asset-pill">GC=F</div><div class="asset-pill">SI=F</div><div class="asset-pill">CL=F</div><div class="asset-pill">KC=F</div></div>`,horizon:`<div class="tabs mono"><span class="tab active">1 DAY</span><span class="tab">1 WEEK</span><span class="tab">1 M</span></div><div class="chart" style="margin-top:18px"><svg viewBox="0 0 600 260" preserveAspectRatio="none"><path d="M0 180 C110 160 200 135 300 118 S460 80 600 44" fill="none" stroke="#10B981" stroke-width="4"/><path d="M300 118 L600 20" stroke="#FBBF24" stroke-width="2" stroke-dasharray="8 8"/><path d="M300 118 L600 170" stroke="#FB7185" stroke-width="2" stroke-dasharray="8 8"/><circle cx="300" cy="118" r="9" fill="#00FF66"/></svg></div>`,terminal:`<div class="mini-grid mono"><div class="mini-card"><span class="shot-label">Free</span><strong class="shot-value">100%</strong></div><div class="mini-card"><span class="shot-label">Newsbox</span><strong class="shot-value">Activo</strong></div><div class="mini-card"><span class="shot-label">Alertas</span><strong class="shot-value">Privadas</strong></div></div>`,privacy:`<div class="privacy-grid"><div class="privacy-card"><h3>Tus datos</h3><p class="lead" style="font-size:14px">Preferencias y portafolio en tu espacio.</p></div><div class="privacy-card"><h3>Tu decisión</h3><p class="lead" style="font-size:14px">Control sin intermediarios invasivos.</p></div></div>`,precision:`<div class="mini-grid mono"><div class="mini-card"><span class="shot-label">Sin anuncios</span><strong class="shot-value">0</strong></div><div class="mini-card"><span class="shot-label">Foco</span><strong class="shot-value">Señal</strong></div><div class="mini-card"><span class="shot-label">UI</span><strong class="shot-value">Clara</strong></div></div>`,standard:`<div class="chart"><svg viewBox="0 0 600 260" preserveAspectRatio="none"><path d="M0 220 C130 210 200 170 280 120 S470 48 600 32" fill="none" stroke="#00FF66" stroke-width="4"/><path d="M0 235 L600 235" stroke="rgba(255,255,255,.14)"/><text x="18" y="42" fill="#94A3B8" font-size="16">Acceso cuantitativo abierto</text></svg></div>`};
-    function setShot(name){document.getElementById('shot-body').innerHTML=shots[name]||shots.chart;gsap.fromTo('#shot-body',{opacity:.55,y:10},{opacity:1,y:0,duration:.35,ease:'power2.out'})}setShot('chart');document.querySelectorAll('.story-card').forEach(card=>ScrollTrigger.create({trigger:card,start:'top center',onEnter:()=>setShot(card.dataset.shot),onEnterBack:()=>setShot(card.dataset.shot)}));
-    function manifesto(){const node=document.getElementById('manifesto-text');node.innerHTML=node.textContent.split(' ').map(word=>`<span>${word}&nbsp;</span>`).join('');gsap.to('#manifesto-text span',{opacity:1,y:0,stagger:.012,ease:'power2.out',scrollTrigger:{trigger:'.manifesto',start:'top 70%',end:'bottom 70%',scrub:true}})}function footerLoop(){const ids=['ret','vol','weight'];setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('es-MX',{hour12:false});document.getElementById('ret').textContent=`+${(9+Math.random()*8).toFixed(2)}%`;document.getElementById('vol').textContent=`${(6+Math.random()*6).toFixed(2)}%`;document.getElementById('weight').textContent=`${(24+Math.random()*42).toFixed(1)}%`;gsap.fromTo(ids.map(id=>`#${id}`),{opacity:.45},{opacity:1,duration:.28,stagger:.04});gsap.to('#inevitable',{opacity:1,duration:.35,delay:.18})},2200)}heroScene();manifesto();footerLoop();
-  </script>
+
+<section class="scrollblock block-logo" id="block1">
+  <canvas class="stars-canvas" id="starsCanvas"></canvas>
+  <img class="logo-style" src="assets/style logo.png" alt="algorithm">
+</section>
+
+<section class="scrollblock" data-align="left" id="block2">
+  <div class="block-inner">
+    <div class="sb-media"><img src="assets/shanghai-hero.jpg.png" alt="Persona usando la plataforma The Algorithm en el teléfono"></div>
+    <div class="sb-copy glass">
+      <p>Herramientas bancarias de primer nivel ahora disponibles</p>
+      <p>Acceso al mejor algoritmo matemático de forma gratuita</p>
+      <p class="sb-tag mono">In the name of mankind</p>
+    </div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="right" id="block3">
+  <div class="block-inner">
+    <div class="sb-media">
+      <img src="assets/grafica.png.png" alt="Gráfica de predicción de precios con bandas de Markov">
+      <div class="sb-badge"><img src="assets/prob tomorrow.png" alt="Precio más probable para mañana"></div>
+    </div>
+    <div class="sb-copy glass"><p>Anticipa movimientos de los activos más populares en los mercados mundiales</p></div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="left" id="block4">
+  <div class="block-inner">
+    <div class="sb-media">
+      <img src="assets/makowitz.png.png" alt="Distribución de portafolio según la Teoría de Markowitz">
+      <div class="sb-badge"><img src="assets/makowitz1.png.png" alt="Detalle de pesos óptimos de portafolio"></div>
+    </div>
+    <div class="sb-copy glass"><p>Realiza portafolios de inversión de los mejores activos en los mercados mundiales para invertir en un solo paso</p></div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="right" id="block5">
+  <div class="block-inner">
+    <div class="sb-media"><img src="assets/mapa global.png" alt="Mapa global de relevancia de activos"></div>
+    <div class="sb-copy glass"><p>Te mostramos dónde en el mundo los activos cobran relevancia</p></div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="left" id="block6">
+  <div class="block-inner">
+    <div class="sb-media"><img src="assets/debate geopolitico.png" alt="Debate geopolítico entre IA conservadora y liberal"></div>
+    <div class="sb-copy glass"><p>Te mostramos cómo un debate entre IA conservadores y liberales y la síntesis de este debate; así mismo la noticia se califica y pondera en los cálculos de probabilidad</p></div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="right" id="block7">
+  <div class="block-inner">
+    <div class="sb-media"><img src="assets/Perfil de riesgo.png" alt="Calibración de perfil de riesgo"></div>
+    <div class="sb-copy glass"><p>Te damos la flexibilidad de elegir tu sesgo conservador o abierto respecto al riesgo</p></div>
+  </div>
+</section>
+
+<section class="scrollblock" data-align="left" id="block8">
+  <div class="block-inner">
+    <div class="sb-media"><img src="assets/top portafolios.png" alt="Top Portfolio: mejores activos para invertir hoy"></div>
+    <div class="sb-copy glass"><p>The Algorithm introduce Top Portfolio, un segmento donde The Algorithm da el mejor top 3 de activos para invertir hoy</p></div>
+  </div>
+</section>
+
+<section class="scrollblock block-final" id="blockFinal">
+  <div class="final-inner">
+    <div class="final-frame"><img src="assets/inicio .png" alt="algorithm"></div>
+    <a class="btn btn-primary big" href="https://thalgorithm.com">Entra ahora absolutamente gratis</a>
+    <span class="final-tag mono">In the name of mankind</span>
+  </div>
+</section>
+
+</main>
+
+<footer>&copy; <span id="year"></span> The Algorithm &middot; <a href="https://thalgorithm.com">thalgorithm.com</a></footer>
+
+<script type="module">
+import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
+import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js';
+gsap.registerPlugin(ScrollTrigger);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+document.getElementById('year').textContent = new Date().getFullYear();
+
+/* NAV scroll state */
+const navbar = document.getElementById('navbar');
+addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 10), { passive: true });
+
+/* MODAL PANELS */
+const panels = {
+  mision: { title: 'Nuestra Misión', html: `
+    <p>Acercar las finanzas de alta precisión, la banca inteligente y la tecnología de matemáticas aplicadas a las manos de cualquier persona, ayudando a que cada decisión de inversión en el mundo sea mucho más inteligente.</p>
+    <p>En The Algorithm, creemos firmemente que la educación financiera es un pilar básico para el desarrollo humano. Pensamos que entre más información y mejores herramientas tengan las personas, la humanidad avanza y mejora todos los días. Por eso hacemos lo que hacemos, y por eso nuestro lema siempre será: In the name of mankind.</p>` },
+  vision: { title: 'Nuestra Visión', html: `
+    <p>Llevar herramientas financieras de nivel avanzado a todos los hogares del mundo de forma completamente gratuita.</p>
+    <p>A lo largo de la historia, la tecnología ha hecho más sencillas las tareas del día a día, pero las herramientas financieras potentes se han quedado atrapadas y privatizadas exclusivamente para los bancos y los grandes sectores privados. Nuestro objetivo es romper esa barrera. Así como en su momento las grandes herramientas de construcción cambiaron la forma en que la humanidad edificó su entorno, The Algorithm busca ser ese instrumento fundamental que permita a cualquier persona construir un futuro financiero mejor para su vida y su familia.</p>` },
+  valores: { title: 'Valores', html: `
+    <p>Para que esta visión no se quede solo en una gran inspiración, sino que conecte con la realidad de quien usa la plataforma, nos sostenemos sobre tres valores clave:</p>
+    <ul>
+      <li><strong>Autonomía y Empoderamiento</strong>Las herramientas tecnológicas no tienen verdadero valor si no devuelven el control a las personas. Queremos que recuperes el timón de tus decisiones económicas con absoluta independencia, libres de comisiones abusivas o intermediarios con agendas ocultas.</li>
+      <li><strong>Ingeniería y Precisión Práctica (El Mecanismo)</strong>Detrás de cada interfaz accesible hay matemáticas aplicadas de nivel institucional y flujos de datos automatizados. Transformamos la complejidad analítica en claridad absoluta para el día a día.</li>
+      <li><strong>Transparencia Radical</strong>Ofrecer modelos matemáticos avanzados de forma gratuita suele generar escepticismo ("¿cuál es el truco?"). Nuestra respuesta es la honestidad abierta: la rigor técnica no está peleada con la accesibilidad universal, y la confianza se gana mostrando exactamente cómo operamos, sin letras chiquitas.</li>
+    </ul>` },
+  algorithm: { title: 'Qué es The Algorithm', html: `
+    <p>The Algorithm es mucho más que un conjunto de líneas de código; es un motor analítico vivo impulsado por matemáticas de nivel institucional, diseñado para descifrar el caos de los mercados globales y traducirlo en claridad para ti.</p>
+    <p>Para lograrlo, opera bajo una arquitectura de alta precisión que combina diversos componentes clave:</p>
+    <ul>
+      <li><strong>Modelos Estocásticos y Probabilidad Avanzada</strong>No adivinamos el futuro, calculamos escenarios. Incorporamos modelos probabilísticos y procesos estocásticos dinámicos inspirados en trayectorias estocásticas (como las cadenas de Markov) para anticiparnos al movimiento cambiante de los mercados con rigor científico.</li>
+      <li><strong>Reconocimiento de Patrones Ocultos</strong>El motor analiza constantemente flujos masivos de datos históricos y en tiempo real para detectar huellas digitales y comportamientos recurrentes que el ojo humano o las herramientas tradicionales jamás alcanzan a ver.</li>
+      <li><strong>Correlaciones Cruzadas Globales</strong>Evaluamos las interacciones invisibles y las conexiones profundas entre múltiples activos en todo el mundo, permitiéndonos detectar oportunidades únicas, riesgos ocultos y situaciones de sesgo en el tablero financiero global.</li>
+      <li><strong>Optimización y Elegancia Matemática</strong>El motor utiliza técnicas de optimización avanzada y modelos de asignación inteligente (respaldados por complejas soluciones analíticas y de optimización restringida). Esto traduce la más alta exigencia matemática en respuestas inmediatas, limpias y listas para tu beneficio.</li>
+    </ul>
+    <p>En pocas palabras, transformamos la complejidad de las matemáticas aplicadas en una herramienta intuitiva y directa para que el poder de la predicción financiera esté, por fin, de tu lado.</p>` }
+};
+const overlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const modalClose = document.getElementById('modalClose');
+let lastFocused = null;
+function openModal(key) {
+  const d = panels[key];
+  if (!d) return;
+  modalTitle.textContent = d.title;
+  modalBody.innerHTML = d.html;
+  lastFocused = document.activeElement;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  modalClose.focus();
+}
+function closeModal() {
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  lastFocused?.focus();
+}
+document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.panel)));
+modalClose.addEventListener('click', closeModal);
+overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
+
+/* HERO CAROUSEL */
+(function carousel() {
+  const track = document.getElementById('carouselTrack');
+  const slides = [...track.children];
+  const dotsWrap = document.getElementById('carouselDots');
+  let index = 0;
+  slides.forEach((_, i) => {
+    const dot = document.createElement('button');
+    dot.setAttribute('aria-label', `Ir a la tarjeta ${i + 1}`);
+    dot.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(dot);
+  });
+  const dots = [...dotsWrap.children];
+  function setActive(i) {
+    index = i;
+    dots.forEach((d, di) => d.classList.toggle('active', di === i));
+  }
+  function goTo(i) {
+    const next = (i + slides.length) % slides.length;
+    slides[next].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+  let syncQueued = false;
+  function syncActiveToScroll() {
+    syncQueued = false;
+    const center = track.scrollLeft + track.clientWidth / 2;
+    let nearest = 0, best = Infinity;
+    slides.forEach((s, i) => {
+      const dist = Math.abs((s.offsetLeft + s.offsetWidth / 2) - center);
+      if (dist < best) { best = dist; nearest = i; }
+    });
+    setActive(nearest);
+  }
+  track.addEventListener('scroll', () => { if (!syncQueued) { syncQueued = true; requestAnimationFrame(syncActiveToScroll); } }, { passive: true });
+  addEventListener('resize', syncActiveToScroll);
+  document.getElementById('carPrev').addEventListener('click', () => goTo(index - 1));
+  document.getElementById('carNext').addEventListener('click', () => goTo(index + 1));
+  setActive(0);
+  if (!reduceMotion) {
+    let autoplay = setInterval(() => goTo(index + 1), 4400);
+    const carouselEl = document.getElementById('hero');
+    carouselEl.addEventListener('pointerenter', () => clearInterval(autoplay));
+    carouselEl.addEventListener('pointerleave', () => { autoplay = setInterval(() => goTo(index + 1), 4400); });
+    gsap.from('.hero-slide', { opacity: 0, y: 26, scale: .94, stagger: .08, duration: .7, ease: 'power3.out', delay: .15 });
+  }
+})();
+
+/* SCROLL REVEALS + ZOOM */
+document.querySelectorAll('.scrollblock').forEach(block => {
+  if (!reduceMotion) {
+    gsap.set(block, { opacity: 0, y: 40 });
+    gsap.to(block, { opacity: 1, y: 0, duration: .9, ease: 'power3.out', scrollTrigger: { trigger: block, start: 'top 85%' } });
+    const media = block.querySelector('.sb-media img, .logo-style');
+    if (media) gsap.fromTo(media, { scale: .92 }, { scale: 1.06, ease: 'none', scrollTrigger: { trigger: block, start: 'top bottom', end: 'bottom top', scrub: true } });
+  }
+});
+
+/* STARFIELD (block 1) */
+(function starfield() {
+  const canvas = document.getElementById('starsCanvas');
+  const section = document.getElementById('block1');
+  const ctx = canvas.getContext('2d');
+  let stars = [], w = 0, h = 0, dpr = Math.min(devicePixelRatio || 1, 2);
+  function resize() {
+    w = section.clientWidth; h = section.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const count = Math.round((w * h) / 5200);
+    stars = Array.from({ length: count }, () => ({
+      x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.3 + .2,
+      speed: Math.random() * .35 + .08, phase: Math.random() * Math.PI * 2
+    }));
+  }
+  resize();
+  addEventListener('resize', resize);
+  function draw(t) {
+    ctx.clearRect(0, 0, w, h);
+    for (const s of stars) {
+      const twinkle = .55 + Math.sin(t / 900 + s.phase) * .45;
+      ctx.globalAlpha = Math.max(.08, twinkle);
+      ctx.fillStyle = '#EAF9F1';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+      if (!reduceMotion) { s.y += s.speed; if (s.y > h) { s.y = -2; s.x = Math.random() * w; } }
+    }
+    ctx.globalAlpha = 1;
+    if (!reduceMotion) requestAnimationFrame(draw); else requestAnimationFrame(t2 => draw(t2));
+  }
+  if (reduceMotion) draw(0); else requestAnimationFrame(draw);
+})();
+</script>
 </body>
 </html>
