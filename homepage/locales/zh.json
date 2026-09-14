@@ -57,5 +57,8 @@
   },
   "lang": {
     "label": "语言"
+  },
+  "footer": {
+    "eyebrow": "联系我们"
   }
 }

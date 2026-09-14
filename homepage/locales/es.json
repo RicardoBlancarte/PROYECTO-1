@@ -57,5 +57,8 @@
   },
   "lang": {
     "label": "Idioma"
+  },
+  "footer": {
+    "eyebrow": "Escríbenos"
   }
 }

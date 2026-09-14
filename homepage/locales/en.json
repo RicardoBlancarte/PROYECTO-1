@@ -57,5 +57,8 @@
   },
   "lang": {
     "label": "Language"
+  },
+  "footer": {
+    "eyebrow": "Get in touch"
   }
 }
