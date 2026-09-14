@@ -88,15 +88,53 @@ h1,h2,h3,p{margin-top:0}
 .scrollblock[data-align="right"] .sb-copy{order:1}
 .sb-media{position:relative;border-radius:22px;overflow:hidden;border:1px solid var(--line);box-shadow:0 30px 90px rgba(0,0,0,.42);aspect-ratio:16/11;background:#0d1013}
 .sb-media img{width:100%;height:100%;object-fit:cover;will-change:transform}
-.sb-badge{position:absolute;bottom:14px;right:14px;width:min(210px,42%);border-radius:14px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 14px 40px rgba(0,0,0,.5)}
-.sb-badge img{width:100%;display:block}
+.zoomable{transform-origin:center;will-change:transform}
+#block2 .sb-media{aspect-ratio:1056/720}
+#block3 .sb-media{aspect-ratio:1020/666}
+#block4 .sb-media{aspect-ratio:1431/689}
+#block5 .sb-media{aspect-ratio:1411/543}
+#block6 .sb-media{aspect-ratio:16/9}
+#block8 .sb-media{aspect-ratio:1007/329}
+.sb-badge{position:absolute;bottom:14px;right:14px;width:min(210px,42%);aspect-ratio:442/242;border-radius:14px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.sb-badge img{width:100%;height:100%;object-fit:cover;display:block}
+.sb-badge-strip{position:absolute;left:0;right:0;bottom:0;width:100%;aspect-ratio:1402/125;border-top:1px solid var(--line2);box-shadow:0 -10px 30px rgba(0,0,0,.4)}
+.sb-badge-strip img{width:100%;height:100%;object-fit:cover;display:block}
 .sb-copy{padding:30px;display:grid;gap:14px}
 .sb-copy p{color:var(--text);font-size:clamp(18px,2.4vw,24px);line-height:1.4;font-weight:600;letter-spacing:-.02em;margin:0}
 .sb-tag{color:var(--green-bright)!important;font-size:13px!important;font-weight:700!important;letter-spacing:.14em;text-transform:uppercase}
 
 .block-logo{min-height:100vh;justify-content:center;overflow:hidden;background:#000}
 .stars-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.logo-style{position:relative;z-index:1;width:min(60vw,560px);filter:grayscale(1) invert(1) contrast(1.2) brightness(1.1) drop-shadow(0 0 34px rgba(16,185,129,.32));opacity:.94}
+.logo-stage{position:relative;z-index:1;display:grid;place-items:center;gap:22px;width:100%}
+.mandala-wrap{position:absolute;top:50%;left:50%;pointer-events:none}
+.mandala-wrap.m1{width:min(150vw,1400px);animation:float1 22s ease-in-out infinite alternate}
+.mandala-wrap.m2{width:min(105vw,980px);animation:float2 17s ease-in-out infinite alternate}
+.mandala-wrap.m3{width:min(68vw,620px);animation:float3 13s ease-in-out infinite alternate}
+.mandala{display:block;width:100%;aspect-ratio:1/1;transform:translate(-50%,-50%);stroke:#00f3ff;fill:none}
+.mandala-wrap.m1 .mandala{opacity:.08;filter:blur(2px);animation:spin 130s linear infinite}
+.mandala-wrap.m2 .mandala{opacity:.14;filter:blur(1px);animation:spin 95s linear infinite reverse}
+.mandala-wrap.m3 .mandala{opacity:.2;animation:spin 65s linear infinite}
+.logo-main{position:relative;z-index:2;width:min(58vw,420px);aspect-ratio:1/1;stroke:#dff9ff;fill:none;filter:drop-shadow(0 0 30px rgba(16,185,129,.34)) drop-shadow(0 0 60px rgba(0,243,255,.14))}
+.logo-caption{position:relative;z-index:2;color:var(--soft);font:600 13px 'JetBrains Mono',monospace;letter-spacing:.5em;text-transform:uppercase;text-indent:.5em;opacity:.85}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes float1{0%{transform:translate(calc(-50% - 18px),calc(-50% - 10px))}100%{transform:translate(calc(-50% + 18px),calc(-50% + 14px))}}
+@keyframes float2{0%{transform:translate(calc(-50% + 14px),calc(-50% - 12px))}100%{transform:translate(calc(-50% - 16px),calc(-50% + 10px))}}
+@keyframes float3{0%{transform:translate(calc(-50% - 10px),calc(-50% + 8px))}100%{transform:translate(calc(-50% + 12px),calc(-50% - 10px))}}
+@media (prefers-reduced-motion: reduce){.mandala-wrap,.mandala{animation:none!important}}
+
+/* ---------- BLOCK 6: AI DEBATE ILLUSTRATION ---------- */
+.debate-svg{width:100%;height:100%;display:block;background:radial-gradient(circle at 30% 35%,rgba(59,130,246,.12),transparent 55%),radial-gradient(circle at 72% 60%,rgba(245,158,11,.12),transparent 55%),#0b0f14}
+.debate-stream{stroke-dasharray:6 8;animation:dash 3.5s linear infinite}
+@media (prefers-reduced-motion: reduce){.debate-stream{animation:none}}
+@keyframes dash{to{stroke-dashoffset:-56}}
+
+/* ---------- BLOCK 7: RISK MOCKUP ---------- */
+.risk-mock{display:flex;align-items:center;justify-content:center;padding:8%;background:linear-gradient(160deg,#0c1116,#131b21)}
+.risk-card{width:100%;max-width:420px;display:grid;gap:16px}
+.risk-track{position:relative;height:10px;border-radius:999px;background:linear-gradient(90deg,#3B82F6,#10B981 45%,#F59E0B 78%,#EF4444)}
+.risk-knob{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:#0B0F12;border:3px solid #F3F4F6;box-shadow:0 0 0 6px rgba(245,158,11,.18),0 6px 18px rgba(0,0,0,.5);transform:translate(-50%,-50%)}
+.risk-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+.risk-readout{color:var(--green-bright);font-size:13px}
 
 .block-final{min-height:92vh;flex-direction:column;justify-content:center;text-align:center;gap:0}
 .final-inner{width:min(760px,100%);margin:0 auto;display:grid;gap:30px;justify-items:center}
@@ -118,11 +156,30 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
   .hero{padding-top:130px}
   .scrollblock{padding:70px 16px}
   .sb-badge{display:none}
-  .logo-style{width:82vw}
+  .sb-badge-strip{aspect-ratio:1402/170}
+  .logo-main{width:78vw}
 }
 </style>
 </head>
 <body>
+
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="algoFlower" viewBox="-1.05 -1.05 2.1 2.1">
+    <g stroke-width="0.012" stroke-linecap="round">
+      <circle cx="0" cy="0" r="0.4" opacity=".9"/>
+      <circle cx="0.4" cy="0" r="0.4" opacity=".9"/>
+      <circle cx="0.2" cy="0.34641" r="0.4" opacity=".9"/>
+      <circle cx="-0.2" cy="0.34641" r="0.4" opacity=".9"/>
+      <circle cx="-0.4" cy="0" r="0.4" opacity=".9"/>
+      <circle cx="-0.2" cy="-0.34641" r="0.4" opacity=".9"/>
+      <circle cx="0.2" cy="-0.34641" r="0.4" opacity=".9"/>
+    </g>
+    <g stroke-width="0.008" opacity=".48">
+      <path d="M0 0L.4 0M0 0L.2 .34641M0 0L-.2 .34641M0 0L-.4 0M0 0L-.2 -.34641M0 0L.2 -.34641M.4 0L.2 .34641M.2 .34641L-.2 .34641M-.2 .34641L-.4 0M-.4 0L-.2 -.34641M-.2 -.34641L.2 -.34641M.2 -.34641L.4 0M.2 .34641L-.2 -.34641M-.2 .34641L.2 -.34641M.4 0L-.4 0"/>
+    </g>
+    <circle cx="0" cy="0" r="0.035" fill="#fff" stroke="none"/>
+  </symbol>
+</svg>
 
 <nav class="navbar" id="navbar">
   <a class="brand-mark" href="https://thalgorithm.com" aria-label="Ir a Thalgorithm"><img src="../logo_algorithm.svg" alt=""><span>algorithm</span></a>
@@ -174,12 +231,18 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 
 <section class="scrollblock block-logo" id="block1">
   <canvas class="stars-canvas" id="starsCanvas"></canvas>
-  <img class="logo-style" src="assets/style logo.png" alt="algorithm">
+  <div class="logo-stage">
+    <div class="mandala-wrap m1" aria-hidden="true"><svg class="mandala"><use href="#algoFlower"></use></svg></div>
+    <div class="mandala-wrap m2" aria-hidden="true"><svg class="mandala"><use href="#algoFlower"></use></svg></div>
+    <div class="mandala-wrap m3" aria-hidden="true"><svg class="mandala"><use href="#algoFlower"></use></svg></div>
+    <svg class="logo-main zoomable" role="img" aria-label="The Algorithm"><use href="#algoFlower"></use></svg>
+    <span class="logo-caption mono">Algorithm</span>
+  </div>
 </section>
 
 <section class="scrollblock" data-align="left" id="block2">
   <div class="block-inner">
-    <div class="sb-media"><img src="assets/shanghai-hero.jpg.png" alt="Persona usando la plataforma The Algorithm en el teléfono"></div>
+    <div class="sb-media"><img class="zoomable" src="assets/shanghai-hero.jpg.png" alt="Persona usando la plataforma The Algorithm en el teléfono"></div>
     <div class="sb-copy glass">
       <p>Herramientas bancarias de primer nivel ahora disponibles</p>
       <p>Acceso al mejor algoritmo matemático de forma gratuita</p>
@@ -191,8 +254,8 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 <section class="scrollblock" data-align="right" id="block3">
   <div class="block-inner">
     <div class="sb-media">
-      <img src="assets/grafica.png.png" alt="Gráfica de predicción de precios con bandas de Markov">
-      <div class="sb-badge"><img src="assets/prob tomorrow.png" alt="Precio más probable para mañana"></div>
+      <img class="zoomable" src="assets/grafica.png.png" alt="Gráfica de predicción de precios con bandas de Markov">
+      <div class="sb-badge-strip"><img src="assets/prob tomorrow.png" alt="Precio más probable para mañana"></div>
     </div>
     <div class="sb-copy glass"><p>Anticipa movimientos de los activos más populares en los mercados mundiales</p></div>
   </div>
@@ -201,7 +264,7 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 <section class="scrollblock" data-align="left" id="block4">
   <div class="block-inner">
     <div class="sb-media">
-      <img src="assets/makowitz.png.png" alt="Distribución de portafolio según la Teoría de Markowitz">
+      <img class="zoomable" src="assets/makowitz.png.png" alt="Distribución de portafolio según la Teoría de Markowitz">
       <div class="sb-badge"><img src="assets/makowitz1.png.png" alt="Detalle de pesos óptimos de portafolio"></div>
     </div>
     <div class="sb-copy glass"><p>Realiza portafolios de inversión de los mejores activos en los mercados mundiales para invertir en un solo paso</p></div>
@@ -210,28 +273,62 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 
 <section class="scrollblock" data-align="right" id="block5">
   <div class="block-inner">
-    <div class="sb-media"><img src="assets/mapa global.png" alt="Mapa global de relevancia de activos"></div>
+    <div class="sb-media"><img class="zoomable" src="assets/mapa global.png" alt="Mapa global de relevancia de activos"></div>
     <div class="sb-copy glass"><p>Te mostramos dónde en el mundo los activos cobran relevancia</p></div>
   </div>
 </section>
 
 <section class="scrollblock" data-align="left" id="block6">
   <div class="block-inner">
-    <div class="sb-media"><img src="assets/debate geopolitico.png" alt="Debate geopolítico entre IA conservadora y liberal"></div>
+    <div class="sb-media">
+      <svg class="debate-svg zoomable" viewBox="0 0 800 450" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Debate entre IA conservadora y liberal, con síntesis ponderada">
+        <defs>
+          <radialGradient id="nodeBlue" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#9fd0ff"/>
+            <stop offset="55%" stop-color="#3B82F6" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="nodeAmber" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffe4ad"/>
+            <stop offset="55%" stop-color="#F59E0B" stop-opacity=".85"/>
+            <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <path class="debate-stream" d="M300 195 C400 150 400 150 500 195" fill="none" stroke="#10B981" stroke-width="2" opacity=".55"/>
+        <path class="debate-stream" d="M300 235 C400 265 400 265 500 235" fill="none" stroke="#10B981" stroke-width="2" opacity=".35" style="animation-delay:-1.2s"/>
+        <path class="debate-stream" d="M300 215 L500 215" fill="none" stroke="#dff9ff" stroke-width="1.4" opacity=".4" style="animation-delay:-2.1s"/>
+        <circle cx="230" cy="215" r="150" fill="url(#nodeBlue)"/>
+        <circle cx="570" cy="215" r="150" fill="url(#nodeAmber)"/>
+        <circle cx="230" cy="215" r="34" fill="none" stroke="#eaf6ff" stroke-width="2" opacity=".85"/>
+        <circle cx="230" cy="215" r="17" fill="#eaf6ff"/>
+        <circle cx="570" cy="215" r="34" fill="none" stroke="#fff3da" stroke-width="2" opacity=".85"/>
+        <circle cx="570" cy="215" r="17" fill="#fff3da"/>
+        <text x="230" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO CONSERVADOR</text>
+        <text x="570" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO LIBERAL</text>
+        <text x="400" y="375" text-anchor="middle" fill="#10B981" font-family="'JetBrains Mono',monospace" font-size="12.5" letter-spacing="3">SÍNTESIS PONDERADA</text>
+      </svg>
+    </div>
     <div class="sb-copy glass"><p>Te mostramos cómo un debate entre IA conservadores y liberales y la síntesis de este debate; así mismo la noticia se califica y pondera en los cálculos de probabilidad</p></div>
   </div>
 </section>
 
 <section class="scrollblock" data-align="right" id="block7">
   <div class="block-inner">
-    <div class="sb-media"><img src="assets/Perfil de riesgo.png" alt="Calibración de perfil de riesgo"></div>
+    <div class="sb-media risk-mock">
+      <div class="risk-card zoomable" role="img" aria-label="Selector de perfil de riesgo entre conservador y agresivo">
+        <span class="eyebrow">Perfil de riesgo</span>
+        <div class="risk-track"><div class="risk-knob" style="left:64%"></div></div>
+        <div class="risk-labels"><span>Conservador</span><span>Agresivo</span></div>
+        <div class="risk-readout mono">Sesgo actual: <strong>64% Agresivo</strong></div>
+      </div>
+    </div>
     <div class="sb-copy glass"><p>Te damos la flexibilidad de elegir tu sesgo conservador o abierto respecto al riesgo</p></div>
   </div>
 </section>
 
 <section class="scrollblock" data-align="left" id="block8">
   <div class="block-inner">
-    <div class="sb-media"><img src="assets/top portafolios.png" alt="Top Portfolio: mejores activos para invertir hoy"></div>
+    <div class="sb-media"><img class="zoomable" src="assets/top portafolios.png" alt="Top Portfolio: mejores activos para invertir hoy"></div>
     <div class="sb-copy glass"><p>The Algorithm introduce Top Portfolio, un segmento donde The Algorithm da el mejor top 3 de activos para invertir hoy</p></div>
   </div>
 </section>
@@ -252,6 +349,7 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
 import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTrigger.js';
 gsap.registerPlugin(ScrollTrigger);
+ScrollTrigger.config({ ignoreMobileResize: true });
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 document.getElementById('year').textContent = new Date().getFullYear();
 
@@ -329,7 +427,9 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.c
   }
   function goTo(i) {
     const next = (i + slides.length) % slides.length;
-    slides[next].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const slide = slides[next];
+    const target = slide.offsetLeft + slide.offsetWidth / 2 - track.clientWidth / 2;
+    track.scrollTo({ left: target, behavior: 'smooth' });
   }
   let syncQueued = false;
   function syncActiveToScroll() {
@@ -348,21 +448,35 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.c
   document.getElementById('carNext').addEventListener('click', () => goTo(index + 1));
   setActive(0);
   if (!reduceMotion) {
-    let autoplay = setInterval(() => goTo(index + 1), 4400);
-    const carouselEl = document.getElementById('hero');
-    carouselEl.addEventListener('pointerenter', () => clearInterval(autoplay));
-    carouselEl.addEventListener('pointerleave', () => { autoplay = setInterval(() => goTo(index + 1), 4400); });
+    let autoplay = null;
+    let hovering = false;
+    let heroVisible = true;
+    function startAutoplay() { if (!autoplay && heroVisible && !hovering) autoplay = setInterval(() => goTo(index + 1), 4400); }
+    function stopAutoplay() { clearInterval(autoplay); autoplay = null; }
+    const heroEl = document.getElementById('hero');
+    heroEl.addEventListener('pointerenter', () => { hovering = true; stopAutoplay(); });
+    heroEl.addEventListener('pointerleave', () => { hovering = false; startAutoplay(); });
+    new IntersectionObserver(entries => {
+      heroVisible = entries[0].isIntersecting;
+      heroVisible ? startAutoplay() : stopAutoplay();
+    }, { threshold: 0.2 }).observe(heroEl);
+    startAutoplay();
     gsap.from('.hero-slide', { opacity: 0, y: 26, scale: .94, stagger: .08, duration: .7, ease: 'power3.out', delay: .15 });
   }
 })();
 
 /* SCROLL REVEALS + ZOOM */
-document.querySelectorAll('.scrollblock').forEach(block => {
+document.querySelectorAll('.scrollblock').forEach((block, i) => {
   if (!reduceMotion) {
     gsap.set(block, { opacity: 0, y: 40 });
     gsap.to(block, { opacity: 1, y: 0, duration: .9, ease: 'power3.out', scrollTrigger: { trigger: block, start: 'top 85%' } });
-    const media = block.querySelector('.sb-media img, .logo-style');
-    if (media) gsap.fromTo(media, { scale: .92 }, { scale: 1.06, ease: 'none', scrollTrigger: { trigger: block, start: 'top bottom', end: 'bottom top', scrub: true } });
+    const media = block.querySelector('.zoomable');
+    if (media) {
+      const zoomOut = i % 2 === 1;
+      gsap.fromTo(media,
+        { scale: zoomOut ? 1.05 : .92 },
+        { scale: zoomOut ? .93 : 1.06, ease: 'none', scrollTrigger: { trigger: block, start: 'top bottom', end: 'bottom top', scrub: .8 } });
+    }
   }
 });
 
@@ -384,7 +498,8 @@ document.querySelectorAll('.scrollblock').forEach(block => {
     }));
   }
   resize();
-  addEventListener('resize', resize);
+  let resizeTimer = null;
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 200); });
   function draw(t) {
     ctx.clearRect(0, 0, w, h);
     for (const s of stars) {
