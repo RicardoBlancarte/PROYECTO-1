@@ -34,13 +34,28 @@ h1,h2,h3,p{margin-top:0}
 .brand-mark{display:flex;align-items:center;gap:9px;font-weight:700;flex:0 0 auto}
 .brand-mark img{width:26px;height:26px;filter:drop-shadow(0 0 12px rgba(16,185,129,.35))}
 .brand-mark span{font-size:13px;letter-spacing:.26em;text-transform:lowercase;color:var(--soft)}
-.nav-links{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 auto;padding:2px 6px}
-.nav-links::-webkit-scrollbar{display:none}
+.nav-menu{display:flex;align-items:center;gap:10px;flex:1 1 auto;justify-content:space-between;min-width:0}
+.nav-links{display:flex;align-items:center;gap:6px;flex:1 1 auto;padding:2px 6px;min-width:0}
 .nav-link{flex:0 0 auto;border:1px solid transparent;background:transparent;color:var(--muted);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;transition:color .2s ease,background .2s ease,border-color .2s ease}
 .nav-link:hover{color:var(--text);background:rgba(255,255,255,.05);border-color:var(--line)}
 .nav-cta{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 16px 9px 10px;border-radius:999px;border:1px solid rgba(16,185,129,.4);background:rgba(16,185,129,.08);color:var(--text);font:700 12px 'JetBrains Mono',monospace;letter-spacing:.08em;transition:box-shadow .2s ease,background .2s ease}
 .nav-cta img{width:20px;height:20px}
 .nav-cta:hover{background:rgba(16,185,129,.16);box-shadow:0 0 22px rgba(16,185,129,.22)}
+.nav-burger{display:none;flex:0 0 auto;width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);align-items:center;justify-content:center;flex-direction:column;gap:4px}
+.nav-burger span{display:block;width:16px;height:2px;border-radius:2px;background:var(--soft);transition:transform .2s ease,opacity .2s ease}
+.nav-burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.nav-burger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.nav-burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.lang-switch{position:relative;flex:0 0 auto}
+.lang-current{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--soft);padding:7px 10px;border-radius:999px;font-size:12px}
+.lang-current:hover{border-color:var(--line2)}
+.lang-flag{font-size:15px;line-height:1}
+.lang-code{font-size:11px;letter-spacing:.06em}
+.lang-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:10;min-width:150px;padding:6px;border-radius:14px;border:1px solid var(--line2);background:rgba(9,9,11,.96);backdrop-filter:blur(14px);box-shadow:0 20px 50px rgba(0,0,0,.4);display:none;flex-direction:column;gap:2px}
+.lang-menu.open{display:flex}
+.lang-option{display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border-radius:9px;border:none;background:transparent;color:var(--soft);font-size:13px;text-align:left}
+.lang-option:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.lang-option.active{color:var(--green-bright)}
 
 /* ---------- MODAL ---------- */
 .modal-overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,5,6,.72);backdrop-filter:blur(6px);opacity:0;visibility:hidden;transition:opacity .25s ease;}
@@ -61,20 +76,11 @@ h1,h2,h3,p{margin-top:0}
 .hero-inner{width:min(1180px,100%);margin:0 auto;display:grid;gap:36px}
 .hero-head{max-width:780px}
 .hero-head h1{font-size:clamp(32px,5.4vw,58px);line-height:1.05;font-weight:700;letter-spacing:-.04em;margin:14px 0 14px}
-.hero-carousel{position:relative}
-.carousel-track{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 18px;scrollbar-width:none}
-.carousel-track::-webkit-scrollbar{display:none}
-.hero-slide{scroll-snap-align:center;flex:0 0 min(320px,78vw);border-radius:22px;padding:26px 22px;display:flex;flex-direction:column;gap:14px;min-height:210px}
+.attr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;width:min(1140px,100%);margin:0 auto}
+.attr-card{border-radius:22px;padding:26px 22px;display:flex;flex-direction:column;gap:14px;min-height:210px}
 .slide-dot{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center}
-.hero-slide h3{font-size:16px;font-weight:700;letter-spacing:-.02em}
-.hero-slide p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0}
-.carousel-arrow{position:absolute;top:50%;translate:0 -50%;width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);background:rgba(9,9,11,.7);backdrop-filter:blur(10px);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;z-index:5}
-.carousel-arrow.prev{left:-6px}
-.carousel-arrow.next{right:-6px}
-.carousel-arrow:hover{border-color:var(--green);box-shadow:0 0 18px rgba(16,185,129,.25)}
-.carousel-dots{display:flex;justify-content:center;gap:7px;margin-top:-6px}
-.carousel-dots button{width:7px;height:7px;border-radius:50%;background:var(--line2);border:none;padding:0;transition:background .2s ease,transform .2s ease}
-.carousel-dots button.active{background:var(--green-bright);transform:scale(1.3)}
+.attr-card h3{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.attr-card p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0}
 .hero-cta-row{display:flex;justify-content:center}
 .glass-cta{display:inline-flex;align-items:center;gap:9px;padding:12px 22px;border-radius:999px;border:1px solid rgba(16,185,129,.4);background:rgba(255,255,255,.03);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--text);font:700 12px 'JetBrains Mono',monospace;letter-spacing:.14em;box-shadow:0 0 26px rgba(16,185,129,.14)}
 .glass-cta:hover{border-color:var(--green-bright);box-shadow:0 0 34px rgba(0,255,136,.24)}
@@ -149,8 +155,16 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
   .block-inner{grid-template-columns:1fr!important}
   .scrollblock[data-align="right"] .sb-media,.scrollblock[data-align="right"] .sb-copy{order:0}
   .sb-copy{padding:22px}
-  .brand-mark span{display:none}
-  .nav-cta span.cta-label{display:none}
+  .attr-grid{grid-template-columns:repeat(2,1fr)}
+  .nav-burger{display:flex}
+  .nav-menu{position:absolute;top:calc(100% + 10px);left:0;right:0;flex-direction:column;align-items:stretch;gap:10px;padding:16px;border:1px solid var(--line2);border-radius:18px;background:rgba(9,9,11,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 24px 60px rgba(0,0,0,.4);display:none}
+  .nav-menu.open{display:flex}
+  .nav-links{flex-direction:column;align-items:stretch;overflow-x:visible;gap:4px;padding:0}
+  .nav-link{width:100%;text-align:left;padding:12px 14px}
+  .lang-switch{width:100%}
+  .lang-current{width:100%;justify-content:center}
+  .lang-menu{position:static;margin-top:8px;width:100%;box-shadow:none;border-color:var(--line)}
+  .nav-cta{justify-content:center;width:100%}
 }
 @media (max-width:540px){
   .hero{padding-top:130px}
@@ -158,6 +172,8 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
   .sb-badge{display:none}
   .sb-badge-strip{aspect-ratio:1402/170}
   .logo-main{width:78vw}
+  .attr-grid{grid-template-columns:1fr}
+  .mandala-wrap.m1{display:none}
 }
 </style>
 </head>
@@ -183,13 +199,26 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 
 <nav class="navbar" id="navbar">
   <a class="brand-mark" href="https://thalgorithm.com" aria-label="Ir a Thalgorithm"><img src="../logo_algorithm.svg" alt=""><span>algorithm</span></a>
-  <div class="nav-links">
-    <button class="nav-link" data-panel="mision">Nuestra Misión</button>
-    <button class="nav-link" data-panel="vision">Nuestra Visión</button>
-    <button class="nav-link" data-panel="valores">Valores</button>
-    <button class="nav-link" data-panel="algorithm">Qué es The Algorithm</button>
+  <button class="nav-burger" id="navBurger" aria-label="Abrir menú" aria-expanded="false" aria-controls="navMenu"><span></span><span></span><span></span></button>
+  <div class="nav-menu" id="navMenu">
+    <div class="nav-links">
+      <button class="nav-link" data-panel="mision" data-i18n="nav.mision">Nuestra Misión</button>
+      <button class="nav-link" data-panel="vision" data-i18n="nav.vision">Nuestra Visión</button>
+      <button class="nav-link" data-panel="valores" data-i18n="nav.valores">Valores</button>
+      <button class="nav-link" data-panel="algorithm" data-i18n="nav.algorithm">Qué es The Algorithm</button>
+      <div class="lang-switch" id="langSwitch">
+        <button class="lang-current" id="langButton" aria-haspopup="true" aria-expanded="false">
+          <span class="lang-flag" id="langFlag">🇪🇸</span><span class="lang-code mono" id="langCode">ES</span>
+        </button>
+        <div class="lang-menu" id="langMenu">
+          <button class="lang-option" data-lang="es"><span class="lang-flag">🇪🇸</span> Español</button>
+          <button class="lang-option" data-lang="en"><span class="lang-flag">🇬🇧</span> English</button>
+          <button class="lang-option" data-lang="zh"><span class="lang-flag">🇨🇳</span> 中文</button>
+        </div>
+      </div>
+    </div>
+    <a class="nav-cta" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt=""><span class="cta-label">THALGORITHM</span></a>
   </div>
-  <a class="nav-cta" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt=""><span class="cta-label">THALGORITHM</span></a>
 </nav>
 
 <div class="modal-overlay" id="modalOverlay">
@@ -206,23 +235,18 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
 <section class="hero" id="hero">
   <div class="hero-inner">
     <div class="hero-head">
-      <span class="eyebrow">In the name of mankind</span>
-      <h1>El motor cuantitativo que trabaja para ti</h1>
-      <p class="lead">Matemáticas de nivel institucional, gratis, para cualquier persona. Esto es lo que hay dentro de The Algorithm.</p>
+      <span class="eyebrow" data-i18n="hero.eyebrow">In the name of mankind</span>
+      <h1 data-i18n="hero.title">El motor cuantitativo que trabaja para ti</h1>
+      <p class="lead" data-i18n="hero.lead">Matemáticas de nivel institucional, gratis, para cualquier persona. Esto es lo que hay dentro de The Algorithm.</p>
     </div>
-    <div class="hero-carousel">
-      <button class="carousel-arrow prev" id="carPrev" aria-label="Anterior">&lsaquo;</button>
-      <div class="carousel-track glass" id="carouselTrack" style="background:transparent;border:none;box-shadow:none">
-        <article class="hero-slide glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#10B981">Σ</div><h3>Motor Estocástico</h3><p>Simulaciones tipo Markov y Monte Carlo para anticipar escenarios de precio con rigor científico.</p></article>
-        <article class="hero-slide glass" style="border-color:rgba(59,130,246,.28)"><div class="slide-dot" style="background:rgba(59,130,246,.14);color:#3B82F6">W</div><h3>Optimización Markowitz</h3><p>Portafolios óptimos calculados en segundos, sin comisiones ni intermediarios de por medio.</p></article>
-        <article class="hero-slide glass" style="border-color:rgba(245,158,11,.28)"><div class="slide-dot" style="background:rgba(245,158,11,.14);color:#F59E0B">AI</div><h3>Inteligencia Geopolítica</h3><p>Debates de IA conservadora y liberal que ponderan cada noticia dentro del cálculo de probabilidad.</p></article>
-        <article class="hero-slide glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#00FF88">◎</div><h3>Mapa de Correlaciones</h3><p>Visualiza en tiempo real dónde en el mundo se mueven realmente tus activos.</p></article>
-        <article class="hero-slide glass" style="border-color:rgba(239,68,68,.28)"><div class="slide-dot" style="background:rgba(239,68,68,.14);color:#EF4444">±</div><h3>Perfil de Riesgo</h3><p>Calibra tu sesgo conservador o abierto y deja que el motor se adapte a ti.</p></article>
-        <article class="hero-slide glass" style="border-color:rgba(0,255,136,.3)"><div class="slide-dot" style="background:rgba(0,255,136,.14);color:#00FF88">★</div><h3>Top Portfolio</h3><p>El top 3 de activos recomendados hoy, directo desde el motor analítico.</p></article>
-      </div>
-      <button class="carousel-arrow next" id="carNext" aria-label="Siguiente">&rsaquo;</button>
+    <div class="attr-grid">
+      <article class="attr-card glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#10B981">Σ</div><h3 data-i18n="attributes.0.title">Motor Estocástico</h3><p data-i18n="attributes.0.desc">Simulaciones tipo Markov y Monte Carlo para anticipar escenarios de precio con rigor científico.</p></article>
+      <article class="attr-card glass" style="border-color:rgba(59,130,246,.28)"><div class="slide-dot" style="background:rgba(59,130,246,.14);color:#3B82F6">W</div><h3 data-i18n="attributes.1.title">Optimización Markowitz</h3><p data-i18n="attributes.1.desc">Portafolios óptimos calculados en segundos, sin comisiones ni intermediarios de por medio.</p></article>
+      <article class="attr-card glass" style="border-color:rgba(245,158,11,.28)"><div class="slide-dot" style="background:rgba(245,158,11,.14);color:#F59E0B">AI</div><h3 data-i18n="attributes.2.title">Inteligencia Geopolítica</h3><p data-i18n="attributes.2.desc">Debates de IA conservadora y liberal que ponderan cada noticia dentro del cálculo de probabilidad.</p></article>
+      <article class="attr-card glass" style="border-color:rgba(16,185,129,.28)"><div class="slide-dot" style="background:rgba(16,185,129,.14);color:#00FF88">◎</div><h3 data-i18n="attributes.3.title">Mapa de Correlaciones</h3><p data-i18n="attributes.3.desc">Visualiza en tiempo real dónde en el mundo se mueven realmente tus activos.</p></article>
+      <article class="attr-card glass" style="border-color:rgba(239,68,68,.28)"><div class="slide-dot" style="background:rgba(239,68,68,.14);color:#EF4444">±</div><h3 data-i18n="attributes.4.title">Perfil de Riesgo</h3><p data-i18n="attributes.4.desc">Calibra tu sesgo conservador o abierto y deja que el motor se adapte a ti.</p></article>
+      <article class="attr-card glass" style="border-color:rgba(0,255,136,.3)"><div class="slide-dot" style="background:rgba(0,255,136,.14);color:#00FF88">★</div><h3 data-i18n="attributes.5.title">Top Portfolio</h3><p data-i18n="attributes.5.desc">El top 3 de activos recomendados hoy, directo desde el motor analítico.</p></article>
     </div>
-    <div class="carousel-dots" id="carouselDots"></div>
     <div class="hero-cta-row">
       <a class="glass-cta" href="https://thalgorithm.com"><img src="../logo_algorithm.svg" alt="">THALGORITHM</a>
     </div>
@@ -244,9 +268,9 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
   <div class="block-inner">
     <div class="sb-media"><img class="zoomable" src="assets/shanghai-hero.jpg.png" alt="Persona usando la plataforma The Algorithm en el teléfono"></div>
     <div class="sb-copy glass">
-      <p>Herramientas bancarias de primer nivel ahora disponibles</p>
-      <p>Acceso al mejor algoritmo matemático de forma gratuita</p>
-      <p class="sb-tag mono">In the name of mankind</p>
+      <p data-i18n="blocks.block2.line1">Herramientas bancarias de primer nivel ahora disponibles</p>
+      <p data-i18n="blocks.block2.line2">Acceso al mejor algoritmo matemático de forma gratuita</p>
+      <p class="sb-tag mono" data-i18n="blocks.block2.tag">In the name of mankind</p>
     </div>
   </div>
 </section>
@@ -257,7 +281,7 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
       <img class="zoomable" src="assets/grafica.png.png" alt="Gráfica de predicción de precios con bandas de Markov">
       <div class="sb-badge-strip"><img src="assets/prob tomorrow.png" alt="Precio más probable para mañana"></div>
     </div>
-    <div class="sb-copy glass"><p>Anticipa movimientos de los activos más populares en los mercados mundiales</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block3.text">Anticipa movimientos de los activos más populares en los mercados mundiales</p></div>
   </div>
 </section>
 
@@ -267,14 +291,14 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
       <img class="zoomable" src="assets/makowitz.png.png" alt="Distribución de portafolio según la Teoría de Markowitz">
       <div class="sb-badge"><img src="assets/makowitz1.png.png" alt="Detalle de pesos óptimos de portafolio"></div>
     </div>
-    <div class="sb-copy glass"><p>Realiza portafolios de inversión de los mejores activos en los mercados mundiales para invertir en un solo paso</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block4.text">Realiza portafolios de inversión de los mejores activos en los mercados mundiales para invertir en un solo paso</p></div>
   </div>
 </section>
 
 <section class="scrollblock" data-align="right" id="block5">
   <div class="block-inner">
     <div class="sb-media"><img class="zoomable" src="assets/mapa global.png" alt="Mapa global de relevancia de activos"></div>
-    <div class="sb-copy glass"><p>Te mostramos dónde en el mundo los activos cobran relevancia</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block5.text">Te mostramos dónde en el mundo los activos cobran relevancia</p></div>
   </div>
 </section>
 
@@ -303,12 +327,12 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
         <circle cx="230" cy="215" r="17" fill="#eaf6ff"/>
         <circle cx="570" cy="215" r="34" fill="none" stroke="#fff3da" stroke-width="2" opacity=".85"/>
         <circle cx="570" cy="215" r="17" fill="#fff3da"/>
-        <text x="230" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO CONSERVADOR</text>
-        <text x="570" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO LIBERAL</text>
-        <text x="400" y="375" text-anchor="middle" fill="#10B981" font-family="'JetBrains Mono',monospace" font-size="12.5" letter-spacing="3">SÍNTESIS PONDERADA</text>
+        <text data-i18n="blocks.block6.nodeLeft" x="230" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO CONSERVADOR</text>
+        <text data-i18n="blocks.block6.nodeRight" x="570" y="325" text-anchor="middle" fill="#9CA3AF" font-family="'JetBrains Mono',monospace" font-size="14" letter-spacing="2">MARCO LIBERAL</text>
+        <text data-i18n="blocks.block6.synthesis" x="400" y="375" text-anchor="middle" fill="#10B981" font-family="'JetBrains Mono',monospace" font-size="12.5" letter-spacing="3">SÍNTESIS PONDERADA</text>
       </svg>
     </div>
-    <div class="sb-copy glass"><p>Te mostramos cómo un debate entre IA conservadores y liberales y la síntesis de este debate; así mismo la noticia se califica y pondera en los cálculos de probabilidad</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block6.text">Te mostramos cómo un debate entre IA conservadores y liberales y la síntesis de este debate; así mismo la noticia se califica y pondera en los cálculos de probabilidad</p></div>
   </div>
 </section>
 
@@ -316,28 +340,28 @@ footer a{color:var(--soft);text-decoration:underline;text-decoration-color:var(-
   <div class="block-inner">
     <div class="sb-media risk-mock">
       <div class="risk-card zoomable" role="img" aria-label="Selector de perfil de riesgo entre conservador y agresivo">
-        <span class="eyebrow">Perfil de riesgo</span>
+        <span class="eyebrow" data-i18n="blocks.block7.eyebrow">Perfil de riesgo</span>
         <div class="risk-track"><div class="risk-knob" style="left:64%"></div></div>
-        <div class="risk-labels"><span>Conservador</span><span>Agresivo</span></div>
-        <div class="risk-readout mono">Sesgo actual: <strong>64% Agresivo</strong></div>
+        <div class="risk-labels"><span data-i18n="blocks.block7.labelLeft">Conservador</span><span data-i18n="blocks.block7.labelRight">Agresivo</span></div>
+        <div class="risk-readout mono"><span data-i18n="blocks.block7.readoutPrefix">Sesgo actual:</span> <strong data-i18n="blocks.block7.readoutValue">64% Agresivo</strong></div>
       </div>
     </div>
-    <div class="sb-copy glass"><p>Te damos la flexibilidad de elegir tu sesgo conservador o abierto respecto al riesgo</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block7.text">Te damos la flexibilidad de elegir tu sesgo conservador o abierto respecto al riesgo</p></div>
   </div>
 </section>
 
 <section class="scrollblock" data-align="left" id="block8">
   <div class="block-inner">
     <div class="sb-media"><img class="zoomable" src="assets/top portafolios.png" alt="Top Portfolio: mejores activos para invertir hoy"></div>
-    <div class="sb-copy glass"><p>The Algorithm introduce Top Portfolio, un segmento donde The Algorithm da el mejor top 3 de activos para invertir hoy</p></div>
+    <div class="sb-copy glass"><p data-i18n="blocks.block8.text">The Algorithm introduce Top Portfolio, un segmento donde The Algorithm da el mejor top 3 de activos para invertir hoy</p></div>
   </div>
 </section>
 
 <section class="scrollblock block-final" id="blockFinal">
   <div class="final-inner">
     <div class="final-frame"><img src="assets/inicio .png" alt="algorithm"></div>
-    <a class="btn btn-primary big" href="https://thalgorithm.com">Entra ahora absolutamente gratis</a>
-    <span class="final-tag mono">In the name of mankind</span>
+    <a class="btn btn-primary big" href="https://thalgorithm.com" data-i18n="final.cta">Entra ahora absolutamente gratis</a>
+    <span class="final-tag mono" data-i18n="final.tag">In the name of mankind</span>
   </div>
 </section>
 
@@ -357,40 +381,18 @@ document.getElementById('year').textContent = new Date().getFullYear();
 const navbar = document.getElementById('navbar');
 addEventListener('scroll', () => navbar.classList.toggle('scrolled', scrollY > 10), { passive: true });
 
-/* MODAL PANELS */
-const panels = {
-  mision: { title: 'Nuestra Misión', html: `
-    <p>Acercar las finanzas de alta precisión, la banca inteligente y la tecnología de matemáticas aplicadas a las manos de cualquier persona, ayudando a que cada decisión de inversión en el mundo sea mucho más inteligente.</p>
-    <p>En The Algorithm, creemos firmemente que la educación financiera es un pilar básico para el desarrollo humano. Pensamos que entre más información y mejores herramientas tengan las personas, la humanidad avanza y mejora todos los días. Por eso hacemos lo que hacemos, y por eso nuestro lema siempre será: In the name of mankind.</p>` },
-  vision: { title: 'Nuestra Visión', html: `
-    <p>Llevar herramientas financieras de nivel avanzado a todos los hogares del mundo de forma completamente gratuita.</p>
-    <p>A lo largo de la historia, la tecnología ha hecho más sencillas las tareas del día a día, pero las herramientas financieras potentes se han quedado atrapadas y privatizadas exclusivamente para los bancos y los grandes sectores privados. Nuestro objetivo es romper esa barrera. Así como en su momento las grandes herramientas de construcción cambiaron la forma en que la humanidad edificó su entorno, The Algorithm busca ser ese instrumento fundamental que permita a cualquier persona construir un futuro financiero mejor para su vida y su familia.</p>` },
-  valores: { title: 'Valores', html: `
-    <p>Para que esta visión no se quede solo en una gran inspiración, sino que conecte con la realidad de quien usa la plataforma, nos sostenemos sobre tres valores clave:</p>
-    <ul>
-      <li><strong>Autonomía y Empoderamiento</strong>Las herramientas tecnológicas no tienen verdadero valor si no devuelven el control a las personas. Queremos que recuperes el timón de tus decisiones económicas con absoluta independencia, libres de comisiones abusivas o intermediarios con agendas ocultas.</li>
-      <li><strong>Ingeniería y Precisión Práctica (El Mecanismo)</strong>Detrás de cada interfaz accesible hay matemáticas aplicadas de nivel institucional y flujos de datos automatizados. Transformamos la complejidad analítica en claridad absoluta para el día a día.</li>
-      <li><strong>Transparencia Radical</strong>Ofrecer modelos matemáticos avanzados de forma gratuita suele generar escepticismo ("¿cuál es el truco?"). Nuestra respuesta es la honestidad abierta: la rigor técnica no está peleada con la accesibilidad universal, y la confianza se gana mostrando exactamente cómo operamos, sin letras chiquitas.</li>
-    </ul>` },
-  algorithm: { title: 'Qué es The Algorithm', html: `
-    <p>The Algorithm es mucho más que un conjunto de líneas de código; es un motor analítico vivo impulsado por matemáticas de nivel institucional, diseñado para descifrar el caos de los mercados globales y traducirlo en claridad para ti.</p>
-    <p>Para lograrlo, opera bajo una arquitectura de alta precisión que combina diversos componentes clave:</p>
-    <ul>
-      <li><strong>Modelos Estocásticos y Probabilidad Avanzada</strong>No adivinamos el futuro, calculamos escenarios. Incorporamos modelos probabilísticos y procesos estocásticos dinámicos inspirados en trayectorias estocásticas (como las cadenas de Markov) para anticiparnos al movimiento cambiante de los mercados con rigor científico.</li>
-      <li><strong>Reconocimiento de Patrones Ocultos</strong>El motor analiza constantemente flujos masivos de datos históricos y en tiempo real para detectar huellas digitales y comportamientos recurrentes que el ojo humano o las herramientas tradicionales jamás alcanzan a ver.</li>
-      <li><strong>Correlaciones Cruzadas Globales</strong>Evaluamos las interacciones invisibles y las conexiones profundas entre múltiples activos en todo el mundo, permitiéndonos detectar oportunidades únicas, riesgos ocultos y situaciones de sesgo en el tablero financiero global.</li>
-      <li><strong>Optimización y Elegancia Matemática</strong>El motor utiliza técnicas de optimización avanzada y modelos de asignación inteligente (respaldados por complejas soluciones analíticas y de optimización restringida). Esto traduce la más alta exigencia matemática en respuestas inmediatas, limpias y listas para tu beneficio.</li>
-    </ul>
-    <p>En pocas palabras, transformamos la complejidad de las matemáticas aplicadas en una herramienta intuitiva y directa para que el poder de la predicción financiera esté, por fin, de tu lado.</p>` }
-};
+/* MODAL */
+let panels = {};
 const overlay = document.getElementById('modalOverlay');
 const modalTitle = document.getElementById('modalTitle');
 const modalBody = document.getElementById('modalBody');
 const modalClose = document.getElementById('modalClose');
 let lastFocused = null;
+let openModalKey = null;
 function openModal(key) {
   const d = panels[key];
   if (!d) return;
+  openModalKey = key;
   modalTitle.textContent = d.title;
   modalBody.innerHTML = d.html;
   lastFocused = document.activeElement;
@@ -401,6 +403,7 @@ function openModal(key) {
 function closeModal() {
   overlay.classList.remove('open');
   document.body.style.overflow = '';
+  openModalKey = null;
   lastFocused?.focus();
 }
 document.querySelectorAll('[data-panel]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.panel)));
@@ -408,62 +411,65 @@ modalClose.addEventListener('click', closeModal);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 addEventListener('keydown', e => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal(); });
 
-/* HERO CAROUSEL */
-(function carousel() {
-  const track = document.getElementById('carouselTrack');
-  const slides = [...track.children];
-  const dotsWrap = document.getElementById('carouselDots');
-  let index = 0;
-  slides.forEach((_, i) => {
-    const dot = document.createElement('button');
-    dot.setAttribute('aria-label', `Ir a la tarjeta ${i + 1}`);
-    dot.addEventListener('click', () => goTo(i));
-    dotsWrap.appendChild(dot);
+/* NAV BURGER (mobile) */
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById('navMenu');
+function closeNavMenu() { navMenu.classList.remove('open'); navBurger.setAttribute('aria-expanded', 'false'); }
+function toggleNavMenu() { const open = navMenu.classList.toggle('open'); navBurger.setAttribute('aria-expanded', String(open)); }
+navBurger.addEventListener('click', e => { e.stopPropagation(); toggleNavMenu(); });
+navMenu.querySelectorAll('.nav-link, .nav-cta').forEach(el => el.addEventListener('click', () => closeNavMenu()));
+document.addEventListener('click', e => { if (!navMenu.contains(e.target) && !navBurger.contains(e.target)) closeNavMenu(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeNavMenu(); });
+
+/* LANGUAGE SWITCH + I18N */
+const LANG_KEY = 'algo_lang';
+const SUPPORTED_LANGS = ['es', 'en', 'zh'];
+let currentLang = localStorage.getItem(LANG_KEY);
+if (!SUPPORTED_LANGS.includes(currentLang)) currentLang = 'es';
+const i18nCache = {};
+const langFlagEl = document.getElementById('langFlag');
+const langCodeEl = document.getElementById('langCode');
+const langButton = document.getElementById('langButton');
+const langMenu = document.getElementById('langMenu');
+const langSwitch = document.getElementById('langSwitch');
+function getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+async function loadLocale(lang) {
+  if (i18nCache[lang]) return i18nCache[lang];
+  const res = await fetch(`locales/${lang}.json`);
+  const data = await res.json();
+  i18nCache[lang] = data;
+  return data;
+}
+function applyLocale(dict) {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const val = getPath(dict, el.dataset.i18n);
+    if (typeof val === 'string') el.textContent = val;
   });
-  const dots = [...dotsWrap.children];
-  function setActive(i) {
-    index = i;
-    dots.forEach((d, di) => d.classList.toggle('active', di === i));
-  }
-  function goTo(i) {
-    const next = (i + slides.length) % slides.length;
-    const slide = slides[next];
-    const target = slide.offsetLeft + slide.offsetWidth / 2 - track.clientWidth / 2;
-    track.scrollTo({ left: target, behavior: 'smooth' });
-  }
-  let syncQueued = false;
-  function syncActiveToScroll() {
-    syncQueued = false;
-    const center = track.scrollLeft + track.clientWidth / 2;
-    let nearest = 0, best = Infinity;
-    slides.forEach((s, i) => {
-      const dist = Math.abs((s.offsetLeft + s.offsetWidth / 2) - center);
-      if (dist < best) { best = dist; nearest = i; }
-    });
-    setActive(nearest);
-  }
-  track.addEventListener('scroll', () => { if (!syncQueued) { syncQueued = true; requestAnimationFrame(syncActiveToScroll); } }, { passive: true });
-  addEventListener('resize', syncActiveToScroll);
-  document.getElementById('carPrev').addEventListener('click', () => goTo(index - 1));
-  document.getElementById('carNext').addEventListener('click', () => goTo(index + 1));
-  setActive(0);
-  if (!reduceMotion) {
-    let autoplay = null;
-    let hovering = false;
-    let heroVisible = true;
-    function startAutoplay() { if (!autoplay && heroVisible && !hovering) autoplay = setInterval(() => goTo(index + 1), 4400); }
-    function stopAutoplay() { clearInterval(autoplay); autoplay = null; }
-    const heroEl = document.getElementById('hero');
-    heroEl.addEventListener('pointerenter', () => { hovering = true; stopAutoplay(); });
-    heroEl.addEventListener('pointerleave', () => { hovering = false; startAutoplay(); });
-    new IntersectionObserver(entries => {
-      heroVisible = entries[0].isIntersecting;
-      heroVisible ? startAutoplay() : stopAutoplay();
-    }, { threshold: 0.2 }).observe(heroEl);
-    startAutoplay();
-    gsap.from('.hero-slide', { opacity: 0, y: 26, scale: .94, stagger: .08, duration: .7, ease: 'power3.out', delay: .15 });
-  }
-})();
+  panels = dict.modals || {};
+  langFlagEl.textContent = dict._meta?.flag || '🌐';
+  langCodeEl.textContent = (dict._meta?.language || currentLang).toUpperCase();
+  document.documentElement.lang = dict._meta?.language || currentLang;
+  document.querySelectorAll('.lang-option').forEach(opt => opt.classList.toggle('active', opt.dataset.lang === currentLang));
+  if (overlay.classList.contains('open') && openModalKey) openModal(openModalKey);
+}
+async function setLang(lang) {
+  if (!SUPPORTED_LANGS.includes(lang)) return;
+  currentLang = lang;
+  localStorage.setItem(LANG_KEY, lang);
+  applyLocale(await loadLocale(lang));
+}
+function closeLangMenu() { langMenu.classList.remove('open'); langButton.setAttribute('aria-expanded', 'false'); }
+langButton.addEventListener('click', e => { e.stopPropagation(); const open = langMenu.classList.toggle('open'); langButton.setAttribute('aria-expanded', String(open)); });
+document.querySelectorAll('.lang-option').forEach(btn => btn.addEventListener('click', () => { setLang(btn.dataset.lang); closeLangMenu(); closeNavMenu(); }));
+document.addEventListener('click', e => { if (!langSwitch.contains(e.target)) closeLangMenu(); });
+addEventListener('keydown', e => { if (e.key === 'Escape') closeLangMenu(); });
+
+/* ATTRIBUTE GRID ENTRANCE */
+if (!reduceMotion) {
+  gsap.from('.attr-card', { opacity: 0, y: 24, stagger: .06, duration: .6, ease: 'power3.out', delay: .2 });
+}
+
+setLang(currentLang);
 
 /* SCROLL REVEALS + ZOOM */
 document.querySelectorAll('.scrollblock').forEach((block, i) => {

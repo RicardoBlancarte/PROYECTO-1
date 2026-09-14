@@ -1,0 +1,61 @@
+{
+  "_meta": {
+    "language": "en",
+    "label": "English",
+    "flag": "🇬🇧",
+    "doNotTranslate": ["The Algorithm", "THALGORITHM", "Markowitz", "Markov", "Monte Carlo", "Top Portfolio"]
+  },
+  "nav": {
+    "mision": "Our Mission",
+    "vision": "Our Vision",
+    "valores": "Values",
+    "algorithm": "What Is The Algorithm"
+  },
+  "modals": {
+    "mision": {
+      "title": "Our Mission",
+      "html": "<p>Bringing high-precision finance, intelligent banking, and applied-mathematics technology into anyone's hands, helping every investment decision in the world become far smarter.</p><p>At The Algorithm, we firmly believe financial education is a basic pillar of human development. We believe that the more information and better tools people have, the more humanity advances and improves every day. That's why we do what we do, and why our motto will always be: In the name of mankind.</p>"
+    },
+    "vision": {
+      "title": "Our Vision",
+      "html": "<p>Bringing advanced-level financial tools to every household in the world, completely free of charge.</p><p>Throughout history, technology has made everyday tasks simpler, but powerful financial tools have remained locked away and privatized exclusively for banks and large private sectors. Our goal is to break that barrier. Just as great construction tools once changed the way humanity built its surroundings, The Algorithm seeks to be that fundamental instrument that lets anyone build a better financial future for themselves and their family.</p>"
+    },
+    "valores": {
+      "title": "Values",
+      "html": "<p>So that this vision doesn't stay just a grand inspiration, but connects with the reality of whoever uses the platform, we stand on three key values:</p><ul><li><strong>Autonomy and Empowerment</strong>Technological tools have no real value if they don't hand control back to people. We want you to take back the wheel of your financial decisions with complete independence, free from abusive fees or intermediaries with hidden agendas.</li><li><strong>Engineering and Practical Precision (The Mechanism)</strong>Behind every accessible interface lies institutional-level applied mathematics and automated data pipelines. We turn analytical complexity into absolute clarity for everyday life.</li><li><strong>Radical Transparency</strong>Offering advanced mathematical models for free tends to raise skepticism (\"what's the catch?\"). Our answer is open honesty: technical rigor is not at odds with universal accessibility, and trust is earned by showing exactly how we operate, with no fine print.</li></ul>"
+    },
+    "algorithm": {
+      "title": "What Is The Algorithm",
+      "html": "<p>The Algorithm is much more than a set of lines of code; it's a living analytical engine powered by institutional-level mathematics, designed to decode the chaos of global markets and translate it into clarity for you.</p><p>To achieve this, it operates under a high-precision architecture that combines several key components:</p><ul><li><strong>Stochastic Models and Advanced Probability</strong>We don't guess the future, we calculate scenarios. We incorporate probabilistic models and dynamic stochastic processes inspired by stochastic trajectories (like Markov chains) to anticipate the shifting movement of markets with scientific rigor.</li><li><strong>Hidden Pattern Recognition</strong>The engine constantly analyzes massive streams of historical and real-time data to detect digital fingerprints and recurring behaviors that the human eye or traditional tools could never spot.</li><li><strong>Global Cross-Correlations</strong>We evaluate the invisible interactions and deep connections between multiple assets around the world, letting us detect unique opportunities, hidden risks, and bias situations across the global financial board.</li><li><strong>Optimization and Mathematical Elegance</strong>The engine uses advanced optimization techniques and intelligent allocation models (backed by complex analytical and constrained-optimization solutions). This turns the highest mathematical rigor into immediate, clean answers ready for your benefit.</li></ul><p>In short, we turn the complexity of applied mathematics into an intuitive, direct tool so that the power of financial prediction is, at last, on your side.</p>"
+    }
+  },
+  "hero": {
+    "eyebrow": "In the name of mankind",
+    "title": "The quantitative engine that works for you",
+    "lead": "Institutional-grade mathematics, free, for anyone. Here's what's inside The Algorithm."
+  },
+  "attributes": [
+    { "title": "Stochastic Engine", "desc": "Markov-style and Monte Carlo simulations to anticipate price scenarios with scientific rigor." },
+    { "title": "Markowitz Optimization", "desc": "Optimal portfolios calculated in seconds, with no fees or middlemen involved." },
+    { "title": "Geopolitical Intelligence", "desc": "Conservative and liberal AI debates that weigh every news item inside the probability calculation." },
+    { "title": "Correlation Map", "desc": "See in real time where in the world your assets actually move." },
+    { "title": "Risk Profile", "desc": "Calibrate your conservative or open bias and let the engine adapt to you." },
+    { "title": "Top Portfolio", "desc": "Today's top 3 recommended assets, straight from the analytical engine." }
+  ],
+  "blocks": {
+    "block2": { "line1": "Top-tier banking tools now available", "line2": "Access to the best mathematical algorithm, completely free", "tag": "In the name of mankind" },
+    "block3": { "text": "Anticipate movements in the world's most popular assets" },
+    "block4": { "text": "Build investment portfolios of the world's best assets in a single step" },
+    "block5": { "text": "We show you where in the world assets gain relevance" },
+    "block6": { "text": "We show you how a debate between conservative and liberal AIs unfolds, and the synthesis of that debate; the news is also scored and weighted into the probability calculations", "nodeLeft": "CONSERVATIVE FRAME", "nodeRight": "LIBERAL FRAME", "synthesis": "WEIGHTED SYNTHESIS" },
+    "block7": { "text": "We give you the flexibility to choose your conservative or open bias toward risk", "eyebrow": "Risk Profile", "labelLeft": "Conservative", "labelRight": "Aggressive", "readoutPrefix": "Current bias:", "readoutValue": "64% Aggressive" },
+    "block8": { "text": "The Algorithm introduces Top Portfolio, a segment where The Algorithm gives you the best top 3 assets to invest in today" }
+  },
+  "final": {
+    "cta": "Get in now, absolutely free",
+    "tag": "In the name of mankind"
+  },
+  "lang": {
+    "label": "Language"
+  }
+}

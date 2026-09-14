@@ -1,0 +1,61 @@
+{
+  "_meta": {
+    "language": "es",
+    "label": "Español",
+    "flag": "🇪🇸",
+    "doNotTranslate": ["The Algorithm", "THALGORITHM", "Markowitz", "Markov", "Monte Carlo", "Top Portfolio"]
+  },
+  "nav": {
+    "mision": "Nuestra Misión",
+    "vision": "Nuestra Visión",
+    "valores": "Valores",
+    "algorithm": "Qué es The Algorithm"
+  },
+  "modals": {
+    "mision": {
+      "title": "Nuestra Misión",
+      "html": "<p>Acercar las finanzas de alta precisión, la banca inteligente y la tecnología de matemáticas aplicadas a las manos de cualquier persona, ayudando a que cada decisión de inversión en el mundo sea mucho más inteligente.</p><p>En The Algorithm, creemos firmemente que la educación financiera es un pilar básico para el desarrollo humano. Pensamos que entre más información y mejores herramientas tengan las personas, la humanidad avanza y mejora todos los días. Por eso hacemos lo que hacemos, y por eso nuestro lema siempre será: In the name of mankind.</p>"
+    },
+    "vision": {
+      "title": "Nuestra Visión",
+      "html": "<p>Llevar herramientas financieras de nivel avanzado a todos los hogares del mundo de forma completamente gratuita.</p><p>A lo largo de la historia, la tecnología ha hecho más sencillas las tareas del día a día, pero las herramientas financieras potentes se han quedado atrapadas y privatizadas exclusivamente para los bancos y los grandes sectores privados. Nuestro objetivo es romper esa barrera. Así como en su momento las grandes herramientas de construcción cambiaron la forma en que la humanidad edificó su entorno, The Algorithm busca ser ese instrumento fundamental que permita a cualquier persona construir un futuro financiero mejor para su vida y su familia.</p>"
+    },
+    "valores": {
+      "title": "Valores",
+      "html": "<p>Para que esta visión no se quede solo en una gran inspiración, sino que conecte con la realidad de quien usa la plataforma, nos sostenemos sobre tres valores clave:</p><ul><li><strong>Autonomía y Empoderamiento</strong>Las herramientas tecnológicas no tienen verdadero valor si no devuelven el control a las personas. Queremos que recuperes el timón de tus decisiones económicas con absoluta independencia, libres de comisiones abusivas o intermediarios con agendas ocultas.</li><li><strong>Ingeniería y Precisión Práctica (El Mecanismo)</strong>Detrás de cada interfaz accesible hay matemáticas aplicadas de nivel institucional y flujos de datos automatizados. Transformamos la complejidad analítica en claridad absoluta para el día a día.</li><li><strong>Transparencia Radical</strong>Ofrecer modelos matemáticos avanzados de forma gratuita suele generar escepticismo (\"¿cuál es el truco?\"). Nuestra respuesta es la honestidad abierta: la rigor técnica no está peleada con la accesibilidad universal, y la confianza se gana mostrando exactamente cómo operamos, sin letras chiquitas.</li></ul>"
+    },
+    "algorithm": {
+      "title": "Qué es The Algorithm",
+      "html": "<p>The Algorithm es mucho más que un conjunto de líneas de código; es un motor analítico vivo impulsado por matemáticas de nivel institucional, diseñado para descifrar el caos de los mercados globales y traducirlo en claridad para ti.</p><p>Para lograrlo, opera bajo una arquitectura de alta precisión que combina diversos componentes clave:</p><ul><li><strong>Modelos Estocásticos y Probabilidad Avanzada</strong>No adivinamos el futuro, calculamos escenarios. Incorporamos modelos probabilísticos y procesos estocásticos dinámicos inspirados en trayectorias estocásticas (como las cadenas de Markov) para anticiparnos al movimiento cambiante de los mercados con rigor científico.</li><li><strong>Reconocimiento de Patrones Ocultos</strong>El motor analiza constantemente flujos masivos de datos históricos y en tiempo real para detectar huellas digitales y comportamientos recurrentes que el ojo humano o las herramientas tradicionales jamás alcanzan a ver.</li><li><strong>Correlaciones Cruzadas Globales</strong>Evaluamos las interacciones invisibles y las conexiones profundas entre múltiples activos en todo el mundo, permitiéndonos detectar oportunidades únicas, riesgos ocultos y situaciones de sesgo en el tablero financiero global.</li><li><strong>Optimización y Elegancia Matemática</strong>El motor utiliza técnicas de optimización avanzada y modelos de asignación inteligente (respaldados por complejas soluciones analíticas y de optimización restringida). Esto traduce la más alta exigencia matemática en respuestas inmediatas, limpias y listas para tu beneficio.</li></ul><p>En pocas palabras, transformamos la complejidad de las matemáticas aplicadas en una herramienta intuitiva y directa para que el poder de la predicción financiera esté, por fin, de tu lado.</p>"
+    }
+  },
+  "hero": {
+    "eyebrow": "In the name of mankind",
+    "title": "El motor cuantitativo que trabaja para ti",
+    "lead": "Matemáticas de nivel institucional, gratis, para cualquier persona. Esto es lo que hay dentro de The Algorithm."
+  },
+  "attributes": [
+    { "title": "Motor Estocástico", "desc": "Simulaciones tipo Markov y Monte Carlo para anticipar escenarios de precio con rigor científico." },
+    { "title": "Optimización Markowitz", "desc": "Portafolios óptimos calculados en segundos, sin comisiones ni intermediarios de por medio." },
+    { "title": "Inteligencia Geopolítica", "desc": "Debates de IA conservadora y liberal que ponderan cada noticia dentro del cálculo de probabilidad." },
+    { "title": "Mapa de Correlaciones", "desc": "Visualiza en tiempo real dónde en el mundo se mueven realmente tus activos." },
+    { "title": "Perfil de Riesgo", "desc": "Calibra tu sesgo conservador o abierto y deja que el motor se adapte a ti." },
+    { "title": "Top Portfolio", "desc": "El top 3 de activos recomendados hoy, directo desde el motor analítico." }
+  ],
+  "blocks": {
+    "block2": { "line1": "Herramientas bancarias de primer nivel ahora disponibles", "line2": "Acceso al mejor algoritmo matemático de forma gratuita", "tag": "In the name of mankind" },
+    "block3": { "text": "Anticipa movimientos de los activos más populares en los mercados mundiales" },
+    "block4": { "text": "Realiza portafolios de inversión de los mejores activos en los mercados mundiales para invertir en un solo paso" },
+    "block5": { "text": "Te mostramos dónde en el mundo los activos cobran relevancia" },
+    "block6": { "text": "Te mostramos cómo un debate entre IA conservadores y liberales y la síntesis de este debate; así mismo la noticia se califica y pondera en los cálculos de probabilidad", "nodeLeft": "MARCO CONSERVADOR", "nodeRight": "MARCO LIBERAL", "synthesis": "SÍNTESIS PONDERADA" },
+    "block7": { "text": "Te damos la flexibilidad de elegir tu sesgo conservador o abierto respecto al riesgo", "eyebrow": "Perfil de riesgo", "labelLeft": "Conservador", "labelRight": "Agresivo", "readoutPrefix": "Sesgo actual:", "readoutValue": "64% Agresivo" },
+    "block8": { "text": "The Algorithm introduce Top Portfolio, un segmento donde The Algorithm da el mejor top 3 de activos para invertir hoy" }
+  },
+  "final": {
+    "cta": "Entra ahora absolutamente gratis",
+    "tag": "In the name of mankind"
+  },
+  "lang": {
+    "label": "Idioma"
+  }
+}
