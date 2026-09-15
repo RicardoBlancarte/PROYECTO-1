@@ -197,3 +197,22 @@ begin
     and ranked.rn > case a.interval when 'daily' then 126 when 'weekly' then 500 when 'monthly' then 60 when 'yearly' then 5 else 126 end;
 end;
 $$;
+
+-- FASE 2: aviso de privacidad multilingue y consentimiento de invitados.
+-- La entrada "invitado" (nombre + correo, sin cuenta de Supabase Auth) es hoy el flujo
+-- principal de la plataforma (premium/elite "coming soon"), asi que el consentimiento debe
+-- poder registrarse tambien sin sesion autenticada para que el punto 6 sea auditable en la
+-- practica y no solo para las cuentas registradas.
+alter table public.privacy_consents alter column user_id drop not null;
+alter table public.privacy_consents add column if not exists email text;
+alter table public.privacy_consents add column if not exists full_name text;
+alter table public.privacy_consents add column if not exists idioma text not null default 'es';
+alter table public.privacy_consents add column if not exists ccpa_do_not_sell boolean not null default false;
+
+alter table public.privacy_consents drop constraint if exists privacy_consents_idioma_check;
+alter table public.privacy_consents add constraint privacy_consents_idioma_check check (idioma in ('es', 'en', 'zh'));
+
+alter table public.privacy_consents drop constraint if exists privacy_consents_identity_check;
+alter table public.privacy_consents add constraint privacy_consents_identity_check check (user_id is not null or email is not null);
+
+create index if not exists privacy_consents_email_idx on public.privacy_consents (email, timestamp_aceptacion desc);
