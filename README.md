@@ -81,7 +81,15 @@ En Cloudflare Pages crea un proyecto conectado al repositorio de GitHub. Usa est
 
 Después de publicar, registra el dominio de Pages en Supabase Authentication.
 
-Configura estos secretos o variables de entorno en **Settings > Environment variables** de Cloudflare Pages: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEWS_API_KEY` y `FMP_API_KEY`. Las Functions bajo `functions/api/` los leen mediante `context.env`; el navegador recibe exclusivamente `SUPABASE_URL` y `SUPABASE_ANON_KEY` desde `/api/public-config`. Comprueba bindings sin revelar valores con `/api/health`.
+Configura estos secretos o variables de entorno en **Settings > Environment variables** de Cloudflare Pages: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEWS_API_KEY`, `FMP_API_KEY` y `ANTHROPIC_API_KEY`. Las Functions bajo `functions/api/` los leen mediante `context.env`; el navegador recibe exclusivamente `SUPABASE_URL` y `SUPABASE_ANON_KEY` desde `/api/public-config`. Comprueba bindings sin revelar valores con `/api/health`.
+
+## Debate liberal/conservador de noticias (News Box)
+
+`/api/news` puntúa cada titular con dos analistas independientes (sesgo liberal y sesgo conservador, -10 a +10 cada uno) llamando a la Anthropic Messages API (`ANTHROPIC_API_KEY`, modelo `claude-haiku-4-5-20251001`). Cada titular se deduplica por `content_hash` contra `asset_news_scores` antes de gastar una llamada al LLM, así un mismo titular nunca se vuelve a puntuar. Si `ANTHROPIC_API_KEY` no está configurado, o la llamada falla, cae de vuelta a una heurística local por palabras clave — el News Box nunca deja de cargar por falta de esa llave. Genera la tuya en [console.anthropic.com](https://console.anthropic.com/) y configúrala igual que las demás:
+
+```bash
+npx wrangler pages secret put ANTHROPIC_API_KEY --project-name <NOMBRE_DEL_PROYECTO>
+```
 
 Para desarrollo local, copia `.dev.vars.example` como `.dev.vars`, completa las variables y ejecuta `npm install` seguido de `npm run dev`. El archivo `.dev.vars` está ignorado por Git.
 

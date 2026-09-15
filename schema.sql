@@ -216,3 +216,31 @@ alter table public.privacy_consents drop constraint if exists privacy_consents_i
 alter table public.privacy_consents add constraint privacy_consents_identity_check check (user_id is not null or email is not null);
 
 create index if not exists privacy_consents_email_idx on public.privacy_consents (email, timestamp_aceptacion desc);
+
+-- FASE 3: puntuacion dual liberal/conservadora de noticias (News Box, punto 8) y
+-- persistencia de sesion server-side para cuentas autenticadas (punto 7).
+alter table public.asset_news_scores add column if not exists liberal_impact numeric check (liberal_impact between -10 and 10);
+alter table public.asset_news_scores add column if not exists conservative_impact numeric check (conservative_impact between -10 and 10);
+alter table public.asset_news_scores add column if not exists scoring_method text not null default 'heuristic';
+alter table public.asset_news_scores drop constraint if exists asset_news_scores_scoring_method_check;
+alter table public.asset_news_scores add constraint asset_news_scores_scoring_method_check check (scoring_method in ('heuristic', 'llm'));
+
+-- El invitado (nombre + correo, sin cuenta) sigue usando localStorage; esta tabla es solo
+-- para cuando la cuenta autenticada (premium/elite) este activa, protegida por RLS propia.
+create table if not exists public.user_state (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  portfolio jsonb not null default '[]'::jsonb,
+  last_asset_key text,
+  prediction_horizon text check (prediction_horizon in ('daily', 'weekly', 'monthly')),
+  chart_range text check (chart_range in ('1d', '1w', '1m', '3m', '1y', '2y')),
+  risk_posture text check (risk_posture in ('conservative', 'open')),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.user_state enable row level security;
+
+drop policy if exists "users manage their own state" on public.user_state;
+create policy "users manage their own state"
+on public.user_state for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
