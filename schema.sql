@@ -244,3 +244,36 @@ create policy "users manage their own state"
 on public.user_state for all to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
+
+-- FASE 4: motor de prediccion por senales binarias (punto 9). Una fila por activo/fecha
+-- (no 30 columnas fijas), llenada por lectura derivada de asset_historical_prices, nunca
+-- escribiendo sobre ella. La llena actualizar_automatico.py como parte de la misma cascada
+-- diaria que ya hace el upsert de precios, no un cron/Edge Function paralelo.
+create table if not exists public.asset_signals (
+  symbol text not null,
+  date date not null,
+  signal smallint not null check (signal in (0, 1)),
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, date)
+);
+
+alter table public.asset_signals enable row level security;
+create index if not exists asset_signals_symbol_date_idx on public.asset_signals (symbol, date desc);
+
+-- Historial diario del Win Rate de ambos motores (el actual "legacy" y el nuevo "shadow_v2"
+-- de senales/patrones), para poder comparar antes de decidir promover el motor nuevo a
+-- produccion. Lo llena la misma cascada de actualizar_automatico.py, no un cron aparte.
+create table if not exists public.win_rate_history (
+  date date not null,
+  engine text not null check (engine in ('legacy', 'shadow_v2')),
+  global_win_rate numeric,
+  details jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default timezone('utc', now()),
+  primary key (date, engine)
+);
+
+alter table public.win_rate_history enable row level security;
+
+-- Patron sin precedente historico exacto para esa ventana (9.3): se calcula en
+-- functions/api/patterns.js y se persiste aqui para auditoria, junto al resto del snapshot.
+alter table public.asset_pattern_snapshots add column if not exists is_singularity boolean not null default false;

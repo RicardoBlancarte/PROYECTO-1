@@ -19,11 +19,12 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install yfinance pandas supabase
+          pip install yfinance pandas supabase requests
 
       - name: Ejecutar script de actualización
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PAGES_BASE_URL: ${{ secrets.PAGES_BASE_URL }}
         run: |
           python actualizar_automatico.py
