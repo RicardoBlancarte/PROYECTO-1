@@ -400,6 +400,7 @@ import { ScrollTrigger } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/ScrollTr
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+fetch('/api/track-view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: 'homepage' }) }).catch(() => {});
 document.getElementById('year').textContent = new Date().getFullYear();
 
 /* NAV scroll state */

@@ -301,3 +301,17 @@ create table if not exists public.push_subscriptions (
 
 alter table public.push_subscriptions enable row level security;
 create index if not exists push_subscriptions_asset_symbol_idx on public.push_subscriptions (asset_symbol);
+
+-- FASE 6: tour de bienvenida (punto 10) y contador de visitas del panel de superadmin (punto 14).
+alter table public.profiles add column if not exists has_completed_onboarding boolean not null default false;
+
+-- Log simple de vistas (una fila por carga de página, no una cuenta agregada) para poder
+-- evolucionar despues a "sesiones unicas" sin rehacer nada, tal como se pidio explicitamente.
+create table if not exists public.page_views (
+  id bigint generated always as identity primary key,
+  page text not null check (page in ('platform', 'homepage')),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.page_views enable row level security;
+create index if not exists page_views_page_created_idx on public.page_views (page, created_at desc);
