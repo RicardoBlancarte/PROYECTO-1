@@ -7,15 +7,37 @@ export async function onRequestGet(context) {
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';
   if (!symbol || !context.env.SUPABASE_URL || !context.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Pattern cache is unavailable.' }, 503);
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
-  // Bulk prices always come from the daily-synced asset_historical_prices table (never a live API pull).
-  const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date' }).toString();
-  const pricesResponse = await fetch(pricesUrl, { headers });
-  const dailyRows = pricesResponse.ok ? await pricesResponse.json() : [];
-  if (dailyRows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
-  const rows = horizon === 'weekly' ? toWeekly(dailyRows) : horizon === 'monthly' ? toMonthly(dailyRows) : dailyRows;
-  if (rows.length < 8) return json({ error: 'Not enough cached history for this horizon.' }, 422);
-  const bits = rows.slice(1).map((row, index) => Number(row.close) >= Number(rows[index].close) ? '1' : '0');
+
+  // Fuente primaria para el horizonte diario (punto 9.2): asset_signals ya consolidada por
+  // el backfill histórico + la cascada diaria de actualizar_automatico.py. Solo se cae al
+  // respaldo (derivar de asset_historical_prices) si un símbolo aún no tiene suficiente
+  // profundidad ahí (p. ej. recién agregado al catálogo, antes de su primer backfill).
+  let bits = null;
+  let signalSource = 'asset_historical_prices';
+  if (horizon === 'daily') {
+    const signalsUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_signals`);
+    signalsUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'signal' }).toString();
+    const signalsResponse = await fetch(signalsUrl, { headers });
+    const signalRows = signalsResponse.ok ? await signalsResponse.json() : [];
+    if (signalRows.length >= 8) {
+      bits = signalRows.map(row => String(row.signal));
+      signalSource = 'asset_signals';
+    }
+  }
+
+  if (!bits) {
+    // Respaldo: weekly/monthly siempre llegan aquí (asset_signals es solo diaria), y daily
+    // también si asset_signals todavía no tiene suficiente historial para este símbolo.
+    const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
+    pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date' }).toString();
+    const pricesResponse = await fetch(pricesUrl, { headers });
+    const dailyRows = pricesResponse.ok ? await pricesResponse.json() : [];
+    if (dailyRows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
+    const rows = horizon === 'weekly' ? toWeekly(dailyRows) : horizon === 'monthly' ? toMonthly(dailyRows) : dailyRows;
+    if (rows.length < 8) return json({ error: 'Not enough cached history for this horizon.' }, 422);
+    bits = rows.slice(1).map((row, index) => Number(row.close) > Number(rows[index].close) ? '1' : '0');
+  }
+
   const newsUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_news_scores`);
   newsUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'published_at.desc', limit: '20', select: 'impact_score' }).toString();
   const newsResponse = await fetch(newsUrl, { headers });
@@ -27,7 +49,7 @@ export async function onRequestGet(context) {
     logPredictionAudit(context.env, headers, symbol, tier, horizon, result, newsAdjustment)
   ]);
   const allowed = tier === 'normal' ? ['daily'] : tier === 'premium' ? ['daily', 'weekly'] : ['daily', 'weekly', 'monthly'];
-  return json({ symbol, horizon, allowedHorizons: allowed, newsAdjustment: Number(newsAdjustment.toFixed(2)), patterns: result, computedAt: new Date().toISOString() });
+  return json({ symbol, horizon, allowedHorizons: allowed, newsAdjustment: Number(newsAdjustment.toFixed(2)), patterns: result, signalSource, computedAt: new Date().toISOString() });
 }
 
 // Punto 9.3: patron binario (1 alza / 0 baja) sobre la ventana dada, con deteccion de

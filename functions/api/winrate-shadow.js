@@ -44,7 +44,7 @@ async function computeShadowWinRate(env, headers, symbol) {
   if (rows.length < MIN_HISTORY + 1) return null;
   const closes = rows.map(row => Number(row.close));
   const dates = rows.map(row => row.date);
-  const bits = closes.slice(1).map((close, index) => close >= closes[index] ? '1' : '0');
+  const bits = closes.slice(1).map((close, index) => close > closes[index] ? '1' : '0');
 
   let hits = 0; let samples = 0;
   for (let t = MIN_HISTORY; t < bits.length; t += 1) {

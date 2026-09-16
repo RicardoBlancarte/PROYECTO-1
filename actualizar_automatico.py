@@ -26,6 +26,68 @@ assets = [
     ("ZS=F", "commodity"), ("KC=F", "commodity")
 ]
 
+def backfill_asset_signals():
+    """Backfill retroactivo de asset_signals (punto 9.2): recorre TODO el historial ya
+    existente en asset_historical_prices (no solo desde hoy) y llena asset_signals con la
+    profundidad completa. Se evalua por simbolo y es idempotente/autocurativa: si un simbolo
+    ya esta al dia (una senal por cada par de cierres consecutivos), se omite sin costo; si
+    le faltan filas (primera corrida tras este cambio, o un hueco), recalcula ese simbolo
+    completo. Se llama ANTES de descargar/insertar el cierre de hoy, para que la comparacion
+    de conteos no se desalinee por el nuevo dato del dia.
+    """
+    for symbol, asset_type in assets:
+        try:
+            prices_count = (
+                supabase.table("asset_historical_prices")
+                .select("date", count="exact")
+                .eq("symbol", symbol)
+                .execute()
+                .count
+            )
+            if not prices_count or prices_count < 2:
+                continue
+            signals_count = (
+                supabase.table("asset_signals")
+                .select("date", count="exact")
+                .eq("symbol", symbol)
+                .execute()
+                .count
+            ) or 0
+            if signals_count >= prices_count - 1:
+                continue  # ya al dia, nada que recalcular para este simbolo
+
+            history = (
+                supabase.table("asset_historical_prices")
+                .select("date,close")
+                .eq("symbol", symbol)
+                .order("date", desc=False)
+                .execute()
+                .data
+            ) or []
+            if len(history) < 2:
+                continue
+
+            rows = []
+            for i in range(1, len(history)):
+                prev_close = float(history[i - 1]["close"])
+                curr_close = float(history[i]["close"])
+                rows.append({
+                    "symbol": symbol,
+                    "date": history[i]["date"],
+                    # Sube -> 1; baja o se mantiene -> 0 (comparacion estricta).
+                    "signal": 1 if curr_close > prev_close else 0,
+                })
+
+            for start in range(0, len(rows), 500):
+                chunk = rows[start:start + 500]
+                supabase.table("asset_signals").upsert(chunk, on_conflict="symbol,date").execute()
+            print(f"Backfill histórico de señales completado para {symbol}: {len(rows)} filas.")
+        except Exception as e:
+            print(f"Error en backfill de señales para {symbol}: {e}")
+
+
+backfill_asset_signals()
+
 daily_data = []
 for symbol, asset_type in assets:
     try:
@@ -58,10 +120,11 @@ if daily_data:
     ).execute()
     print("Datos actualizados automáticamente en Supabase.")
 
-# FASE 4 — paso 1 de la cascada: señal binaria (1 alza / 0 baja) por activo, derivada por
-# lectura de asset_historical_prices (nunca al revés), y persistida en asset_signals.
-# Se calcula sobre la propia tabla ya actualizada arriba para no depender de que la ventana
-# de 5 días de yfinance siempre tenga 2+ sesiones (fines de semana largos, feriados, etc.).
+# FASE 4 — paso 1 de la cascada: señal binaria (1 alza / 0 baja-o-igual) por activo, derivada
+# por lectura de asset_historical_prices (nunca al revés). El backfill histórico ya corrió
+# arriba con todo el pasado; aquí solo se inserta la señal del cierre de HOY que se acaba de
+# upsert-ear, comparando contra el cierre inmediatamente anterior (liviano, sin recorrer todo
+# el historial cada día).
 signal_rows = []
 for symbol, asset_type in assets:
     try:
@@ -80,7 +143,8 @@ for symbol, asset_type in assets:
         signal_rows.append({
             "symbol": symbol,
             "date": latest["date"],
-            "signal": 1 if float(latest["close"]) >= float(previous["close"]) else 0,
+            # Sube -> 1; baja o se mantiene -> 0 (misma regla estricta que el backfill).
+            "signal": 1 if float(latest["close"]) > float(previous["close"]) else 0,
         })
     except Exception as e:
         print(f"Error de señal con {symbol}: {e}")

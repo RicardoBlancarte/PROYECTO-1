@@ -9,6 +9,8 @@ Thumbs.db
 node_modules/
 .dev.vars
 .env
+__pycache__/
+*.pyc
 
 # Archivos temporales
 *.tmp
