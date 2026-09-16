@@ -226,7 +226,23 @@
     // en vez de perderla.
     function guestNamespace() { try { const guest = JSON.parse(localStorage.getItem('horizon_guest') || '{}'); return guest.email ? String(guest.email).trim().toLowerCase() : ''; } catch (error) { return ''; } }
     function guestScopedKey(base) { const ns = guestNamespace(); return ns ? `${base}::${ns}` : base; }
-    function getGuestItem(base) { const key = guestScopedKey(base); let value = localStorage.getItem(key); if (value === null && key !== base) { const legacy = localStorage.getItem(base); if (legacy !== null) { localStorage.setItem(key, legacy); value = legacy; } } return value; }
+    function getGuestItem(base) {
+      const key = guestScopedKey(base);
+      let value = localStorage.getItem(key);
+      let migrated = false;
+      if (value === null && key !== base) {
+        const legacy = localStorage.getItem(base);
+        if (legacy !== null) {
+          localStorage.setItem(key, legacy);
+          localStorage.removeItem(base); // BUG corregido: antes no se borraba, así que TODO invitado nuevo seguía heredando de aquí.
+          value = legacy;
+          migrated = true;
+        }
+      }
+      // TODO: quitar este console.log de depuración temporal una vez confirmado en producción.
+      console.log(`[GUEST-DEBUG] getGuestItem base="${base}" namespacedKey="${key}" migrated=${migrated} value=${JSON.stringify(value)}`);
+      return value;
+    }
     function setGuestItem(base, value) { localStorage.setItem(guestScopedKey(base), value); }
     function removeGuestItem(base) { localStorage.removeItem(guestScopedKey(base)); }
     function updateAuthEmailValidity() { const email = $('email').value; const valid = isValidEmail(email); $('auth-submit-btn').disabled = !valid; $('auth-error').textContent = email && !valid ? 'Correo inválido: revisa el formato (ejemplo@dominio.com).' : ''; return valid; }
@@ -480,7 +496,14 @@
     const PRIVACY_VERSION = '2026-09-01';
     let privacyLang = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : (navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'es';
     function setPrivacyLang(lang) { privacyLang = ['es','en','zh'].includes(lang) ? lang : 'es'; document.querySelectorAll('[data-privacy-lang]').forEach(node => { node.hidden = node.dataset.privacyLang !== privacyLang; }); ['es','en','zh'].forEach(code => $(`privacy-lang-${code}`).classList.toggle('active', code === privacyLang)); }
-    function ensurePrivacyConsent() { const accepted = currentUser ? privacyAcceptedAt : getGuestItem('algo_privacy_accepted_v1'); setPrivacyLang(privacyLang); $('privacy-modal').classList.toggle('active', !accepted); if (accepted) maybeStartOnboarding(); }
+    function ensurePrivacyConsent() {
+      const accepted = currentUser ? privacyAcceptedAt : getGuestItem('algo_privacy_accepted_v1');
+      // TODO: quitar este console.log de depuración temporal una vez confirmado en producción.
+      console.log('[GUEST-DEBUG] ensurePrivacyConsent', { email: guestNamespace() || '(sin email / autenticado)', currentUser: !!currentUser, accepted, mostrandoModal: !accepted });
+      setPrivacyLang(privacyLang);
+      $('privacy-modal').classList.toggle('active', !accepted);
+      if (accepted) maybeStartOnboarding();
+    }
     $('privacy-modal-accept').onclick = async () => {
       if (!$('privacy-modal-check').checked) return $('privacy-modal-error').textContent = 'Marca la casilla para otorgar tu consentimiento.';
       $('privacy-modal-error').textContent = '';
@@ -531,7 +554,13 @@
     ];
     let tourStepIndex = 0;
     function hasCompletedOnboarding() { return currentUser ? onboardingDoneForUser : getGuestItem('algo_onboarding_done_v1') === '1'; }
-    function maybeStartOnboarding() { if (hasCompletedOnboarding()) return; setTimeout(() => { tourStepIndex = 0; showTourStep(); }, 600); }
+    function maybeStartOnboarding() {
+      const done = hasCompletedOnboarding();
+      // TODO: quitar este console.log de depuración temporal una vez confirmado en producción.
+      console.log('[GUEST-DEBUG] maybeStartOnboarding', { email: guestNamespace() || '(sin email / autenticado)', currentUser: !!currentUser, hasCompletedOnboarding: done });
+      if (done) return;
+      setTimeout(() => { tourStepIndex = 0; showTourStep(); }, 600);
+    }
     function positionTourBubble(anchor) {
       const bubble = $('tour-bubble'); const rect = anchor.getBoundingClientRect(); const margin = 16;
       bubble.style.left = `${Math.max(margin, Math.min(window.innerWidth - bubble.offsetWidth - margin, rect.left))}px`;
