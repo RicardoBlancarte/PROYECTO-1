@@ -1,9 +1,11 @@
+import json
 import os
 from datetime import date
 
 import requests
 import yfinance as yf
 import pandas as pd
+from pywebpush import webpush, WebPushException
 from supabase import create_client, Client
 
 # Credenciales desde variables de entorno (seguro para automatización)
@@ -12,6 +14,11 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 # URL publica del deploy de Cloudflare Pages, solo para leer /api/winrate* al cierre del dia.
 # No es secreta, pero se configura como secret/variable del repo igual que las demas.
 PAGES_BASE_URL = os.environ.get("PAGES_BASE_URL")
+# Par de llaves VAPID (punto 12, Web Push). La privada solo vive aqui (GitHub Actions); la
+# publica tambien se configura en Cloudflare Pages para que /api/public-config la exponga.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
+VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:contact@thalgorithm.com")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -175,3 +182,90 @@ if PAGES_BASE_URL:
             print(f"Error registrando Win Rate ({engine}): {e}")
 else:
     print("PAGES_BASE_URL no configurado; se omite el registro diario de Win Rate.")
+
+
+# FASE 5 — paso final de la cascada: alertas por Web Push (punto 12, reemplaza WhatsApp).
+# La meta y el simbolo viven en la propia fila de push_subscriptions (autocontenida, sin
+# cuenta) porque el invitado es hoy toda la base real de usuarios. Se compara la fase actual
+# (misma regla que portfolioState() en el frontend) contra la ultima fase conocida y solo se
+# notifica en las 3 transiciones validas: entra amarillo, entra rojo, o sale a verde.
+def send_push_alerts():
+    if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+        print("VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY no configuradas; se omiten las notificaciones push.")
+        return
+
+    subscriptions = supabase.table("push_subscriptions").select("*").execute().data or []
+    if not subscriptions:
+        return
+
+    price_cache = {}
+    phase_labels = {
+        "red": "zona roja (meta alcanzada)",
+        "yellow": "zona amarilla (cerca de meta)",
+        "blue": "zona verde (en seguimiento)",
+    }
+
+    for sub in subscriptions:
+        symbol = sub["asset_symbol"]
+        try:
+            if symbol not in price_cache:
+                rows = (
+                    supabase.table("asset_historical_prices")
+                    .select("close")
+                    .eq("symbol", symbol)
+                    .order("date", desc=True)
+                    .limit(1)
+                    .execute()
+                    .data
+                )
+                price_cache[symbol] = float(rows[0]["close"]) if rows else None
+            price = price_cache[symbol]
+            if price is None:
+                continue
+
+            goal = float(sub["goal"])
+            distance = abs(goal - price) / price if price else 1
+            if price >= goal:
+                phase = "red"
+            elif distance <= 0.03:
+                phase = "yellow"
+            else:
+                phase = "blue"
+
+            last_phase = sub.get("last_phase", "blue")
+            valid_transition = phase != last_phase and (phase in ("yellow", "red") or last_phase in ("yellow", "red"))
+
+            if valid_transition:
+                try:
+                    webpush(
+                        subscription_info={
+                            "endpoint": sub["endpoint"],
+                            "keys": {"p256dh": sub["keys_p256dh"], "auth": sub["keys_auth"]},
+                        },
+                        data=json.dumps({
+                            "title": f"ALGORITHM · {symbol}",
+                            "body": f"Entró a {phase_labels.get(phase, phase)}. Precio: {price:.2f} · Meta: {goal:.2f}.",
+                            "url": "https://thalgorithm.com/",
+                        }),
+                        vapid_private_key=VAPID_PRIVATE_KEY,
+                        vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+                    )
+                    print(f"Push enviado para {symbol}: {last_phase} -> {phase}")
+                except WebPushException as e:
+                    status = getattr(e.response, "status_code", None)
+                    if status in (404, 410):
+                        supabase.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
+                        print(f"Suscripción expirada/revocada eliminada ({symbol}).")
+                        continue
+                    print(f"Error enviando push ({symbol}): {e}")
+
+            if phase != last_phase:
+                supabase.table("push_subscriptions").update({
+                    "last_phase": phase,
+                    "updated_at": date.today().isoformat(),
+                }).eq("id", sub["id"]).execute()
+        except Exception as e:
+            print(f"Error evaluando alerta push para {symbol}: {e}")
+
+
+send_push_alerts()

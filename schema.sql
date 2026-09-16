@@ -277,3 +277,27 @@ alter table public.win_rate_history enable row level security;
 -- Patron sin precedente historico exacto para esa ventana (9.3): se calcula en
 -- functions/api/patterns.js y se persiste aqui para auditoria, junto al resto del snapshot.
 alter table public.asset_pattern_snapshots add column if not exists is_singularity boolean not null default false;
+
+-- FASE 5: alertas por Web Push (punto 12), reemplaza WhatsApp para el semaforo de activos.
+-- La meta y el simbolo viven en la propia fila de suscripcion (autocontenida): el invitado
+-- (nombre+correo, sin cuenta) es hoy el 100% de la base real de usuarios, y su portafolio
+-- solo vive en localStorage, nunca en Supabase, asi que un cron server-side no puede evaluar
+-- "cambio de fase respecto a la meta" si la meta no viaja con la suscripcion. user_id/email
+-- quedan opcionales para cuando exista una cuenta autenticada real.
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  endpoint text not null,
+  keys_p256dh text not null,
+  keys_auth text not null,
+  asset_symbol text not null,
+  goal numeric not null,
+  last_phase text not null default 'blue' check (last_phase in ('blue', 'yellow', 'red')),
+  user_id uuid references auth.users(id) on delete cascade,
+  email text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (endpoint, asset_symbol)
+);
+
+alter table public.push_subscriptions enable row level security;
+create index if not exists push_subscriptions_asset_symbol_idx on public.push_subscriptions (asset_symbol);

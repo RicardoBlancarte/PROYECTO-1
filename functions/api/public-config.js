@@ -4,9 +4,11 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
 });
 
 export async function onRequestGet(context) {
-  const { SUPABASE_URL, SUPABASE_ANON_KEY } = context.env;
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, VAPID_PUBLIC_KEY } = context.env;
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return json({ error: 'Public auth configuration is unavailable.' }, 503);
-  return json({ url: normalizedSupabaseUrl(SUPABASE_URL, SUPABASE_ANON_KEY), anonKey: SUPABASE_ANON_KEY });
+  // VAPID_PUBLIC_KEY es pública por diseño (el navegador la necesita para pushManager.subscribe());
+  // la privada nunca se expone aquí ni en ningún archivo servido al navegador.
+  return json({ url: normalizedSupabaseUrl(SUPABASE_URL, SUPABASE_ANON_KEY), anonKey: SUPABASE_ANON_KEY, vapidPublicKey: VAPID_PUBLIC_KEY || null });
 }
 
 function normalizedSupabaseUrl(url, anonKey) { const ref = jwtRef(anonKey); return ref ? `https://${ref}.supabase.co` : url; }

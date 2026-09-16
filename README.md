@@ -81,7 +81,7 @@ En Cloudflare Pages crea un proyecto conectado al repositorio de GitHub. Usa est
 
 Después de publicar, registra el dominio de Pages en Supabase Authentication.
 
-Configura estos secretos o variables de entorno en **Settings > Environment variables** de Cloudflare Pages: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEWS_API_KEY`, `FMP_API_KEY` y `ANTHROPIC_API_KEY`. Las Functions bajo `functions/api/` los leen mediante `context.env`; el navegador recibe exclusivamente `SUPABASE_URL` y `SUPABASE_ANON_KEY` desde `/api/public-config`. Comprueba bindings sin revelar valores con `/api/health`.
+Configura estos secretos o variables de entorno en **Settings > Environment variables** de Cloudflare Pages: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEWS_API_KEY`, `FMP_API_KEY`, `ANTHROPIC_API_KEY` y `VAPID_PUBLIC_KEY`. Las Functions bajo `functions/api/` los leen mediante `context.env`; el navegador recibe exclusivamente `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `VAPID_PUBLIC_KEY` desde `/api/public-config`. Comprueba bindings sin revelar valores con `/api/health`.
 
 ## Debate liberal/conservador de noticias (News Box)
 
@@ -93,11 +93,24 @@ npx wrangler pages secret put ANTHROPIC_API_KEY --project-name <NOMBRE_DEL_PROYE
 
 Para desarrollo local, copia `.dev.vars.example` como `.dev.vars`, completa las variables y ejecuta `npm install` seguido de `npm run dev`. El archivo `.dev.vars` está ignorado por Git.
 
-## WhatsApp Cloud API
+## Alertas por Web Push
 
-Configura en Cloudflare Pages los secretos `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `META_APP_SECRET`, `WHATSAPP_TEST_RECIPIENT` y `WHATSAPP_TEST_TRIGGER_TOKEN`. En Meta configura el webhook como `https://algorithm-global-engine.pages.dev/api/whatsapp/webhook` y suscribe el campo `messages`. La Function valida la firma de Meta, busca `clients.phone` en formato E.164 sin `+`, evita duplicados por `meta_message_id` y registra eventos en `whatsapp_events`.
+El semáforo de portafolio (punto 12) ya no usa WhatsApp/Meta Cloud API — se descartó por
+completo esa integración. Las alertas llegan por Web Push nativo del navegador cuando un
+activo con meta entra o sale de zona amarilla/roja, calculado dentro de la misma cascada
+diaria (`actualizar_automatico.py`, vía `pywebpush`).
 
-Para enviar una prueba al destinatario sandbox configurado, ejecuta una petición `POST` a `/api/whatsapp/test` con el encabezado `X-WhatsApp-Test-Token`. Nunca coloques ese token, números de prueba ni el token de Meta en el navegador o Git.
+1. Genera el par de llaves una sola vez: `npx web-push generate-vapid-keys`.
+2. `VAPID_PUBLIC_KEY` como secreto de Cloudflare Pages (la expone `/api/public-config` para
+   que el navegador pueda suscribirse; es pública por diseño, no hay riesgo en exponerla).
+3. `VAPID_PUBLIC_KEY` **y** `VAPID_PRIVATE_KEY` como secretos de GitHub Actions (Python firma
+   los envíos con la privada; nunca debe llegar al navegador ni a ningún archivo público).
+4. Las suscripciones (`functions/api/push/subscribe.js`) se guardan en `public.push_subscriptions`
+   de forma autocontenida — sin requerir cuenta, porque el invitado (nombre+correo) es hoy
+   toda la base real de usuarios.
+
+En iPhone, el usuario debe "Añadir a pantalla de inicio" y tener iOS 16.4 o superior; versiones
+anteriores no soportan Web Push aunque se agregue a pantalla de inicio.
 
 ## Subir a GitHub
 
