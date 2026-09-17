@@ -6,9 +6,12 @@ const CATALOG = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX'
 const WINDOW = 5;
 const MIN_HISTORY = WINDOW + 11;
 
+import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=1800' } });
 
 export async function onRequestGet(context) {
+  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
   const url = new URL(context.request.url);
   const wantsAll = ['1', 'true'].includes((url.searchParams.get('all') || '').toLowerCase());
   const single = (url.searchParams.get('symbol') || '').toUpperCase();

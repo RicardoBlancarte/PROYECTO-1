@@ -1,11 +1,14 @@
 // KPI de eficacia predictiva: back-test walk-forward del motor estocástico real (Markov + Monte Carlo,
 // mismas fórmulas que el frontend) contra los precios reales cacheados en asset_historical_prices.
 // Requiere solo 5 sesiones previas para estimar sigma, por lo que opera desde bloques de ~8-10 sesiones.
+import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+
 const CATALOG = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'NFLX', 'AMD', 'INTC', 'JPM', 'V', 'MA', 'JNJ', 'WMT', 'PG', 'DIS', 'ASML', 'TSM', 'KO', 'GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZC=F', 'ZW=F', 'ZS=F', 'KC=F'];
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=1800' } });
 
 export async function onRequestGet(context) {
+  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
   const url = new URL(context.request.url);
   const wantsAll = ['1', 'true'].includes((url.searchParams.get('all') || '').toLowerCase());
   const single = (url.searchParams.get('symbol') || '').toUpperCase();

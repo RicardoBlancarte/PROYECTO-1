@@ -315,3 +315,25 @@ create table if not exists public.page_views (
 
 alter table public.page_views enable row level security;
 create index if not exists page_views_page_created_idx on public.page_views (page, created_at desc);
+
+-- FASE 7: persistencia real de las sugerencias enviadas desde el botón "Sugerencias" de la
+-- cintilla superior (antes se perdían: el handler solo limpiaba el campo y mostraba un toast).
+-- Se inserta vía functions/api/suggestions.js con service role (igual que privacy-consent.js),
+-- para que un invitado sin sesión de Supabase también pueda enviar una sugerencia.
+create table if not exists public.user_suggestions (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users(id) on delete set null,
+  email text,
+  full_name text,
+  message text not null,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.user_suggestions enable row level security;
+create index if not exists user_suggestions_created_idx on public.user_suggestions (created_at desc);
+
+-- Misma politica que "authenticated users can view profiles": deja que el panel de
+-- superadmin (pestaña Sugerencias del modal de Usuarios) lea el listado con supabaseClient,
+-- igual que ya hace loadUsers() contra profiles.
+create policy "authenticated users can view suggestions"
+on public.user_suggestions for select to authenticated using (true);

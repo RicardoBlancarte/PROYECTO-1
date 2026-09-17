@@ -3,6 +3,8 @@
 // No existe todavía (ni aquí ni en ningún otro endpoint) un log de latencia/errores HTTP ni de
 // consultas por activo, así que esas dos gráficas se dejan fuera de este endpoint a propósito:
 // el frontend las muestra como "sin datos" en vez de simular números.
+import { isAdminRequestAuthorized } from '../../_shared/admin-auth.js';
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=900' } });
 
 const DAY_MS = 86400000;
@@ -10,6 +12,7 @@ const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 export async function onRequestGet(context) {
   const { env } = context;
+  if (!isAdminRequestAuthorized(context.request, env)) return json({ error: 'No autorizado.' }, 401);
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ usageByDay: { labels: [], platform: [] }, registrationsByWeek: { labels: [], counts: [] } });
   const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
   const [usageByDay, registrationsByWeek] = await Promise.all([

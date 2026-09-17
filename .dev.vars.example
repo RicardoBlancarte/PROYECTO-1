@@ -10,3 +10,9 @@ ANTHROPIC_API_KEY=
 # el navegador ni ningún archivo servido al público.
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+# Parche interino de acceso para los endpoints de solo-lectura del panel de superadmin
+# (winrate, winrate-shadow, admin/metrics, GET de track-view). Si se deja vacía, esos
+# endpoints se quedan abiertos como hoy. El valor se captura del mismo password que ya se
+# teclea al entrar como superadmin (ver admin-go en index.html) y se envía como header
+# X-Admin-Secret; no es autenticación real, ver functions/_shared/admin-auth.js.
+ADMIN_API_SECRET=
