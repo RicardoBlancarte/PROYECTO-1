@@ -41,14 +41,20 @@ export async function onRequestGet(context) {
   const sigma = covariance2x2(vectors.map(v => v.r), vectors.map(v => v.v));
   const invSigma = invert2x2(sigma);
   const sigmaScale = Math.sqrt((sigma.a + sigma.d) / 2);
-  // TODO(fase-b, aprobado 2026-09-28): "rangeUsed" hoy solo mide la dimensión retorno, elegida
-  // arbitrariamente. Reemplazar por una medida conjunta derivada de la misma Sigma que ya se
-  // usa para Mahalanobis, ej. sqrt(det(Sigma)) (proporcional al área/volumen de dispersión
-  // conjunta retorno+volumen), para que N_min deje de depender de una sola dimensión elegida
-  // a mano. No bloquea la validación de Fase A; sí debe resolverse antes de recalibrar N_min
-  // en Fase B.
-  const rReturns = vectors.map(v => v.r);
-  const rangeUsed = Math.max(...rReturns) - Math.min(...rReturns);
+  // Corregido 2026-09-28 (validación de Fase A detectó el problema en vivo): "rangeUsed" ya NO
+  // es el max-min de una sola dimensión. Ese enfoque colapsaba a ~0 en cuanto el activo tenía
+  // UN SOLO día extremo en su historial (cualquier activo líquido, tarde o temprano), porque el
+  // rango lo domina el peor/mejor día jamás visto y la fórmula de Silverman lo eleva a la sexta
+  // potencia — con eso N_min quedaba tan chico que "historial_insuficiente" nunca se podía
+  // disparar para ningún activo real, anulando la protección del punto 3.
+  // En su lugar se usa el "radio generalizado" de la misma Sigma 2D que ya se usa para
+  // Mahalanobis: el área de la elipse de 1-sigma es proporcional a sqrt(det(Sigma)), y el radio
+  // de un círculo con esa misma área es det(Sigma)^(1/4) — un escalar en la misma escala que
+  // sigmaScale, pero agregado sobre TODO el historial (promedia, no toma el máximo), así que un
+  // solo día extremo ya no puede dominarlo. r y v ya están normalizados por MAD (adimensionales),
+  // así que a, b, d (y por tanto det) también lo son; no hay problema de unidades al combinarlos.
+  const detSigma = Math.max(sigma.a * sigma.d - sigma.b * sigma.b, 1e-12);
+  const rangeUsed = Math.pow(detSigma, 0.25);
 
   // Patrones de 3 días con desenlace conocido: j-2,j-1,j como patrón, j+1 como desenlace.
   const targetPattern = vectors.slice(-3);
@@ -68,10 +74,9 @@ export async function onRequestGet(context) {
   const probabilityUp = wTotal > 0 ? weightedSum / wTotal : unconditionalUpRate;
 
   // Regla de Silverman (d=2): h_opt(N) = (4/(d+2))^(1/(d+4)) * sigma * N^(-1/(d+4)).
-  // N_min despejado exigiendo h_opt(N_min) = c * rango.
-  const nMin = rangeUsed > 0
-    ? Math.pow((Math.pow(4 / (SILVERMAN_D + 2), 1 / (SILVERMAN_D + 4)) * sigmaScale) / (SILVERMAN_C * rangeUsed), SILVERMAN_D + 4)
-    : Infinity;
+  // N_min despejado exigiendo h_opt(N_min) = c * rango. rangeUsed ya nunca es 0 (piso de
+  // detSigma arriba), así que esto ya no necesita un caso Infinity aparte.
+  const nMin = Math.pow((Math.pow(4 / (SILVERMAN_D + 2), 1 / (SILVERMAN_D + 4)) * sigmaScale) / (SILVERMAN_C * rangeUsed), SILVERMAN_D + 4);
 
   // W_total "alto" se mide contra N_min: equivale a pedir al menos N_min vecinos de peso
   // pleno para considerar que hay precedente sólido (no hay un umbral numérico propio en la
@@ -84,7 +89,7 @@ export async function onRequestGet(context) {
   const modelNotes = {
     engine: 'shadow_v2_vectors',
     sigma: { rr: sigma.a, rv: sigma.b, vv: sigma.d },
-    rangeDimension: 'return_mad_norm', // TODO(fase-b): reemplazar por sqrt(det(Sigma)), ver comentario junto a rangeUsed.
+    rangeDimension: 'det_sigma_quarter_power', // ver comentario junto a rangeUsed: det(Sigma)^(1/4), no max-min de una sola dimensión.
     unconditionalUpRate: Number(unconditionalUpRate.toFixed(3)),
   };
 
@@ -100,10 +105,10 @@ export async function onRequestGet(context) {
     horizon,
     probabilityUp: Number(probabilityUp.toFixed(3)),
     nPatterns,
-    nMin: Number.isFinite(nMin) ? Number(nMin.toFixed(3)) : null,
+    nMin: formatPrecise(nMin),
     wTotal: Number(wTotal.toFixed(3)),
     sigmaScale: Number(sigmaScale.toFixed(4)),
-    rangeUsed: Number(rangeUsed.toFixed(4)),
+    rangeUsed: formatPrecise(rangeUsed),
     patternConfidenceLabel,
     modelNotes,
     computedAt: new Date().toISOString(),
@@ -177,6 +182,17 @@ function invert2x2(sigma) {
 
 function mahalanobisSq(dr, dv, inv) {
   return dr * dr * inv.a + 2 * dr * dv * inv.b + dv * dv * inv.d;
+}
+
+// nMin/rangeUsed pueden ser legítimamente muy chicos (ej. 0.0000259) sin ser un bug: un
+// .toFixed(3) ingenuo los redondea a "0.000" y hace ver como si el cálculo hubiera colapsado
+// a cero cuando en realidad es un valor positivo válido. Se usa notación exponencial solo por
+// debajo de 1e-6 (donde JS igual la usaría por defecto al serializar); arriba de eso, 6
+// decimales son más que suficientes para no perder la magnitud real del valor.
+function formatPrecise(value) {
+  if (!Number.isFinite(value)) return null;
+  if (value === 0) return 0;
+  return Math.abs(value) < 1e-6 ? Number(value.toExponential(4)) : Number(value.toFixed(6));
 }
 
 // Distancia total entre dos trayectorias de 3 vectores: suma de la Mahalanobis-cuadrado
