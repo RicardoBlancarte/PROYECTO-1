@@ -41,6 +41,12 @@ export async function onRequestGet(context) {
   const sigma = covariance2x2(vectors.map(v => v.r), vectors.map(v => v.v));
   const invSigma = invert2x2(sigma);
   const sigmaScale = Math.sqrt((sigma.a + sigma.d) / 2);
+  // TODO(fase-b, aprobado 2026-09-28): "rangeUsed" hoy solo mide la dimensión retorno, elegida
+  // arbitrariamente. Reemplazar por una medida conjunta derivada de la misma Sigma que ya se
+  // usa para Mahalanobis, ej. sqrt(det(Sigma)) (proporcional al área/volumen de dispersión
+  // conjunta retorno+volumen), para que N_min deje de depender de una sola dimensión elegida
+  // a mano. No bloquea la validación de Fase A; sí debe resolverse antes de recalibrar N_min
+  // en Fase B.
   const rReturns = vectors.map(v => v.r);
   const rangeUsed = Math.max(...rReturns) - Math.min(...rReturns);
 
@@ -78,7 +84,7 @@ export async function onRequestGet(context) {
   const modelNotes = {
     engine: 'shadow_v2_vectors',
     sigma: { rr: sigma.a, rv: sigma.b, vv: sigma.d },
-    rangeDimension: 'return_mad_norm',
+    rangeDimension: 'return_mad_norm', // TODO(fase-b): reemplazar por sqrt(det(Sigma)), ver comentario junto a rangeUsed.
     unconditionalUpRate: Number(unconditionalUpRate.toFixed(3)),
   };
 
