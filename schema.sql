@@ -337,3 +337,50 @@ create index if not exists user_suggestions_created_idx on public.user_suggestio
 -- igual que ya hace loadUsers() contra profiles.
 create policy "authenticated users can view suggestions"
 on public.user_suggestions for select to authenticated using (true);
+
+-- MOTOR V2 — FASE A (puntos 2 y 3 de la instrucción de calibración matemática): representación
+-- vectorial de patrones (retorno, volumen) con distancia de Mahalanobis y kernel continuo, en
+-- lugar de la señal binaria 1/0 del motor shadow_v2 existente (asset_signals /
+-- asset_pattern_snapshots, que NO se tocan). Todo esto vive en tablas nuevas, se calcula en
+-- functions/api/patterns-vectors.js (endpoint aparte, no enlazado desde ninguna UI) y no se
+-- integra a la cascada de actualizar_automatico.py en esta fase.
+--
+-- Cache de auditoría de los vectores (r_t, v_t) por símbolo/horizonte/fecha, normalizados por
+-- MAD contra el propio historial del activo. Solo se persisten los últimos N por llamada
+-- (ver PERSIST_LIMIT en el endpoint); el cálculo de Sigma/N/W_total en memoria usa el
+-- historial completo disponible en asset_historical_prices, no lo que quede persistido aquí.
+create table if not exists public.asset_pattern_vectors (
+  symbol text not null,
+  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  date date not null,
+  return_mad_norm numeric not null,
+  volume_mad_norm numeric not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, horizon, date)
+);
+
+alter table public.asset_pattern_vectors enable row level security;
+create index if not exists asset_pattern_vectors_symbol_horizon_date_idx
+  on public.asset_pattern_vectors (symbol, horizon, date desc);
+
+-- Snapshot del motor vectorial: probabilidad candidata (kernel-weighted, sin clamp artificial:
+-- una media ponderada de valores en [0,1] ya queda en [0,1] por construcción), más N, W_total,
+-- N_min (regla de Silverman) y la etiqueta de confianza del punto 3. Una fila por
+-- símbolo/horizonte, sobrescrita en cada cálculo (mismo patrón que asset_pattern_snapshots).
+create table if not exists public.asset_pattern_vectors_snapshots (
+  symbol text not null,
+  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  probability_up numeric not null check (probability_up between 0 and 1),
+  n_patterns integer not null,
+  n_min numeric not null,
+  w_total numeric not null,
+  sigma_scale numeric not null,
+  range_used numeric not null,
+  pattern_confidence_label text not null
+    check (pattern_confidence_label in ('historial_insuficiente', 'anomalia_genuina', 'precedente_solido')),
+  model_notes jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, horizon)
+);
+
+alter table public.asset_pattern_vectors_snapshots enable row level security;
