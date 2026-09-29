@@ -337,3 +337,28 @@ create index if not exists user_suggestions_created_idx on public.user_suggestio
 -- igual que ya hace loadUsers() contra profiles.
 create policy "authenticated users can view suggestions"
 on public.user_suggestions for select to authenticated using (true);
+
+-- MOTOR V2 — FASE B, sub-fase 1 (Punto 1 de la instrucción de calibración matemática): Factor
+-- de Sensibilidad bayesiano. El modelo legacy no tiene ni Markov ni Monte Carlo reales (son
+-- etiquetas de UI sobre una fórmula cerrada `precio*(1+sigma*step)`); lo único real y fijo es
+-- la constante `step` por horizonte en index.html (PREDICTION_HORIZON: .21/.55/1.15), que nunca
+-- se calibró. Esta tabla guarda la versión bayesiana (Student-t, MAD, por símbolo+horizonte) de
+-- ese factor, calculada en functions/api/sensitivity-factor.js (endpoint aparte, admin-gated,
+-- no enlazado desde ninguna UI). No se toca index.html ni la cascada de
+-- actualizar_automatico.py en esta sub-fase.
+create table if not exists public.asset_sensitivity_factor (
+  symbol text not null,
+  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  sensitivity_factor numeric not null,
+  prior_mean numeric not null,
+  tau_scale numeric not null,
+  degrees_of_freedom numeric not null,
+  sample_kurtosis numeric not null,
+  n_observations integer not null,
+  iterations integer not null,
+  model_notes jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, horizon)
+);
+
+alter table public.asset_sensitivity_factor enable row level security;
