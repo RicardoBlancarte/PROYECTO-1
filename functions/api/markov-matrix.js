@@ -8,8 +8,19 @@
 // mensual no tiene suficiente profundidad histórica todavía — re-muestrear aquí sería peor, no
 // mejor). Los horizontes semanal/mensual se obtienen elevando esta misma matriz a una potencia
 // (P^5, P^21; convención de días hábiles), nunca reajustando con menos datos. Los estados se
-// definen por terciles de la distribución de retornos del propio activo (no un corte fijo), y
-// la matriz se inclina por asimetría muestral hacia bajista/alcista, como pide el punto 1.
+// definen por terciles de la distribución de retornos del propio activo (no un corte fijo).
+//
+// Corregido tras revisión numérica (validación en modo sombra, antes de desplegar): la primera
+// versión inclinaba la matriz de transición con la asimetría muestral. Verificado con un
+// sintético reproducible que eso era un error de categoría — la asimetría mide la forma/magnitud
+// de las colas de la distribución de retornos, no la frecuencia con la que se transita entre
+// terciles, y el tilt alejaba artificialmente la distribución estacionaria de (1/3,1/3,1/3), que
+// es la frecuencia marginal real de cada tercil por construcción (confirmado: con skew=-0.56 el
+// tilt movía la estacionaria ~0.41 en L1, un efecto compuesto enorme para una asimetría modesta).
+// La matriz del modelo es ahora la cruda, sin inclinar. `sampleSkewness` se sigue calculando y
+// devolviendo como campo informativo — la sub-fase B3 (Monte Carlo) la va a usar para la
+// magnitud de los movimientos dentro de cada estado (colas), junto con la semi-desviación del
+// VaR, que es el lugar correcto para esa información.
 import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -17,7 +28,6 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 const STATES = ['bajista', 'neutral', 'alcista'];
 const STEPS_BY_HORIZON = { daily: 1, weekly: 5, monthly: 21 }; // convención estándar de días hábiles.
 const MIN_OBSERVATIONS = 60; // piso holgado para terciles + conteos de transición con 3 estados.
-const TILT_K = 1.0; // intensidad del tilt por skewness; no especificada en la instrucción, ver plan.
 const FETCH_LIMIT = 5000;
 
 export async function onRequestGet(context) {
@@ -44,24 +54,25 @@ export async function onRequestGet(context) {
   const highThreshold = percentile(sorted, 2 / 3);
   const stateSeries = returns.map(r => classify(r, lowThreshold, highThreshold));
 
-  const rawMatrix = buildTransitionMatrix(stateSeries);
+  const transitionMatrix = buildTransitionMatrix(stateSeries);
+  // Informativo para Fase B3 (Monte Carlo); ya NO ajusta esta matriz (ver comentario de arriba).
   const sampleSkewness = skewnessOf(returns);
-  const tiltedMatrix = tiltMatrix(rawMatrix, sampleSkewness, TILT_K);
 
   const currentStateIndex = stateSeries[stateSeries.length - 1];
   const steps = STEPS_BY_HORIZON[horizon];
-  const poweredMatrix = matPow(tiltedMatrix, steps);
+  const poweredMatrix = matPow(transitionMatrix, steps);
   const projectedRow = poweredMatrix[currentStateIndex];
 
   const modelNotes = {
     engine: 'shadow_v2_markov',
     stateOrder: STATES,
     stepsConvention: 'dias_habiles',
+    sampleSkewnessNote: 'informativo, reservado para Fase B3 (Monte Carlo): no ajusta esta matriz.',
   };
 
   await persistSnapshot(context.env, headers, symbol, {
-    lowThreshold, highThreshold, sampleSkewness, tiltK: TILT_K,
-    transitionMatrixRaw: rawMatrix, transitionMatrixTilted: tiltedMatrix,
+    lowThreshold, highThreshold, sampleSkewness,
+    transitionMatrix,
     currentState: STATES[currentStateIndex], nObservations: returns.length, modelNotes,
   });
 
@@ -72,9 +83,7 @@ export async function onRequestGet(context) {
     lowThreshold: Number(lowThreshold.toFixed(6)),
     highThreshold: Number(highThreshold.toFixed(6)),
     sampleSkewness: Number(sampleSkewness.toFixed(4)),
-    tiltK: TILT_K,
-    transitionMatrixRaw: roundMatrix(rawMatrix),
-    transitionMatrixTilted: roundMatrix(tiltedMatrix),
+    transitionMatrix: roundMatrix(transitionMatrix),
     currentState: STATES[currentStateIndex],
     projectedDistribution: { bajista: Number(projectedRow[0].toFixed(4)), neutral: Number(projectedRow[1].toFixed(4)), alcista: Number(projectedRow[2].toFixed(4)) },
     nObservations: returns.length,
@@ -122,7 +131,8 @@ function normalizeRow(row) {
 
 function mean(values) { return values.reduce((sum, v) => sum + v, 0) / values.length; }
 
-// Asimetría muestral en exceso (estimador simple, mismo estilo que la curtosis de B1): m3/m2^1.5.
+// Asimetría muestral (estimador simple, mismo estilo que la curtosis de B1): m3/m2^1.5.
+// Informativo para Fase B3 (Monte Carlo) — ver comentario al inicio del archivo.
 function skewnessOf(values) {
   const m = mean(values);
   const deviations = values.map(v => v - m);
@@ -130,14 +140,6 @@ function skewnessOf(values) {
   const m3 = mean(deviations.map(d => d * d * d));
   if (m2 <= 1e-12) return 0;
   return m3 / Math.pow(m2, 1.5);
-}
-
-// Inclina las columnas bajista/alcista de cada fila (neutral no se toca) y renormaliza. Skew
-// negativo (cola izquierda) -> más peso a bajista, menos a alcista; skew positivo, al revés.
-function tiltMatrix(matrix, skew, k) {
-  const bajistaFactor = Math.exp(-skew * k);
-  const alcistaFactor = Math.exp(skew * k);
-  return matrix.map(row => normalizeRow([row[0] * bajistaFactor, row[1], row[2] * alcistaFactor]));
 }
 
 function multiply3x3(a, b) {
@@ -169,9 +171,7 @@ async function persistSnapshot(env, headers, symbol, snapshot) {
       low_threshold: snapshot.lowThreshold,
       high_threshold: snapshot.highThreshold,
       sample_skewness: snapshot.sampleSkewness,
-      tilt_k: snapshot.tiltK,
-      transition_matrix_raw: snapshot.transitionMatrixRaw,
-      transition_matrix_tilted: snapshot.transitionMatrixTilted,
+      transition_matrix: snapshot.transitionMatrix,
       current_state: snapshot.currentState,
       n_observations: snapshot.nObservations,
       model_notes: snapshot.modelNotes,

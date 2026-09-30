@@ -371,14 +371,19 @@ alter table public.asset_sensitivity_factor enable row level security;
 -- (P^5, P^21), no reajustando con menos datos — por eso no hay columna de horizonte aquí. Se
 -- calcula en functions/api/markov-matrix.js (endpoint aparte, admin-gated, no enlazado desde
 -- ninguna UI), solo lectura sobre asset_historical_prices.
+--
+-- Sin inclinar por skewness (corregido antes de desplegar nada: inclinar la matriz de
+-- transición con la asimetría muestral era un error de categoría — la asimetría mide forma/
+-- magnitud de colas, no frecuencia de transición entre terciles, y alejaba la estacionaria de
+-- (1/3,1/3,1/3), que es la frecuencia marginal real por construcción). `sample_skewness` se
+-- guarda igual, como dato informativo para la Fase B3 (Monte Carlo: magnitud de movimiento
+-- dentro de cada estado + semi-desviación del VaR), no para ajustar esta matriz.
 create table if not exists public.asset_markov_matrix (
   symbol text primary key,
   low_threshold numeric not null,
   high_threshold numeric not null,
   sample_skewness numeric not null,
-  tilt_k numeric not null,
-  transition_matrix_raw jsonb not null,
-  transition_matrix_tilted jsonb not null,
+  transition_matrix jsonb not null,
   current_state text not null check (current_state in ('bajista', 'neutral', 'alcista')),
   n_observations integer not null,
   model_notes jsonb not null default '{}'::jsonb,
