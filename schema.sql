@@ -362,3 +362,27 @@ create table if not exists public.asset_sensitivity_factor (
 );
 
 alter table public.asset_sensitivity_factor enable row level security;
+
+-- MOTOR V2 — FASE B, sub-fase 2 (Punto 1, parte de la matriz de Markov): matriz de transición
+-- real de 3 estados (bajista/neutral/alcista), estimada en pasos DIARIOS (no re-muestreada a
+-- semanal/mensual: una matriz de transición necesita mucha más muestra por celda que una
+-- regresión escalar, y B1 ya mostró que mensual no tiene suficiente profundidad histórica
+-- todavía). Los horizontes semanal/mensual se derivan elevando esta misma matriz a una potencia
+-- (P^5, P^21), no reajustando con menos datos — por eso no hay columna de horizonte aquí. Se
+-- calcula en functions/api/markov-matrix.js (endpoint aparte, admin-gated, no enlazado desde
+-- ninguna UI), solo lectura sobre asset_historical_prices.
+create table if not exists public.asset_markov_matrix (
+  symbol text primary key,
+  low_threshold numeric not null,
+  high_threshold numeric not null,
+  sample_skewness numeric not null,
+  tilt_k numeric not null,
+  transition_matrix_raw jsonb not null,
+  transition_matrix_tilted jsonb not null,
+  current_state text not null check (current_state in ('bajista', 'neutral', 'alcista')),
+  n_observations integer not null,
+  model_notes jsonb not null default '{}'::jsonb,
+  computed_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.asset_markov_matrix enable row level security;
