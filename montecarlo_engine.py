@@ -91,6 +91,49 @@ def bowley_skewness(values):
     return float((q3 + q1 - 2 * q2) / denom)
 
 
+def weighted_skewness(values, weights):
+    """Asimetria clasica (momentos), pero ponderada -- para medir la asimetria del POOL de
+    remuestreo tal como realmente se usa (pesado por similitud de Mahalanobis), no la del
+    historial completo sin ponderar."""
+    values = np.asarray(values, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    w_sum = weights.sum()
+    mean = np.sum(weights * values) / w_sum
+    dev = values - mean
+    m2 = np.sum(weights * dev ** 2) / w_sum
+    m3 = np.sum(weights * dev ** 3) / w_sum
+    if m2 <= 1e-12:
+        return 0.0
+    return float(m3 / (m2 ** 1.5))
+
+
+def weighted_quantile(values, weights, q):
+    """Cuantil ponderado (interpolacion sobre el punto medio del peso acumulado) -- version
+    ponderada de np.percentile, para poder calcular una asimetria de Bowley ponderada."""
+    values = np.asarray(values, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    order = np.argsort(values)
+    values_sorted = values[order]
+    weights_sorted = weights[order]
+    cum = np.cumsum(weights_sorted) - 0.5 * weights_sorted
+    cum /= weights_sorted.sum()
+    return float(np.interp(q, cum, values_sorted))
+
+
+def weighted_bowley_skewness(values, weights):
+    """Asimetria de Bowley (por cuantiles), pero ponderada -- a diferencia de
+    weighted_skewness (momentos), no depende de valores extremos individuales, asi que sirve
+    para distinguir ruido de Monte Carlo (dominado por colas pesadas) de un sesgo real en los
+    pesos del pool."""
+    q1 = weighted_quantile(values, weights, 0.25)
+    q2 = weighted_quantile(values, weights, 0.50)
+    q3 = weighted_quantile(values, weights, 0.75)
+    denom = q3 - q1
+    if denom <= 1e-12:
+        return 0.0
+    return float((q3 + q1 - 2 * q2) / denom)
+
+
 def standardized_student_t_logpdf(x, nu):
     """Densidad de la Student-t ESTANDARIZADA (Bollerslev 1987): varianza exactamente 1 para
     cualquier nu>2. Una t con parametro de ESCALA=1 (en vez de esto) tiene varianza nu/(nu-2),
@@ -420,6 +463,11 @@ def summarize_simulation(cumulative_log_returns):
         "var_99": var_99_log, "cvar_99": cvar_99_log,
         "semi_deviation": semi_deviation_log,
     }
+    # realized_skewness_simulated va en LOG (igual que sample_skewness_classical/robust de
+    # entrada, que tambien son sobre retornos log) -- la contraparte en retorno simple se
+    # calcula aparte y se guarda en model_notes.realized_skewness_simulated_simple (NO dentro
+    # de log_units, que seria un nombre enganoso para un valor que no esta en log).
+    realized_skewness_simulated_simple = classical_skewness(np.expm1(cumulative_log_returns))
     return {
         "probability_up": probability_up,
         "quantiles": {k: to_simple(v) for k, v in quantiles_log.items()},
@@ -427,6 +475,7 @@ def summarize_simulation(cumulative_log_returns):
         "var_99": to_simple(var_99_log), "cvar_99": to_simple(cvar_99_log),
         "semi_deviation": to_simple(semi_deviation_log),
         "realized_skewness_simulated": classical_skewness(cumulative_log_returns),
+        "realized_skewness_simulated_simple": realized_skewness_simulated_simple,
         "log_units": log_units,
     }
 
@@ -496,6 +545,15 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
     weighted_ez2 = float(np.sum(pool_weights * pool_outcomes ** 2) / pool_weights.sum())
     pool_outcomes = pool_outcomes / np.sqrt(weighted_ez2)
 
+    # Asimetria del pool tal como REALMENTE se usa (ponderado por e^-D, no el historial crudo
+    # sin ponderar) -- invariante a la renormalizacion de arriba (la asimetria no cambia al
+    # reescalar por una constante positiva), asi que da igual calcularla antes o despues.
+    pool_skewness_weighted = weighted_skewness(pool_outcomes, pool_weights)
+    # Version robusta (Bowley, por cuantiles): no depende de valores extremos individuales como
+    # la de momentos de arriba, asi que sirve para distinguir ruido de Monte Carlo de un sesgo
+    # real en los pesos cuando nu es chico (colas muy pesadas).
+    pool_skewness_bowley_weighted = weighted_bowley_skewness(pool_outcomes, pool_weights)
+
     ess = effective_sample_size(pool_weights)
     n_min, sigma_scale, range_used = silverman_n_min(r_norm, v_norm)
 
@@ -511,6 +569,7 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
     )
     summary = summarize_simulation(cumulative)
     log_units = summary.pop("log_units")
+    realized_skewness_simulated_simple = summary.pop("realized_skewness_simulated_simple")
 
     model_notes = {
         "engine": "shadow_v2_montecarlo",
@@ -533,6 +592,9 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
             "detectable y el ajuste converge hacia el caso limite (EWMA/IGARCH)."
         ),
         "pool_e_z2_before_rescale": weighted_ez2,
+        "pool_skewness_weighted": pool_skewness_weighted,
+        "pool_skewness_bowley_weighted": pool_skewness_bowley_weighted,
+        "realized_skewness_simulated_simple": realized_skewness_simulated_simple,
         "log_units": log_units,
     }
 

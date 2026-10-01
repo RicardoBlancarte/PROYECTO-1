@@ -176,6 +176,14 @@ def run():
         f"valor={result['model_notes']['pool_e_z2_before_rescale']:.4f}",
     ))
     results.append(check(
+        "3f. Horizonte daily (1 paso): realized_skewness_simulated debe coincidir casi "
+        "exactamente con pool_skewness_weighted (misma cantidad, dos estimadores -- un paso "
+        "es solo z*sigma_forecast, un escalado positivo que no cambia la asimetria)",
+        abs(result["realized_skewness_simulated"] - result["model_notes"]["pool_skewness_weighted"]) < 0.15,
+        f"simulada={result['realized_skewness_simulated']:.4f}  "
+        f"pool_ponderada={result['model_notes']['pool_skewness_weighted']:.4f}",
+    ))
+    results.append(check(
         "4a. Determinismo: misma semilla + mismos insumos -> resultado identico",
         result["probability_up"] == result_repeat["probability_up"]
         and result["var_95"] == result_repeat["var_95"]
