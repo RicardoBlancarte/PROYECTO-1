@@ -25,7 +25,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install yfinance pandas numpy supabase requests pywebpush
+          pip install yfinance pandas numpy scipy supabase requests pywebpush
 
       - name: Ejecutar script de actualización
         env:

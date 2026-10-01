@@ -406,19 +406,35 @@ alter table public.asset_markov_matrix enable row level security;
 -- reactivara tras un backfill historico real. model_notes.lambda_pool_at_boundary=true NO es
 -- un error: significa pool sin decaimiento por antiguedad (deliberado en este modo, o genuino
 -- si algun dia se recalibra y no se detecta cambio de regimen).
+--
+-- Volatilidad vía GARCH(1,1) con Student-t (garch_omega/alpha/beta), no una recursion EWMA:
+-- la EWMA usada originalmente era tipo IGARCH (coeficientes sumando exactamente 1, solo
+-- marginalmente estable) y mostro retroalimentacion real en produccion para INTC/META (sigma
+-- explotando 12x-42x en trayectorias mensuales). Un GARCH con alpha+beta<1 estricto es estable
+-- por construccion. garch_persistence_at_boundary=true NO es un error: significa que los datos
+-- no muestran reversion a la media detectable. El pool de shocks tambien se renormaliza para
+-- que su E[z^2] ponderado sea exactamente 1 antes de simular (ver model_notes.
+-- pool_e_z2_before_rescale para el valor previo a esa correccion).
+--
+-- var_95/cvar_95/var_99/cvar_99/semi_deviation/quantiles estan en RETORNO SIMPLE (exp(x)-1),
+-- no log — las versiones en log quedan en model_notes.log_units para quien las necesite.
 create table if not exists public.asset_montecarlo_simulation (
   symbol text not null,
   horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
   n_paths integer not null,
   seed bigint not null,
-  lambda_vol numeric not null,
+  garch_omega numeric not null,
+  garch_alpha numeric not null,
+  garch_beta numeric not null,
+  garch_persistence numeric not null,        -- alpha+beta; estacionario por construccion (<1)
+  garch_half_life_days numeric,
   lambda_pool numeric not null,
   degrees_of_freedom numeric not null,
   effective_sample_size numeric not null,
   n_min_threshold numeric not null,          -- N_min de Silverman (Fase A), para contrastar el ESS
   pool_size integer not null,
   probability_up numeric not null check (probability_up between 0 and 1),
-  quantiles jsonb not null,                  -- {p5,p10,p25,p50,p75,p90,p95}
+  quantiles jsonb not null,                  -- {p5,p10,p25,p50,p75,p90,p95}, retorno simple
   var_95 numeric not null,
   cvar_95 numeric not null,
   var_99 numeric not null,
@@ -430,7 +446,7 @@ create table if not exists public.asset_montecarlo_simulation (
   news_uncertainty_variance numeric not null default 0,
   b1_crosscheck jsonb,                       -- snapshot de asset_sensitivity_factor al momento del calculo
   b2_crosscheck jsonb,                       -- snapshot de asset_markov_matrix al momento del calculo
-  model_notes jsonb not null default '{}'::jsonb,  -- incluye lambda_pool_mode y lambda_pool_at_boundary
+  model_notes jsonb not null default '{}'::jsonb,  -- incluye lambda_pool_mode, garch_persistence_at_boundary, pool_e_z2_before_rescale, log_units
   computed_at timestamptz not null default timezone('utc', now()),
   primary key (symbol, horizon)
 );

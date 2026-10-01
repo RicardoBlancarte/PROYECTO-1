@@ -7,21 +7,34 @@ llama explicitamente desde actualizar_automatico.py.
 
 Implementa "Filtered Historical Simulation" (FHS) con remuestreo ponderado, no una Student-t
 parametrica (esa es simetrica por construccion y no captura asimetria sin un parametro extra):
-  - lambda_vol: decaimiento de la recursion EWMA de varianza (escala de semanas/meses),
-    calibrado por maxima verosimilitud Student-t (mismo estilo que B1: nu via curtosis).
+  - GARCH(1,1) con Student-t (omega, alpha, beta), calibrado por maxima verosimilitud con
+    restricciones de estacionariedad (alpha+beta<1) -- reemplaza una recursion EWMA anterior
+    que era tipo IGARCH (coeficientes sumando exactamente 1, solo marginalmente estable) y que
+    en produccion mostro retroalimentacion real: sigma explotaba 12x-42x en trayectorias
+    mensuales para activos cuyo pool de shocks estandarizados tenia E[z^2] > 1 (confirmado con
+    datos reales de INTC/META). Un GARCH genuino con alpha+beta<1 estricto es estable por
+    construccion, sin importar el E[z^2] empirico del pool.
+  - El pool de shocks se renormaliza para que su E[z^2] ponderado sea exactamente 1 antes de
+    usarse en la simulacion (independiente del fix de GARCH; ambos atacan la misma causa raiz
+    desde angulos distintos). El E[z^2] original (antes de renormalizar) queda en model_notes
+    como diagnostico.
   - lambda_pool: decaimiento de la EDAD en el peso de remuestreo (escala de anios -- un
-    parametro DISTINTO de lambda_vol), calibrado por validacion cruzada dejando-uno-fuera de
-    una densidad kernel sobre los shocks estandarizados, con ancho de banda de Silverman 1D.
+    parametro DISTINTO de la volatilidad GARCH), calibrado por validacion cruzada
+    dejando-uno-fuera de una densidad kernel sobre los shocks estandarizados, con ancho de
+    banda de Silverman 1D.
   - Peso final de cada dia historico = lambda_pool^antiguedad * exp(-D_mahalanobis), donde
     D_mahalanobis reutiliza el kernel de Fase A (Sigma 2D de retorno/volumen normalizados por
     MAD), recalculado fresco (no se lee la tabla cacheada de 260 dias de Fase A).
   - Ningun dia se descarta ni se trunca: los extremos entran al pool con su peso completo.
+  - Salidas (VaR, CVaR, semi-desviacion, cuantiles) en retorno SIMPLE (exp(x)-1); las versiones
+    en log quedan en model_notes.log_units para quien las necesite.
 """
 
 import hashlib
 from math import lgamma, log, pi
 
 import numpy as np
+from scipy.optimize import minimize
 
 WINDOW = 3  # mismo tamanio de patron que Fase A.
 SILVERMAN_D = 2
@@ -60,16 +73,6 @@ def mad_normalize(values):
     return (values - med) / mad
 
 
-def excess_kurtosis(values):
-    values = np.asarray(values, dtype=float)
-    dev = values - values.mean()
-    m2 = np.mean(dev ** 2)
-    m4 = np.mean(dev ** 4)
-    if m2 <= 1e-12:
-        return 0.0
-    return float(m4 / (m2 ** 2) - 3.0)
-
-
 def classical_skewness(values):
     values = np.asarray(values, dtype=float)
     dev = values - values.mean()
@@ -88,22 +91,26 @@ def bowley_skewness(values):
     return float((q3 + q1 - 2 * q2) / denom)
 
 
-def nu_from_kurtosis(values, nu_cap=NU_CAP, nu_min=NU_MIN):
-    g2 = excess_kurtosis(values)
-    if g2 <= 0.05:
-        return float(nu_cap)
-    nu = 4.0 + 6.0 / g2
-    return float(min(max(nu, nu_min), nu_cap))
-
-
-def student_t_logpdf(x, nu, scale):
+def standardized_student_t_logpdf(x, nu):
+    """Densidad de la Student-t ESTANDARIZADA (Bollerslev 1987): varianza exactamente 1 para
+    cualquier nu>2. Una t con parametro de ESCALA=1 (en vez de esto) tiene varianza nu/(nu-2),
+    no 1 -- confundir ambas fue la causa de que sigma del GARCH saliera sistematicamente chico
+    por un factor sqrt(nu/(nu-2)), detectado comparando E[z^2] del pool contra nu/(nu-2) con
+    datos reales (INTC/META/AAPL/NFLX). GARCH-t exige que sigma_t sea la desviacion estandar
+    condicional real, no un parametro de escala distinto de ella."""
     x = np.asarray(x, dtype=float)
-    z = x / scale
     return (
         lgamma((nu + 1) / 2) - lgamma(nu / 2)
-        - 0.5 * log(nu * pi) - log(scale)
-        - (nu + 1) / 2 * np.log1p(z * z / nu)
+        - 0.5 * log(pi * (nu - 2))
+        - (nu + 1) / 2 * np.log1p(x * x / (nu - 2))
     )
+
+
+def standardized_t_draw(rng, nu, size=None):
+    """Innovacion Student-t con varianza EXACTAMENTE 1 (no nu/(nu-2), que es lo que da
+    rng.standard_t crudo). Usar esta funcion, nunca rng.standard_t directo, en cualquier
+    generador sintetico de este modulo -- confundir ambas fue el origen del bug de sigma."""
+    return rng.standard_t(nu, size=size) / np.sqrt(nu / (nu - 2))
 
 
 def golden_section_search(f, lo, hi, tol=1e-4, max_iter=60):
@@ -142,39 +149,89 @@ def silverman_bandwidth_1d(values):
 
 
 # ---------------------------------------------------------------------------
-# 2a. lambda_vol: recursion EWMA de varianza, calibrada por MLE Student-t.
+# 2a. GARCH(1,1) con Student-t, calibrado por MLE con restricciones de estacionariedad.
+# Reemplaza la recursion EWMA (tipo IGARCH, solo marginalmente estable) que mostro
+# retroalimentacion real en produccion (sigma explotando 12x-42x en trayectorias mensuales).
+#
+# Reparametrizacion para que las restricciones queden como cajas simples en vez de una
+# restriccion no lineal explicita (alpha+beta<1 se cumple por construccion, no hace falta
+# imponerla aparte):
+#   persistencia = alpha + beta,  en (eps, GARCH_PERSISTENCE_HI)
+#   mezcla       = alpha / persistencia,  en (eps, 1-eps)
+#   varianza_largo_plazo > 0 (optimizada en escala log)
+#   alpha = mezcla * persistencia ; beta = (1-mezcla) * persistencia
+#   omega = varianza_largo_plazo * (1 - persistencia)
 # ---------------------------------------------------------------------------
 
-def ewma_sigma_path(returns, lam):
-    """sigma_t sin look-ahead: sigma[t] se construye solo con informacion hasta t-1."""
+GARCH_PERSISTENCE_LO = 1e-3
+GARCH_PERSISTENCE_HI = 0.999  # estrictamente <1: GARCH con esto es estable por construccion.
+GARCH_MIX_LO = 1e-3
+GARCH_MIX_HI = 1 - 1e-3
+
+
+def _garch_params_from_reparam(persistence, mix, long_run_var):
+    alpha = mix * persistence
+    beta = (1 - mix) * persistence
+    omega = long_run_var * (1 - persistence)
+    return omega, alpha, beta
+
+
+def garch_sigma_path(returns, omega, alpha, beta):
+    """sigma_t sin look-ahead: sigma_t^2 = omega + alpha*r_{t-1}^2 + beta*sigma_{t-1}^2."""
     returns = np.asarray(returns, dtype=float)
     n = len(returns)
     sigma2 = np.empty(n)
-    warmup = returns[:max(5, min(20, n))]
-    prev = max(float(np.var(warmup)), 1e-12)
+    long_run_var = omega / max(1.0 - alpha - beta, 1e-6)
+    prev_sigma2 = max(long_run_var, 1e-12)
     for t in range(n):
-        sigma2[t] = prev
-        prev = lam * prev + (1 - lam) * returns[t] ** 2
-    return np.sqrt(sigma2)
+        sigma2[t] = prev_sigma2
+        prev_sigma2 = omega + alpha * returns[t] ** 2 + beta * prev_sigma2
+    return np.sqrt(np.maximum(sigma2, 1e-12))
 
 
-def calibrar_lambda_vol(returns, lam_lo=0.5, lam_hi=0.995):
+def calibrar_garch(returns):
+    """MLE conjunta de los 4 parametros (persistencia, mezcla, varianza_largo_plazo, nu). nu YA
+    NO se deriva de una formula de curtosis aparte: con la curtosis muestral real observada en
+    activos reales (22-83), `nu=4+6/g2` da casi siempre nu~=4 (la formula pierde resolucion mas
+    alla de g2~20, y ademas mezcla la curtosis inducida por el propio clustering de volatilidad
+    GARCH con la de la innovacion, que son cosas distintas) -- se estima junto con el resto,
+    que es el enfoque estandar para GARCH-t (igual que lo hacen paquetes como rugarch/arch)."""
     returns = np.asarray(returns, dtype=float)
-    seed_sigma = ewma_sigma_path(returns, 0.90)
-    nu = nu_from_kurtosis(returns / seed_sigma)
+    sample_var = max(float(np.var(returns)), 1e-10)
 
-    def log_lik(lam):
-        sigma = ewma_sigma_path(returns, lam)
+    def neg_log_lik(params):
+        persistence, mix, log_lrv, nu = params
+        long_run_var = np.exp(log_lrv)
+        omega, alpha, beta = _garch_params_from_reparam(persistence, mix, long_run_var)
+        sigma = garch_sigma_path(returns, omega, alpha, beta)
         z = returns / sigma
-        return float(np.sum(student_t_logpdf(z, nu, 1.0) - np.log(sigma)))
+        return -float(np.sum(standardized_student_t_logpdf(z, nu) - np.log(sigma)))
 
-    lam_star, ll_star = golden_section_search(log_lik, lam_lo, lam_hi)
-    sigma_final = ewma_sigma_path(returns, lam_star)
+    x0 = [0.95, 0.1, np.log(sample_var), 8.0]
+    bounds = [
+        (GARCH_PERSISTENCE_LO, GARCH_PERSISTENCE_HI),
+        (GARCH_MIX_LO, GARCH_MIX_HI),
+        (np.log(sample_var) - 10, np.log(sample_var) + 10),
+        (NU_MIN, NU_CAP),
+    ]
+    fit = minimize(neg_log_lik, x0, method="L-BFGS-B", bounds=bounds)
+    persistence, mix, log_lrv, nu = fit.x
+    nu = float(nu)
+    long_run_var = float(np.exp(log_lrv))
+    omega, alpha, beta = _garch_params_from_reparam(persistence, mix, long_run_var)
+    sigma_path = garch_sigma_path(returns, omega, alpha, beta)
+    at_boundary = bool(persistence >= GARCH_PERSISTENCE_HI - 1e-3)
+    half_life_days = float(np.log(0.5) / np.log(persistence)) if persistence < 1 else float("inf")
     return {
-        "lambda_vol": lam_star,
+        "omega": float(omega),
+        "alpha": float(alpha),
+        "beta": float(beta),
+        "persistence": float(persistence),
+        "half_life_days": half_life_days,
         "degrees_of_freedom": nu,
-        "sigma_path": sigma_final,
-        "log_likelihood": ll_star,
+        "sigma_path": sigma_path,
+        "at_boundary": at_boundary,
+        "log_likelihood": float(-fit.fun),
     }
 
 
@@ -320,8 +377,8 @@ def derive_seed(symbol, horizon, as_of_date):
     return int(digest[:16], 16) % (2 ** 63 - 1)
 
 
-def simular_trayectorias(pool_outcomes, pool_weights, sigma_today, lambda_vol, steps, n_paths,
-                          seed, news_uncertainty_variance=0.0):
+def simular_trayectorias(pool_outcomes, pool_weights, sigma_today, omega, alpha, beta, steps,
+                          n_paths, seed, news_uncertainty_variance=0.0):
     rng = np.random.default_rng(seed)
     probs = pool_weights / pool_weights.sum()
     cumulative = np.zeros(n_paths)
@@ -333,30 +390,44 @@ def simular_trayectorias(pool_outcomes, pool_weights, sigma_today, lambda_vol, s
         if news_uncertainty_variance > 0:
             r = r + rng.normal(0.0, np.sqrt(news_uncertainty_variance), size=n_paths)
         cumulative += r
-        sigma_t = np.sqrt(lambda_vol * sigma_t ** 2 + (1 - lambda_vol) * r ** 2)
+        # GARCH genuino (alpha+beta<1 estricto, impuesto en calibrar_garch): estable por
+        # construccion, a diferencia de la recursion EWMA anterior (alpha+beta=1 exacto).
+        sigma_t = np.sqrt(np.maximum(omega + alpha * r ** 2 + beta * sigma_t ** 2, 1e-12))
     return cumulative
 
 
-def summarize_simulation(cumulative_returns):
-    probability_up = float(np.mean(cumulative_returns > 0))
+def summarize_simulation(cumulative_log_returns):
+    """cumulative_log_returns es la suma de retornos LOG simulados (aditiva). Las salidas de
+    cara al usuario van en retorno SIMPLE (exp(x)-1, lo que de verdad significa "cuanto cambia
+    el precio"); las versiones en log quedan aparte en 'log_units' para quien las necesite."""
+    probability_up = float(np.mean(cumulative_log_returns > 0))
     p_levels = [5, 10, 25, 50, 75, 90, 95]
-    qs = np.percentile(cumulative_returns, p_levels)
-    quantiles = {f"p{level}": float(q) for level, q in zip(p_levels, qs)}
-    var_95 = float(np.percentile(cumulative_returns, 5))
-    var_99 = float(np.percentile(cumulative_returns, 1))
-    tail_95 = cumulative_returns[cumulative_returns <= var_95]
-    tail_99 = cumulative_returns[cumulative_returns <= var_99]
-    cvar_95 = float(tail_95.mean()) if len(tail_95) else var_95
-    cvar_99 = float(tail_99.mean()) if len(tail_99) else var_99
-    downside = np.minimum(cumulative_returns, 0.0)
-    semi_deviation = float(np.sqrt(np.mean(downside ** 2)))
+    qs_log = np.percentile(cumulative_log_returns, p_levels)
+    quantiles_log = {f"p{level}": float(q) for level, q in zip(p_levels, qs_log)}
+    var_95_log = float(np.percentile(cumulative_log_returns, 5))
+    var_99_log = float(np.percentile(cumulative_log_returns, 1))
+    tail_95 = cumulative_log_returns[cumulative_log_returns <= var_95_log]
+    tail_99 = cumulative_log_returns[cumulative_log_returns <= var_99_log]
+    cvar_95_log = float(tail_95.mean()) if len(tail_95) else var_95_log
+    cvar_99_log = float(tail_99.mean()) if len(tail_99) else var_99_log
+    downside_log = np.minimum(cumulative_log_returns, 0.0)
+    semi_deviation_log = float(np.sqrt(np.mean(downside_log ** 2)))
+
+    to_simple = lambda x: float(np.expm1(x))  # noqa: E731
+    log_units = {
+        "quantiles": quantiles_log,
+        "var_95": var_95_log, "cvar_95": cvar_95_log,
+        "var_99": var_99_log, "cvar_99": cvar_99_log,
+        "semi_deviation": semi_deviation_log,
+    }
     return {
         "probability_up": probability_up,
-        "quantiles": quantiles,
-        "var_95": var_95, "cvar_95": cvar_95,
-        "var_99": var_99, "cvar_99": cvar_99,
-        "semi_deviation": semi_deviation,
-        "realized_skewness_simulated": classical_skewness(cumulative_returns),
+        "quantiles": {k: to_simple(v) for k, v in quantiles_log.items()},
+        "var_95": to_simple(var_95_log), "cvar_95": to_simple(cvar_95_log),
+        "var_99": to_simple(var_99_log), "cvar_99": to_simple(cvar_99_log),
+        "semi_deviation": to_simple(semi_deviation_log),
+        "realized_skewness_simulated": classical_skewness(cumulative_log_returns),
+        "log_units": log_units,
     }
 
 
@@ -376,8 +447,13 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
 
     r_norm, v_norm = build_pattern_vectors(closes, volumes)
 
-    vol_fit = calibrar_lambda_vol(returns)
-    lambda_vol = vol_fit["lambda_vol"]
+    vol_fit = calibrar_garch(returns)
+    garch_omega = vol_fit["omega"]
+    garch_alpha = vol_fit["alpha"]
+    garch_beta = vol_fit["beta"]
+    garch_persistence = vol_fit["persistence"]
+    garch_half_life_days = vol_fit["half_life_days"]
+    garch_at_boundary = vol_fit["at_boundary"]
     nu = vol_fit["degrees_of_freedom"]
     sigma_path = vol_fit["sigma_path"]
     z_full = returns / sigma_path
@@ -414,18 +490,27 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
     age = today_idx - source_days
     pool_weights = (lambda_pool ** age) * np.exp(-dist_today_to_sources)
 
+    # Renormalizacion del pool (causa raiz de la retroalimentacion observada en produccion
+    # para INTC/META): se exige E[z^2] ponderado = 1 exacto antes de simular. weighted_ez2
+    # (el valor ANTES de reescalar) se guarda como diagnostico, no se oculta el sintoma.
+    weighted_ez2 = float(np.sum(pool_weights * pool_outcomes ** 2) / pool_weights.sum())
+    pool_outcomes = pool_outcomes / np.sqrt(weighted_ez2)
+
     ess = effective_sample_size(pool_weights)
     n_min, sigma_scale, range_used = silverman_n_min(r_norm, v_norm)
 
     sigma_last = float(sigma_path[-1])
-    sigma_forecast = float(np.sqrt(lambda_vol * sigma_last ** 2 + (1 - lambda_vol) * returns[-1] ** 2))
+    sigma_forecast = float(np.sqrt(max(
+        garch_omega + garch_alpha * returns[-1] ** 2 + garch_beta * sigma_last ** 2, 1e-12,
+    )))
 
     seed = derive_seed(symbol, horizon, str(dates[-1]))
     cumulative = simular_trayectorias(
-        pool_outcomes, pool_weights, sigma_forecast, lambda_vol, steps, n_paths, seed,
-        news_uncertainty_variance=0.0,
+        pool_outcomes, pool_weights, sigma_forecast, garch_omega, garch_alpha, garch_beta,
+        steps, n_paths, seed, news_uncertainty_variance=0.0,
     )
     summary = summarize_simulation(cumulative)
+    log_units = summary.pop("log_units")
 
     model_notes = {
         "engine": "shadow_v2_montecarlo",
@@ -440,6 +525,15 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
         "window": window,
         "sigma_scale": sigma_scale,
         "range_used": range_used,
+        "garch_persistence": garch_persistence,
+        "garch_half_life_days": garch_half_life_days,
+        "garch_persistence_at_boundary": garch_at_boundary,
+        "garch_persistence_at_boundary_meaning": (
+            "true no es un error: significa que los datos no muestran reversion a la media "
+            "detectable y el ajuste converge hacia el caso limite (EWMA/IGARCH)."
+        ),
+        "pool_e_z2_before_rescale": weighted_ez2,
+        "log_units": log_units,
     }
 
     result = {
@@ -447,7 +541,11 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
         "horizon": horizon,
         "n_paths": n_paths,
         "seed": int(seed),
-        "lambda_vol": lambda_vol,
+        "garch_omega": garch_omega,
+        "garch_alpha": garch_alpha,
+        "garch_beta": garch_beta,
+        "garch_persistence": garch_persistence,
+        "garch_half_life_days": garch_half_life_days,
         "lambda_pool": lambda_pool,
         "degrees_of_freedom": nu,
         "effective_sample_size": ess,
@@ -512,7 +610,8 @@ def fetch_b2_crosscheck(supabase, symbol):
 
 def persist_result(supabase, result):
     payload = {key: result[key] for key in (
-        "symbol", "horizon", "n_paths", "seed", "lambda_vol", "lambda_pool",
+        "symbol", "horizon", "n_paths", "seed", "garch_omega", "garch_alpha", "garch_beta",
+        "garch_persistence", "garch_half_life_days", "lambda_pool",
         "degrees_of_freedom", "effective_sample_size", "n_min_threshold", "pool_size",
         "probability_up", "quantiles", "var_95", "cvar_95", "var_99", "cvar_99",
         "semi_deviation", "sample_skewness_classical", "sample_skewness_robust",
@@ -574,7 +673,9 @@ def generar_sintetico_conocido(n=760, lambda_vol_true=0.92, nu_true=6.0, skew_fl
         # recursivo simulado puede ser inestable de formas que el mercado real nunca es,
         # porque el mercado real no se retroalimenta de si mismo); no afectan la propiedad
         # cualitativa que se quiere probar (colas mas pesadas que una normal).
-        u = np.clip(rng.standard_t(nu_true), -6.0, 6.0)
+        # Estandarizada (varianza 1), no la t cruda de NumPy (varianza nu/(nu-2)) -- ver
+        # standardized_t_draw().
+        u = np.clip(standardized_t_draw(rng, nu_true), -6.0, 6.0)
         negative_side = t >= n // 2 if skew_flip_at_half else True
         scale_down, scale_up = (1.3, 1.0) if negative_side else (1.0, 1.3)
         innovation = u * (scale_down if u < 0 else scale_up)
@@ -586,3 +687,26 @@ def generar_sintetico_conocido(n=760, lambda_vol_true=0.92, nu_true=6.0, skew_fl
     volumes = rng.integers(1_000_000, 5_000_000, size=n + 1).astype(float)
     dates = [f"2020-01-{1 + (i % 28):02d}" for i in range(n + 1)]  # solo para tener algo iterable
     return closes, volumes, dates
+
+
+def generar_sintetico_garch_conocido(n=760, omega_true=9e-6, alpha_true=0.08, beta_true=0.88,
+                                      nu_true=6.0, seed=12345):
+    """Retornos log sinteticos de un GARCH(1,1) genuino con parametros CONOCIDOS, para probar
+    que calibrar_garch() los recupera. A diferencia de generar_sintetico_conocido() (que
+    necesito un tope de sigma2 para no desbordar, porque su recursion EWMA es tipo IGARCH),
+    este generador es estable POR CONSTRUCCION (alpha_true+beta_true=0.96<1 estricto) -- no
+    necesita ningun tope artificial, justamente la propiedad que motivo este cambio."""
+    rng = np.random.default_rng(seed)
+    long_run_var = omega_true / (1.0 - alpha_true - beta_true)
+    sigma2 = long_run_var
+    returns = np.empty(n)
+    for t in range(n):
+        sigma = np.sqrt(sigma2)
+        u = np.clip(standardized_t_draw(rng, nu_true), -8.0, 8.0)  # clip generoso, solo por si acaso numerico
+        r = sigma * u
+        returns[t] = r
+        sigma2 = omega_true + alpha_true * r ** 2 + beta_true * sigma2
+    closes = np.concatenate([[100.0], 100.0 * np.exp(np.cumsum(returns))])
+    volumes = rng.integers(1_000_000, 5_000_000, size=n + 1).astype(float)
+    dates = [f"2020-01-{1 + (i % 28):02d}" for i in range(n + 1)]
+    return returns, closes, volumes, dates
