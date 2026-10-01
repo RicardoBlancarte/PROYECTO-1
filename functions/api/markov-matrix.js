@@ -21,7 +21,7 @@
 // devolviendo como campo informativo — la sub-fase B3 (Monte Carlo) la va a usar para la
 // magnitud de los movimientos dentro de cada estado (colas), junto con la semi-desviación del
 // VaR, que es el lugar correcto para esa información.
-import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+import { checkAdminAuth } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
@@ -31,7 +31,8 @@ const MIN_OBSERVATIONS = 60; // piso holgado para terciles + conteos de transici
 const FETCH_LIMIT = 5000;
 
 export async function onRequestGet(context) {
-  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
+  const authError = checkAdminAuth(context.request, context.env);
+  if (authError) return authError;
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') || '').slice(0, 32).toUpperCase();
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';

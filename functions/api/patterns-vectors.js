@@ -10,7 +10,7 @@
 // empírica retorno/volumen del activo) y el peso de cada patrón histórico es un kernel
 // continuo w_i = e^(-D_i), no un k-vecinos fijo. La "singularidad" (punto 3) se cuantifica
 // contra un N_min derivado de la regla de Silverman (d=2, c=0.5).
-import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+import { checkAdminAuth } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
@@ -21,7 +21,8 @@ const SILVERMAN_D = 2; // dimensiones del vector: retorno, volumen.
 const SILVERMAN_C = 0.5;
 
 export async function onRequestGet(context) {
-  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
+  const authError = checkAdminAuth(context.request, context.env);
+  if (authError) return authError;
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') || '').slice(0, 32).toUpperCase();
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';

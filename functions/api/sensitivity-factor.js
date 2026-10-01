@@ -9,7 +9,7 @@
 // valor global por horizonte), con verosimilitud Student-t (robusta a atípicos), grados de
 // libertad fijados por la curtosis muestral de los residuos, y MAD como escala en vez de
 // desviación estándar clásica.
-import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+import { checkAdminAuth } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
@@ -31,7 +31,8 @@ const CONVERGENCE_TOL = 1e-6;
 const FETCH_LIMIT = 5000;
 
 export async function onRequestGet(context) {
-  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
+  const authError = checkAdminAuth(context.request, context.env);
+  if (authError) return authError;
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') || '').slice(0, 32).toUpperCase();
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';

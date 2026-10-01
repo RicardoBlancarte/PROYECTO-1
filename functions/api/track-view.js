@@ -2,7 +2,7 @@
 // insert por carga de página, sin deduplicación todavía) para que no sea trivial de inflar
 // solo con JS del cliente; queda aislado en este archivo para poder evolucionar más adelante
 // a "sesiones únicas" sin tocar nada más.
-import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+import { checkAdminAuth } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -25,7 +25,8 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { env, request } = context;
-  if (!isAdminRequestAuthorized(request, env)) return json({ error: 'No autorizado.' }, 401);
+  const authError = checkAdminAuth(request, env);
+  if (authError) return authError;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ platform: 0, homepage: 0, total: 0 });
   const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
   const [platform, homepage] = await Promise.all([

@@ -4,12 +4,13 @@
 // Python (montecarlo_engine.py) desde actualizar_automatico.py, porque miles de trayectorias
 // no caben en el límite de 10ms de Cloudflare Workers Free. Este endpoint es un SELECT de
 // solo lectura sobre lo que esa cascada ya calculó y guardó.
-import { isAdminRequestAuthorized } from '../_shared/admin-auth.js';
+import { checkAdminAuth } from '../_shared/admin-auth.js';
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
 export async function onRequestGet(context) {
-  if (!isAdminRequestAuthorized(context.request, context.env)) return json({ error: 'No autorizado.' }, 401);
+  const authError = checkAdminAuth(context.request, context.env);
+  if (authError) return authError;
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') || '').slice(0, 32).toUpperCase();
   const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';
