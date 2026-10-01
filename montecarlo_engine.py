@@ -465,6 +465,91 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
 
 
 # ---------------------------------------------------------------------------
+# Orquestacion con efectos secundarios (red). Es la UNICA parte de este modulo que toca
+# Supabase -- nada aqui se ejecuta al importar el modulo, solo si se llama explicitamente.
+# ---------------------------------------------------------------------------
+
+def fetch_price_history(supabase, symbol, limit=5000):
+    rows = (
+        supabase.table("asset_historical_prices")
+        .select("date,close,volume")
+        .eq("symbol", symbol)
+        .order("date", desc=False)
+        .limit(limit)
+        .execute()
+        .data
+    ) or []
+    closes = [float(r["close"]) for r in rows]
+    volumes = [float(r["volume"] or 0) for r in rows]
+    dates = [r["date"] for r in rows]
+    return closes, volumes, dates
+
+
+def fetch_b1_crosscheck(supabase, symbol, horizon):
+    rows = (
+        supabase.table("asset_sensitivity_factor")
+        .select("*")
+        .eq("symbol", symbol)
+        .eq("horizon", horizon)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    return rows[0] if rows else None
+
+
+def fetch_b2_crosscheck(supabase, symbol):
+    rows = (
+        supabase.table("asset_markov_matrix")
+        .select("*")
+        .eq("symbol", symbol)
+        .limit(1)
+        .execute()
+        .data
+    ) or []
+    return rows[0] if rows else None
+
+
+def persist_result(supabase, result):
+    payload = {key: result[key] for key in (
+        "symbol", "horizon", "n_paths", "seed", "lambda_vol", "lambda_pool",
+        "degrees_of_freedom", "effective_sample_size", "n_min_threshold", "pool_size",
+        "probability_up", "quantiles", "var_95", "cvar_95", "var_99", "cvar_99",
+        "semi_deviation", "sample_skewness_classical", "sample_skewness_robust",
+        "realized_skewness_simulated", "news_uncertainty_variance", "b1_crosscheck",
+        "b2_crosscheck", "model_notes",
+    )}
+    supabase.table("asset_montecarlo_simulation").upsert(payload, on_conflict="symbol,horizon").execute()
+
+
+def run_for_all_assets(supabase, assets, n_paths=10000):
+    """Unica funcion de este modulo con efectos secundarios (red). Recorre el catalogo
+    completo x 3 horizontes. Aislamiento de fallos: un error en un simbolo u horizonte se
+    registra y se sigue con el resto -- nunca tumba la cascada completa."""
+    for symbol, _asset_type in assets:
+        try:
+            closes, volumes, dates = fetch_price_history(supabase, symbol)
+            if len(closes) < MIN_RETURNS + 1:
+                print(f"Monte Carlo: historial insuficiente para {symbol} ({len(closes)} filas), se omite.")
+                continue
+            b2_row = fetch_b2_crosscheck(supabase, symbol)
+            for horizon in STEPS_BY_HORIZON:
+                try:
+                    b1_row = fetch_b1_crosscheck(supabase, symbol, horizon)
+                    result = run_montecarlo_for_symbol(
+                        symbol, horizon, closes, volumes, dates,
+                        b1_row=b1_row, b2_row=b2_row, n_paths=n_paths,
+                    )
+                    persist_result(supabase, result)
+                    print(f"Monte Carlo ({symbol}, {horizon}): P(sube)={result['probability_up']:.3f} "
+                          f"VaR95={result['var_95']:.4f} lambda_pool_mode={result['model_notes']['lambda_pool_mode']}")
+                except Exception as e:
+                    print(f"Error en Monte Carlo ({symbol}, {horizon}): {e}")
+        except Exception as e:
+            print(f"Error en Monte Carlo para {symbol}: {e}")
+
+
+# ---------------------------------------------------------------------------
 # Generador sintetico con propiedades conocidas, para test_montecarlo_synthetic.py.
 # ---------------------------------------------------------------------------
 

@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 22 * * 1-5'
   workflow_dispatch:
+    inputs:
+      only_montecarlo:
+        description: 'Correr SOLO el paso de Monte Carlo (sin tocar precios/senales/Win Rate/alertas push) -- para probar montecarlo_engine.py de forma aislada.'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   run-update:
@@ -19,7 +25,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install yfinance pandas supabase requests pywebpush
+          pip install yfinance pandas numpy supabase requests pywebpush
 
       - name: Ejecutar script de actualización
         env:
@@ -28,5 +34,6 @@ jobs:
           PAGES_BASE_URL: ${{ secrets.PAGES_BASE_URL }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          ONLY_MONTECARLO: ${{ (github.event.inputs.only_montecarlo == 'true') && '1' || '' }}
         run: |
           python actualizar_automatico.py

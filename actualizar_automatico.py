@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from datetime import date
 
 import requests
@@ -32,6 +33,11 @@ assets = [
     ("NG=F", "commodity"), ("HG=F", "commodity"), ("ZC=F", "commodity"), ("ZW=F", "commodity"),
     ("ZS=F", "commodity"), ("KC=F", "commodity")
 ]
+
+if os.environ.get("ONLY_MONTECARLO") == "1":
+    import montecarlo_engine
+    montecarlo_engine.run_for_all_assets(supabase, assets)
+    sys.exit(0)
 
 def backfill_asset_signals():
     """Backfill retroactivo de asset_signals (punto 9.2): recorre TODO el historial ya
@@ -269,3 +275,9 @@ def send_push_alerts():
 
 
 send_push_alerts()
+
+try:
+    import montecarlo_engine
+    montecarlo_engine.run_for_all_assets(supabase, assets)
+except Exception as e:
+    print(f"[montecarlo] error, cascada continua: {e}")

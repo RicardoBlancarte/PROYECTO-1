@@ -391,3 +391,48 @@ create table if not exists public.asset_markov_matrix (
 );
 
 alter table public.asset_markov_matrix enable row level security;
+
+-- MOTOR V2 — FASE B, sub-fase 3 (Punto 1, la parte de Monte Carlo): Filtered Historical
+-- Simulation con remuestreo ponderado (lambda_pool^antiguedad * exp(-Mahalanobis), kernel de
+-- Fase A recalculado fresco), nunca una Student-t parametrica. Se calcula en Python
+-- (montecarlo_engine.py, invocado desde actualizar_automatico.py — no cabe en 10ms de
+-- Cloudflare Workers Free), no en una Pages Function. Esta tabla es la UNICA escritura del
+-- paso de Monte Carlo; se lee de solo lectura desde functions/api/montecarlo.js.
+--
+-- lambda_pool queda fijo en 1.0 en produccion (ver LAMBDA_POOL_MODE en montecarlo_engine.py):
+-- validado con sinteticos de propiedades conocidas que a la profundidad real de datos
+-- (~760 dias) la calibracion por validacion cruzada no separa de forma confiable un pool
+-- estable de uno con cambio de regimen (si separa con mas datos, confirmado a n=5000) — se
+-- reactivara tras un backfill historico real. model_notes.lambda_pool_at_boundary=true NO es
+-- un error: significa pool sin decaimiento por antiguedad (deliberado en este modo, o genuino
+-- si algun dia se recalibra y no se detecta cambio de regimen).
+create table if not exists public.asset_montecarlo_simulation (
+  symbol text not null,
+  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  n_paths integer not null,
+  seed bigint not null,
+  lambda_vol numeric not null,
+  lambda_pool numeric not null,
+  degrees_of_freedom numeric not null,
+  effective_sample_size numeric not null,
+  n_min_threshold numeric not null,          -- N_min de Silverman (Fase A), para contrastar el ESS
+  pool_size integer not null,
+  probability_up numeric not null check (probability_up between 0 and 1),
+  quantiles jsonb not null,                  -- {p5,p10,p25,p50,p75,p90,p95}
+  var_95 numeric not null,
+  cvar_95 numeric not null,
+  var_99 numeric not null,
+  cvar_99 numeric not null,
+  semi_deviation numeric not null,
+  sample_skewness_classical numeric not null,
+  sample_skewness_robust numeric not null,   -- Bowley, cuantiles
+  realized_skewness_simulated numeric not null,
+  news_uncertainty_variance numeric not null default 0,
+  b1_crosscheck jsonb,                       -- snapshot de asset_sensitivity_factor al momento del calculo
+  b2_crosscheck jsonb,                       -- snapshot de asset_markov_matrix al momento del calculo
+  model_notes jsonb not null default '{}'::jsonb,  -- incluye lambda_pool_mode y lambda_pool_at_boundary
+  computed_at timestamptz not null default timezone('utc', now()),
+  primary key (symbol, horizon)
+);
+
+alter table public.asset_montecarlo_simulation enable row level security;
