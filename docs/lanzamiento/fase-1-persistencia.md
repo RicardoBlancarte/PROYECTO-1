@@ -5,13 +5,14 @@
 - **Alcance:** solo diagnóstico por lectura de código. No se editó código ni se tocó ninguna tabla. Las consultas SQL de este documento son de **solo lectura**; las de prueba que escriben datos están marcadas y requieren tu aprobación.
 - **Tablas:** `privacy_consents`, `push_subscriptions`, `user_suggestions`, `profiles`.
 - **Números de línea:** corresponden a `3627414`. `index.html` se desplazó +11 líneas respecto a la auditoría por el bloque CSS de 1.7.
+- **Actualización 2026-10-02:** con los resultados del SQL de producción, **se descarta la hipótesis de la migración faltante (H1)**. La revisión de las Functions de escritura y la nueva hipótesis principal están en la **sección 10**.
 
 ## Resumen
 
 | Tabla | ¿Debería tener filas hoy? | Causa más probable de que esté vacía | ¿Falla en silencio? |
 |---|---|---|---|
 | `profiles` | **No.** Vacía por diseño. | Solo la llena el trigger `on_auth_user_created` al crear un usuario en Supabase Auth. El registro está desactivado: `setAuthMode` fuerza siempre `'guest'` (index.html:229). | No aplica |
-| `privacy_consents` | **Sí.** Debería haber una fila por cada invitado nuevo que acepta el aviso. | No se puede confirmar sin SQL. Hipótesis principal (H1): la migración "FASE 2" de schema.sql:201-218 no está aplicada, porque sin ella el insert de un invitado viola `user_id NOT NULL` o usa columnas que no existen. Alternativas: faltan variables en el entorno (H2) o `SUPABASE_URL` mal formada (H3). | **Sí.** El invitado ve "Consentimiento de privacidad registrado." aunque el servidor falle. |
+| `privacy_consents` | **Sí.** Debería haber una fila por cada invitado nuevo que acepta el aviso. | ~~H1: falta la migración FASE 2~~ (**descartada** el 2026-10-02: las columnas existen). Hipótesis principal actual: `SUPABASE_URL` no tiene la forma canónica en Cloudflare, y es común a todas las Functions que escriben (ver sección 10). | **Sí.** El invitado ve "Consentimiento de privacidad registrado." aunque el servidor falle. |
 | `push_subscriptions` | Solo si alguien completó toda la cadena: fijó una meta, concedió permiso y `VAPID_PUBLIC_KEY` está configurada. | Puede ser falta de uso real, falta de `VAPID_PUBLIC_KEY`, tabla o migración ausente, o filas borradas por la cascada (404/410). | **Sí.** No se revisa la respuesta del POST. |
 | `user_suggestions` | Solo si alguien envió una sugerencia. | Lo más probable es que nadie haya enviado una. Si la Function fallara, el usuario vería un error (este flujo sí revisa la respuesta). | No |
 
@@ -317,6 +318,112 @@ Todas **escriben datos de prueba**: requieren tu aprobación y conviene hacerlas
 **Recomendación:** la mini-fase 1.5c es corta y se puede cerrar antes del lanzamiento. El consentimiento (S1) es lo más urgente, porque hoy puede haber invitados que creen haber aceptado un aviso que no quedó registrado en ningún lado auditable.
 
 ---
+
+## 10. Revisión tras el SQL de producción (2026-10-02)
+
+### 10.1 Resultados reportados (solo estructura y conteos)
+
+| Tabla | Filas / inserciones históricas | Estructura relevante |
+|---|---|---|
+| `privacy_consents` | 0 / 0 | Ya tiene `email`, `full_name`, `idioma` y `ccpa_do_not_sell`. NOT NULL en `version_aviso_privacidad`, `ip_origen` y `hash_consentimiento`; UNIQUE(`hash_consentimiento`). |
+| `push_subscriptions` | 0 / 0 | UNIQUE(`endpoint`, `asset_symbol`); CHECK `last_phase` in ('blue','yellow','red') |
+| `user_suggestions` | 0 / 0 | — |
+| `profiles` | 0 / 0 | — |
+| `page_views` (control) | **2 / 2** | CHECK `page` in ('platform','homepage') |
+
+- **RLS:** activo en las 5 tablas. Solo hay políticas en `profiles` (SELECT y UPDATE para `authenticated`) y en `user_suggestions` (SELECT para `authenticated`). **No hay ninguna política de INSERT.**
+- **Permisos:** `anon`, `authenticated` y `service_role` tienen INSERT en todas.
+- **Triggers:** `on_auth_user_created` y `on_auth_user_updated` en `auth.users`.
+
+**Conclusión:**
+- **H1 (migración faltante) queda descartada.**
+- Como `page_views` solo ha recibido 2 inserciones históricas, aunque `track-view` se llama en **cada** carga de la plataforma (index.html:751) y de la homepage (homepage/index.html:403), el problema **no es de una tabla**: es común a las Functions que escriben.
+
+### 10.2 Las cuatro Functions que escriben: llave, payload y restricciones
+
+Todas envían los mismos encabezados:
+- `apikey: env.SUPABASE_SERVICE_ROLE_KEY`
+- `Authorization: Bearer env.SUPABASE_SERVICE_ROLE_KEY`
+- `Content-Type: application/json`
+
+**Ninguna escribe con la llave anon.**
+
+| Function | URL de escritura | Payload exacto | ¿Cumple las restricciones? |
+|---|---|---|---|
+| `track-view` POST (functions/api/track-view.js:12-24) | `${env.SUPABASE_URL}/rest/v1/page_views` (l. 18), `Prefer: return=minimal` | `{"page": "platform" \| "homepage"}`. `page` se filtra en l. 16 y cualquier otro valor se convierte en `'platform'`. `id` y `created_at` los pone la base. | **Sí.** El CHECK de `page` siempre se cumple. |
+| `privacy-consent` POST, invitado (functions/api/privacy-consent.js:4-45) | `${env.SUPABASE_URL}/rest/v1/privacy_consents` (l. 38), `Prefer: return=minimal` | `{user_id: null, email, full_name, timestamp_aceptacion: ISO, version_aviso_privacidad: body.version \|\| '2026-10-01' (máx. 40), idioma: 'es'\|'en'\|'zh', ccpa_do_not_sell: bool, ip_origen, hash_consentimiento}` (l. 41) | **Sí.** `version_aviso_privacidad` nunca es nula (tiene valor por defecto). `ip_origen` = `CF-Connecting-IP` → `X-Forwarded-For` → `'unavailable'` (l. 12), nunca nula. `hash_consentimiento` = SHA-256 hex de `email\|timestamp-ms\|versión\|IP` (l. 34-36): nunca nulo y solo choca si el mismo correo acepta en el mismo milisegundo. `idioma` está restringido a es/en/zh (l. 9). `email` no es nulo para el invitado (l. 31), así que se cumple `user_id is not null or email is not null`. **Todas las columnas existen.** |
+| Alta de push (functions/api/push/subscribe.js:6-27) | `${env.SUPABASE_URL}/rest/v1/push_subscriptions?on_conflict=endpoint,asset_symbol` (l. 20), `Prefer: resolution=merge-duplicates,return=minimal` | `{endpoint, keys_p256dh, keys_auth, asset_symbol: MAYÚSCULAS ≤32, goal: número >0, email: texto o null, last_phase: 'blue', updated_at: ISO}` (l. 23) | **Sí.** El `on_conflict` coincide con UNIQUE(`endpoint`, `asset_symbol`). `last_phase = 'blue'` cumple el CHECK. Un `''` en `email` se convierte en `null` (l. 15). El upsert necesita INSERT y UPDATE, y `service_role` los tiene. **Todas las columnas existen.** |
+| `suggestions` POST (functions/api/suggestions.js:7-38) | `${env.SUPABASE_URL}/rest/v1/user_suggestions` (l. 31), `Prefer: return=minimal` | `{user_id: null, email: texto o null, full_name: texto o null, message: 1-2000 caracteres}` (l. 34) | **Sí.** `message` no está vacío (l. 12). **Todas las columnas existen.** |
+
+**Ninguna escribe con la llave anon.** Las cuatro usan `SUPABASE_SERVICE_ROLE_KEY`, que en Supabase ignora RLS, así que la falta de políticas de INSERT **no debería** bloquearlas. Solo las bloquearía si `SUPABASE_SERVICE_ROLE_KEY` contuviera en realidad la llave anon/publishable (hipótesis H-B, sección 10.5). Las únicas escrituras con anon son las de `profiles` desde el navegador (index.html:570, 670, 688, 692), con el JWT del usuario y la política UPDATE propia. Hoy no se pueden alcanzar.
+
+### 10.3 Cómo arman la URL y qué pasa con una URL mal formada
+
+- **Sin normalizar:** las cuatro concatenan `${env.SUPABASE_URL}/rest/v1/<tabla>`. Lo mismo hacen `correlation`, `patterns`, `news`, `winrate`, `admin/metrics` y los endpoints del motor v2.
+- **Normalizadas:** solo `public-config.js:14-15` y `market/[symbol].js:29-30` reconstruyen la URL como `https://{ref}.supabase.co` desde el `ref` del JWT de `SUPABASE_ANON_KEY` (commit `ad92e4a`, 2026-09-09).
+
+| Valor de `SUPABASE_URL` | URL que se genera | Resultado en las Functions sin normalizar | Resultado en `market` / `public-config` |
+|---|---|---|---|
+| `https://<ref>.supabase.co` (canónica) | `https://<ref>.supabase.co/rest/v1/page_views` | Funciona | Funciona |
+| Con `/` final | `https://<ref>.supabase.co//rest/v1/page_views` | **Muy probablemente 404** ("no Route matched"): el gateway de Supabase enruta por el prefijo `/rest/v1/` y la doble barra no coincide. No está verificado aquí; la prueba de la sección 10.6 lo confirma. | Funciona (ignora el valor) |
+| Con ruta extra (p. ej. termina en `/rest/v1`) | `…/rest/v1/rest/v1/page_views` | 404 | Funciona |
+| URL del dashboard (`https://supabase.com/dashboard/project/<ref>`) | `…/dashboard/project/<ref>/rest/v1/…` | 404 de supabase.com | Funciona |
+| **Sin `https://`** (`<ref>.supabase.co`) | `<ref>.supabase.co/rest/v1/…` | `fetch` rechaza con `TypeError: Invalid URL`. En `track-view` lo atrapa `.catch(() => {})` (l. 22). En `privacy-consent`, `suggestions` y `push/subscribe` **no hay try/catch**, así que la Function lanza una excepción y Cloudflare responde **500 (error 1101)**. `new URL(...)` en `correlation` también lanza. | Funciona |
+| Con espacio final | El espacio queda dentro del host | URL inválida: igual que la fila anterior | Funciona |
+
+**Conclusión:** cualquier forma no canónica de `SUPABASE_URL` rompe **todas** las escrituras y las lecturas sin normalizar, pero **deja funcionando** los precios (`market`) y la configuración del navegador (`public-config`). El síntoma visible sería "la plataforma muestra datos, pero no se guarda nada", que coincide con lo observado.
+
+### 10.4 ¿Responden 2xx aunque Supabase falle?
+
+| Function | Si Supabase rechaza | Si faltan variables | Si la URL es inválida | Lo que ve el usuario |
+|---|---|---|---|---|
+| `track-view` POST | **200 `{"tracked": true}`**: no revisa la respuesta (l. 18-23) | **200 `{"tracked": false}`** (l. 14) | **200 `{"tracked": true}`** (el `.catch` se traga el error) | Nada. Es una métrica interna. **Siempre responde 2xx**, así que no sirve para detectar la falla desde fuera. |
+| `privacy-consent` POST | 502 | 503 | 500 (excepción) | El invitado ve "registrado" igual (S1, index.html:574-580). |
+| Alta de push | 502 | 503 | 500 | Nada (S3, index.html:404-405). |
+| `suggestions` POST | 502 | 503 | 500 | Toast de error. Es el único flujo honesto. |
+
+Ninguna de las cuatro registra el motivo del fallo en los logs (S9). Para `track-view`, la falla es invisible tanto para el usuario como para el operador.
+
+### 10.5 Nueva hipótesis principal (ordenada)
+
+1. **H3: `SUPABASE_URL` en Cloudflare (Production y/o Preview) no está en la forma canónica `https://<ref>.supabase.co`.** Puede tener barra final, una ruta, ser la URL del dashboard, no llevar `https://` o tener espacios.
+   - El commit `ad92e4a` (2026-09-09) añadió la normalización **solo** en las dos rutas sin las cuales la plataforma se ve rota (precios y configuración del navegador). Eso sugiere que la URL cruda ya fallaba entonces y no se corrigió en el resto.
+   - Las 4 escrituras usan la URL cruda; esquema, permisos, restricciones y payloads están verificados como correctos.
+   - Las 2 inserciones de `page_views` pueden venir de un periodo o entorno con la URL correcta (p. ej. desarrollo local con `.dev.vars`, o antes de un cambio de la variable).
+2. **H2: las variables no están en el entorno donde se probó.** Por ejemplo, solo en Production y no en Preview, o los valores de texto del dashboard no se aplican.
+   - `wrangler.toml` tiene `pages_build_output_dir`, y con eso Cloudflare puede tomar el archivo como fuente de verdad de la configuración.
+   - Si falta `SUPABASE_URL`, `track-view` responde `{tracked: false}` en silencio. En ese caso `market` también respondería 503 y la terminal mostraría los precios fijos de respaldo.
+3. **H-B: `SUPABASE_SERVICE_ROLE_KEY` no contiene la llave `service_role`** (sino la anon o una publishable). RLS bloquearía todos los INSERT, porque no hay políticas de INSERT. Probabilidad baja: `market` lee `asset_historical_prices`, que tampoco tiene políticas de SELECT, con esa misma llave. Si los precios cargan desde Supabase, la llave es `service_role`.
+4. **H-D: poco tráfico real.** Explica solo una parte: no explica 0 consentimientos si hubo al menos un invitado nuevo en Production.
+
+### 10.6 Pruebas para distinguirlas (solo lectura; no escriben en la base)
+
+Sustituye `<HOST>` por `thalgorithm.com` y después por la URL de Preview.
+
+| # | Comando | Qué prueba |
+|---|---|---|
+| T1 | `curl -s https://<HOST>/api/health` | Qué variables existen en ese entorno (solo `true`/`false`, sin valores) |
+| T2 | `curl -s -o NUL -w "%{http_code}" "https://<HOST>/api/market/GC%3DF"` (en Linux/Mac, `-o /dev/null`) | Lectura con **URL normalizada** + `service_role` |
+| T3 | `curl -s -w "\n%{http_code}" "https://<HOST>/api/correlation?symbol=GC%3DF"` | Lectura con **URL cruda** + `service_role`. `correlation.js` no escribe nada. Ojo: tiene caché de 30 min (`max-age=1800`); si hace falta, añade `&t=<número>` para evitar la caché. |
+
+| T1 | T2 | T3 | Conclusión |
+|---|---|---|---|
+| todo `true` | 200 | 200 | URL cruda y llave correctas. Revisar H-D y probar un POST real (sección 8.2) mirando los logs en tiempo real. |
+| todo `true` | 200 | **502 o 500** | **H3 confirmada:** la URL cruda está mal formada. Un 500 indica falta de `https://` o un espacio; un 502 indica barra final, ruta extra o URL del dashboard. |
+| todo `true` | 404 o 502 | 502 | La llave no es `service_role` (H-B) o el proyecto de Supabase no coincide. |
+| algún `false` | 503 | 503 | H2: faltan variables en ese entorno. |
+
+Comprobaciones visuales (no compartas los valores):
+- **Variable `SUPABASE_URL`:** en Cloudflare → Pages → proyecto → Settings → Variables and Secrets, revisa en **Production y Preview** que sea exactamente `https://<ref>.supabase.co`, sin barra final, sin ruta y sin espacios.
+- **Variables gestionadas por `wrangler.toml`:** en la misma pantalla, mira si las variables aparecen como gestionadas por el archivo.
+- **Logs en tiempo real:** en Cloudflare → Pages → proyecto → Functions → Real-time logs, abre la plataforma. Si `privacy-consent` o `correlation` lanzan una excepción (`TypeError: Invalid URL`), aparecerá ahí aunque el código no registre nada.
+- **Tablas de control:** confirma con SQL que también estén casi vacías `asset_news_scores`, `asset_pattern_snapshots` y `asset_prediction_audit`, que escriben `news` y `patterns` con la misma URL cruda. Si lo están, refuerza H3.
+
+### 10.7 Efecto en la propuesta de la sección 8
+
+- **Si se confirma H3:** el arreglo inmediato es **operativo y sin código**: corregir el valor de `SUPABASE_URL` en Cloudflare (Production y Preview) y volver a desplegar. Con eso deberían empezar a llenarse las 5 tablas.
+- **Defensa en 1.5c:** el helper compartido `supabaseUrl(env)` (sección 8.1, punto 2) quita la dependencia del formato de la variable. Hay que hacer que `track-view` deje de responder 200 cuando la inserción falla y registrar el error de Supabase en las cuatro Functions.
+- **Después:** repetir las pruebas de punta a punta de la sección 8.2.
 
 ## Observación fuera de alcance (seguridad, para registrar)
 
