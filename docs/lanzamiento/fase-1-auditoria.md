@@ -17,14 +17,14 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 
 ## Resumen
 
-- **120 hallazgos:** 42 P0, 44 P1 y 34 P2.
+- **121 hallazgos:** 42 P0, 45 P1 y 34 P2.
   - #27 subió de P1 a P0 en la revisión del 2026-10-01.
   - Las filas #83 a #90 se añadieron en esa misma fecha (sección I).
   - Las filas #91 a #93 vienen de la revisión visual de capturas (sección J).
   - Las filas #94 a #96 se añadieron al aplicar las secciones A, B y C (sección K).
   - Las filas #97 a #106 se añadieron al aplicar las secciones E, F y H (sección L).
   - Las filas #107 y #108 corresponden a los arreglos rápidos 1.7 (sección M).
-  - Las filas #109 a #120 vienen de la revisión visual 1.9 (sección N).
+  - Las filas #109 a #121 vienen de la revisión visual 1.9 (sección N).
 - **Decisiones registradas:** 2026-10-01, en la columna *Decisión*. Códigos: **APROBADO** = aplicar el texto propuesto en 1.6; **OCULTAR 1.7** = esconder el elemento en los arreglos rápidos; **DIFERIR** = no se toca en la Fase 1. Las verificaciones solicitadas están al final, en la sección "Verificaciones".
 - **Hallazgos que bloquean el lanzamiento:**
   1. **Top picks** ("Mejores oportunidades", "Top Portfolio", "mejores activos para invertir hoy"). Ordena por **volatilidad** (`sigma × 0.21`), no por retorno, y siempre marca "Alcista" (#1–#5, #67–#68, #72).
@@ -276,6 +276,7 @@ Líneas de index.html en `ccdddbf`. Decisiones del 2026-10-02; lo marcado como A
 | 118 | 429 en `/api/news` y titulares fijos en el Newsbox | index.html:543 (`obtenerNoticiasMundiales`); functions/api/news.js:10-14; titulares de respaldo en index.html:278 (`newsData`), dibujados por `updateNewsbox` (l. 289) | — | **Corregido el 2026-10-02:** `NEWS_API_KEY` es `false` en Production y en Preview (`/api/health`), así que `news.js` **no llama a newsdata.io**. Usa su respaldo, la API pública de **GDELT** (`api.gdeltproject.org/api/v2/doc/doc`, l. 10-11), y reenvía su status (l. 14). GDELT limita a una petición cada pocos segundos por IP, y las Functions salen por IPs compartidas de Cloudflare, así que el 429 es frecuente. Hay una llamada por activo y región, solo con caché de 20 min en `sessionStorage`. **Efecto visible:** el Newsbox se queda con los titulares **fijos** de `newsData`, escritos a mano, presentados como "Noticias de …" sin decir que son ejemplos. Ya existía en `main`. | Aviso visible junto a los titulares fijos. Revisar en Fase 6a el proveedor de noticias (GDELT o newsdata.io) y el caché | P1 | APLICADO 1.7: aviso "Contexto general de ejemplo: no hay noticias recientes disponibles." encima de los titulares fijos (`updateNewsbox`, l. 289). Desaparece cuando llegan noticias reales. Proveedor de noticias y caché: Fase 6a. |
 | 119 | Explorador: placeholder "p. ej. AAPL, oro, EURUSD..."; filtros "ETFs" y "Forex"; resultados `BTC-USD`, `ETH-USD`, `^GSPC` | index.html:101 (placeholder y filtro), 695-729 (`ASSET_ALIAS_CATALOG`) | ES | Sin FMP, el catálogo local no tiene ETFs ni forex: "EURUSD" y esos dos filtros nunca dan resultados. `BTC-USD`, `ETH-USD` y `^GSPC` aparecen en la búsqueda pero no tienen historial (#117). | Placeholder "p. ej. AAPL, oro, petróleo..."; ocultar "ETFs" y "Forex" mientras no haya catálogo completo (#114) | P2 | APLICADO 1.7: placeholder "p. ej. AAPL, oro, petróleo..." y filtros "ETFs" y "Forex" con `hidden disabled` (l. 101). Con `disabled`, tampoco se pueden elegir en navegadores que no ocultan `<option>`. |
 | 120 | `BTC-USD`, `^GSPC` (S&P 500 y "Situación financiera de un país"), `EWZ` (Bovespa) y `EWJ` (Nikkei) abren con la gráfica vacía ("Aún no hay historial de precios para este activo."); en el explorador, `BTC-USD`, `ETH-USD` y `^GSPC` muestran "Sin datos históricos disponibles" | index.html:524 (`fmpSymbols`), 695-729 (`ASSET_ALIAS_CATALOG`); actualizar_automatico.py:26-35 | — | **[lógica]** La cascada diaria solo carga 30 símbolos; estos no tienen filas en `asset_historical_prices`. Agregarlos a la cascada **escribe en `asset_historical_prices`, lo que requiere aprobación del usuario.** | Decidir si se agregan a la cascada o se retiran del selector y del catálogo local | P0 | DIFERIR a Fase 3; es P0 para la beta. Requiere aprobación para tocar `asset_historical_prices`. |
+| 121 | Descripción del Explorador de activos: "Acciones, ETFs, índices, futuros/commodities, forex y cripto de todas las bolsas del proveedor de datos." | index.html:100 | ES | Promete ETFs, forex y "todas las bolsas del proveedor de datos", pero sin FMP (#114) solo existe el catálogo local (acciones, índices, materias primas y cripto) y no hay proveedor configurado. | "Acciones, índices, materias primas y cripto disponibles en la plataforma." | P1 | APLICADO 1.9 (pedido por el usuario tras la revisión visual en escritorio) |
 
 ---
 
