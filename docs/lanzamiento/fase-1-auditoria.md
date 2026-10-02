@@ -17,9 +17,10 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 
 ## Resumen
 
-- **90 hallazgos:** 34 P0, 37 P1 y 19 P2.
+- **93 hallazgos:** 36 P0, 38 P1 y 19 P2.
   - #27 subió de P1 a P0 en la revisión del 2026-10-01.
   - Las filas #83 a #90 se añadieron en esa misma fecha (sección I).
+  - Las filas #91 a #93 vienen de la revisión visual de capturas (sección J).
 - **Decisiones registradas:** 2026-10-01, en la columna *Decisión*. Códigos: **APROBADO** = aplicar el texto propuesto en 1.6; **OCULTAR 1.7** = esconder el elemento en los arreglos rápidos; **DIFERIR** = no se toca en la Fase 1. Las verificaciones solicitadas están al final, en la sección "Verificaciones".
 - **Hallazgos que bloquean el lanzamiento:**
   1. **Top picks** ("Mejores oportunidades", "Top Portfolio", "mejores activos para invertir hoy"). Ordena por **volatilidad** (`sigma × 0.21`), no por retorno, y siempre marca "Alcista" (#1–#5, #67–#68, #72).
@@ -202,6 +203,16 @@ Encontrados al preparar los diffs de la homepage. No estaban en la auditoría or
 | 88 | "Llevar herramientas financieras de nivel avanzado a todos los hogares del mundo de forma completamente gratuita." | locales/*.json:21 (`modals.vision`) | ES/EN/ZH | Promesa de gratuidad a perpetuidad (misma lógica que #45). | Quitar "de forma completamente gratuita". | P1 | APROBADO CON CAMBIO: "Llevar herramientas de análisis financiero a todos los hogares del mundo." |
 | 89 | `alt="Detalle de pesos óptimos de portafolio"` | homepage/index.html:302 | ES | "Óptimos" (misma lógica que #54). | "Detalle del reparto del portafolio" | P2 | APROBADO |
 | 90 | `<title>`, meta description, `alt` y `aria-label` sin `data-i18n` | homepage/index.html (l. 6-7 y atributos) | ES | Siempre quedan en español aunque el usuario elija EN o ZH. Traducirlos requiere tocar JS. | Añadir `data-i18n` para atributos y el `<title>` | P2 | DIFERIR a Fase 8 (junto con `og:*`) |
+
+## J. Revisión visual de capturas (#81, 2026-10-01)
+
+Resultado de la revisión visual que hizo el usuario en el Preview de la homepage (es/en/zh). Los textos están incrustados en las imágenes, así que no se pueden corregir editando texto.
+
+| # | Texto actual | Archivo y línea | Idioma | Problema | Texto propuesto | Prioridad | Decisión |
+|---|---|---|---|---|---|---|---|
+| 91 | Subtítulos incrustados en la imagen del bloque 2 (hombre con celular): "The algorithm reached the goal, it's time... send the order" / "该是时候了…下达指令" | homepage/assets/shanghai-hero.jpg.png (homepage/index.html:279) | EN/ZH | Invita a ejecutar una orden de inversión: suena a recomendación y promete algo que la plataforma no hace. | Versión recortada de la imagen sin la franja de subtítulos | P0 | 1.7: crear una versión recortada como archivo NUEVO, sin borrar ni sobrescribir el original. Mostrar el resultado antes de cambiar la referencia en homepage/index.html. |
+| 92 | Captura de Top picks (bloque 8) con "Mejores oportunidades del motor Markov", "Alcista" y "Proyección óptima" | homepage/assets/top portafolios.png (homepage/index.html:365) | ES | Muestra exactamente los textos retirados en #1, #3 y #4. | Nueva captura tomada del Preview después de los cambios de la Fase 1 | P0 | La retoma el usuario al final de la Fase 1 desde el Preview. |
+| 93 | Captura de la gráfica (bloque 3) con la línea "Markov" y "Probabilidad 23.3%"; captura del mapa con "Hola, Ricardo." | homepage/assets/grafica.png.png, prob tomorrow.png (homepage/index.html:291-292); homepage/assets/mapa global.png (l. 310) | ES | Muestran una cifra de probabilidad que se oculta en #9 y la etiqueta "Markov" retirada en #13. La del mapa muestra el nombre de un usuario real. | Nuevas capturas | P1 | Las retoma el usuario al final de la Fase 1; la gráfica, otra vez en la Fase 2. |
 
 ---
 
