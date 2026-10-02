@@ -17,7 +17,9 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 
 ## Resumen
 
-- **82 hallazgos:** 34 P0, 33 P1 y 15 P2 (#27 subió de P1 a P0 en la revisión del 2026-10-01).
+- **90 hallazgos:** 34 P0, 37 P1 y 19 P2.
+  - #27 subió de P1 a P0 en la revisión del 2026-10-01.
+  - Las filas #83 a #90 se añadieron en esa misma fecha (sección I).
 - **Decisiones registradas:** 2026-10-01, en la columna *Decisión*. Códigos: **APROBADO** = aplicar el texto propuesto en 1.6; **OCULTAR 1.7** = esconder el elemento en los arreglos rápidos; **DIFERIR** = no se toca en la Fase 1. Las verificaciones solicitadas están al final, en la sección "Verificaciones".
 - **Hallazgos que bloquean el lanzamiento:**
   1. **Top picks** ("Mejores oportunidades", "Top Portfolio", "mejores activos para invertir hoy"). Ordena por **volatilidad** (`sigma × 0.21`), no por retorno, y siempre marca "Alcista" (#1–#5, #67–#68, #72).
@@ -33,7 +35,7 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
      - Dice "cifrado de grado militar / military-grade / 军工级".
      - Dice "extremo a extremo" (HTTPS no es cifrado de extremo a extremo).
      - No incluye un aviso explícito de que la plataforma **no es asesoría de inversión**.
-- **Traducciones de la homepage:** `es.json`, `en.json` y `zh.json` tienen exactamente las mismas 57 claves (ninguna falta ni sobra). Los problemas están en el **contenido**, que repite en los 3 idiomas las mismas promesas.
+- **Traducciones de la homepage:** `es.json`, `en.json` y `zh.json` tienen exactamente las mismas 57 claves (ninguna falta ni sobra). Tras la Fase 1 son 53, porque `_meta.doNotTranslate` pasó de 6 a 2 elementos. Los problemas están en el **contenido**, que repite en los 3 idiomas las mismas promesas.
 - **No existen:** `manifest.json`, etiquetas `og:*` ni `twitter:*` en ninguna de las dos páginas (#78).
 - **`NEWS_API_KEY`:** **no está expuesta** (ver la sección final).
 
@@ -78,14 +80,14 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 |---|---|---|---|---|---|---|---|
 | 8 | "MÁS PROBABLE MAÑANA" / "MÁS PROBABLE PASADO MAÑANA" | index.html:86 | ES | **[lógica]** `renderActiveAssetCards` (l. 320) calcula `precio × (1 + sigma × paso)`, que siempre queda por encima del precio actual. No sale de ninguna distribución. | "ESCENARIO DE REFERENCIA · MAÑANA" / "· PASADO MAÑANA" | P0 | OCULTAR 1.7 el precio proyectado de las tarjetas; vuelve en Fase 2 |
 | 9 | "Probabilidad 24.1 %" / "Probabilidad 18.5 %" | index.html:86 y l. 320 | ES | **[lógica]** Es una constante fija (`prob1 / (1 + 2σ)`, l. 314), no una probabilidad calculada. | Quitar la cifra o poner "Estimación ilustrativa (no es una probabilidad calibrada)" | P0 | OCULTAR 1.7 (no mostrar ninguna cifra de probabilidad) |
-| 10 | "Histórico, camino probable y abanico Markov/Monte Carlo desde Hoy. Doble clic en la gráfica para proponer una alerta." | index.html:86 | ES | En el navegador no corre Markov ni Monte Carlo (es una fórmula con sigma). "Doble clic" no funciona en móvil. Jerga. | "Precio histórico y rango estimado para los próximos días. Toca dos veces (o haz doble clic) en la gráfica para fijar una meta de precio." | P1 | VERIFICAR si el doble toque funciona en móvil. Si funciona: APROBADO. Si no: "Precio histórico y rango estimado para los próximos días. Haz doble clic en la gráfica (en computadora) para fijar una meta de precio." y el soporte táctil pasa a Fase 4. — Verificación (código): ver sección "Verificaciones". |
-| 11 | "No hay metas activas. Puedes fijarlas con doble clic en la gráfica del portafolio." | index.html:257 | ES | Instrucción solo para escritorio. | "No hay metas activas. Toca dos veces (o haz doble clic) en la gráfica para fijar una." | P2 | Igual que #10 |
+| 10 | "Histórico, camino probable y abanico Markov/Monte Carlo desde Hoy. Doble clic en la gráfica para proponer una alerta." | index.html:86 | ES | En el navegador no corre Markov ni Monte Carlo (es una fórmula con sigma). "Doble clic" no funciona en móvil. Jerga. | "Precio histórico y rango estimado para los próximos días. Toca dos veces (o haz doble clic) en la gráfica para fijar una meta de precio." | P1 | APROBADO el texto propuesto (el código implementa doble toque manual). Prueba en iOS Safari y Android Chrome en 1.9; si falla, texto alternativo y soporte táctil a Fase 4. |
+| 11 | "No hay metas activas. Puedes fijarlas con doble clic en la gráfica del portafolio." | index.html:257 | ES | Instrucción solo para escritorio. | "No hay metas activas. Toca dos veces (o haz doble clic) en la gráfica para fijar una." | P2 | Igual que #10: APROBADO, sujeto a la prueba en móvil de 1.9. |
 | 12 | Leyenda de la gráfica: "Serie de cierres reales asset_historical_prices.close." | index.html:327 (`afterLabel`) | ES | Expone el nombre de una tabla interna. | "Precios de cierre diarios reales." | P1 | APROBADO |
 | 13 | Leyenda de la gráfica: "Markov: Trayectoria central estimada…", "P10: Escenario conservador: percentil 10 de Monte Carlo.", "P90: Escenario optimista: percentil 90 de Monte Carlo." | index.html:327 | ES | P10/P90 no vienen de Monte Carlo (son `exp(±1.2816·σ)`). "Conservador" se confunde con el debate político. | Etiquetas: "Escenario central", "Escenario bajo", "Escenario alto". Texto: "Estimación basada en la volatilidad del activo." | P1 | APROBADO |
 | 14 | "{activo} · x/y cierres close · Hoy y abanico Diario Markov/Monte Carlo." | index.html:327 (`portfolio-focus`) | ES/EN | Jerga técnica ("close", "abanico", "Markov/Monte Carlo"). | "{activo} · {x} días de historial · rango estimado {Diario}" | P2 | APROBADO |
 | 15 | "Sin cierres reales en Supabase para este activo." | index.html:327 | ES | Menciona un proveedor interno. | "Aún no hay historial de precios para este activo." | P1 | APROBADO |
-| 16 | `last-update`: "Supabase / caché local", "API en vivo / caché 60 min", "API en vivo (hoy)", "Supabase (asset_historical_prices.close)" | index.html:531 | ES | Jerga técnica y nombre de tabla visibles. | "Cierre del último día hábil" / "Precio de hoy (hasta 60 min de retraso)" | P1 | APROBADO, previa aclaración de la fuente "API en vivo (hoy)" / "caché 60 min" (ver sección "Verificaciones") |
-| 17 | Píldora `cache-status`: "MERCADO: CACHÉ EN VIVO", "MERCADO: SUPABASE", "MERCADO: API EN VIVO", "MERCADO: SIN CONEXIÓN" | index.html:531 | ES | Jerga técnica. | "DATOS: CIERRE DIARIO" / "DATOS: PRECIO DE HOY" / "DATOS: SIN CONEXIÓN" | P1 | APROBADO, previa aclaración de la fuente (ver sección "Verificaciones") |
+| 16 | `last-update`: "Supabase / caché local", "API en vivo / caché 60 min", "API en vivo (hoy)", "Supabase (asset_historical_prices.close)" | index.html:531 | ES | Jerga técnica y nombre de tabla visibles. | "Cierre del último día hábil" / "Precio de hoy (hasta 60 min de retraso)" | P1 | OCULTAR 1.7 el botón "Actualizar en vivo" (sin borrar el código). APROBADO solo "Cierre del último día hábil". |
+| 17 | Píldora `cache-status`: "MERCADO: CACHÉ EN VIVO", "MERCADO: SUPABASE", "MERCADO: API EN VIVO", "MERCADO: SIN CONEXIÓN" | index.html:531 | ES | Jerga técnica. | "DATOS: CIERRE DIARIO" / "DATOS: PRECIO DE HOY" / "DATOS: SIN CONEXIÓN" | P1 | Con el botón oculto (#16): APROBADO solo "DATOS: CIERRE DIARIO" / "DATOS: SIN CONEXIÓN". |
 | 18 | "MARKET ACTIVE" (siempre en verde) | index.html:80 | EN | Promesa: es un texto fijo que no depende del horario de mercado. | Quitarlo, o "Datos de cierre diario" | P1 | Quitar el texto |
 | 19 | Panel "Estado de mercado": "Activo de referencia $4,610.69", "Probabilidad principal 24.1 %" | index.html:104 | ES | **[lógica]** Valores **fijos en el HTML** que nunca se actualizan. | Quitar las dos métricas fijas o conectarlas a datos reales | P0 | OCULTAR 1.7 las dos métricas fijas; Fase 3 |
 | 20 | Textos fijos por activo (`tech`), p. ej. oro: "el escenario central contempla una subida moderada mañana y continuidad condicionada pasado mañana" | index.html:264 (`assetData`) | ES | Narrativa direccional escrita a mano que no depende de los datos del día. | Quitar las frases que indican dirección. Ej.: "El oro suele comportarse como activo defensivo; su rango estimado depende de la volatilidad reciente." | P1 | APROBADO; en el diff mostrar el texto nuevo de cada activo |
@@ -132,8 +134,8 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 | 46 | "Monte Carlo y el abanico percentil son funciones Premium." / "Ver planes y prueba gratis" | index.html:99 | ES | Contradice el plan Free. Hoy está oculto porque el panel no está bloqueado, pero sigue en el DOM. | Quitarlo o "Próximamente" | P2 | APROBADO CON CAMBIO: "Próximamente" |
 | 47 | "Probabilidades de modelos combinados" / "Markov de 1 día y cuantiles Monte Carlo derivados de z-score × sigma diaria del activo." | index.html:99 | ES | Jerga. No combina modelos: es la misma fórmula con sigma. | "Rango estimado para mañana" / "Escenarios bajo, central y alto calculados con la volatilidad del activo." | P1 | APROBADO |
 | 48 | Tabla: "Cadenas de Markov (1 día)", "x % confianza", "Monte Carlo P10 (conservador)", "P90 (optimista)", "Consistente con Markov 1D" | index.html:296 (`renderProbabilityTable`) | ES | **[lógica]** La "confianza" es la constante 24.1 / (1 + 2σ). Ni Markov ni Monte Carlo se ejecutan aquí. "Conservador" en otro sentido. | Filas: "Escenario central", "Escenario bajo (10 %)", "Escenario alto (90 %)". Quitar la columna "Confianza". | P0 | APROBADO el texto de las filas; OCULTAR 1.7 la columna "Confianza" |
-| 49 | "$1$ representa subida y $0$ bajada. La nota geopolítica ajusta la frecuencia empírica…" | index.html:100 | ES | Los `$…$` se ven literales (no se carga KaTeX ni MathJax). "Frecuencia empírica" es jerga. | "1 = día de subida, 0 = día de bajada. La noticia del día ajusta ligeramente la frecuencia histórica; no garantiza resultados." | P1 | VERIFICAR si la noticia de verdad ajusta esa frecuencia. Si sí: APROBADO. Si no: "1 = día de subida, 0 = día de bajada. Es la frecuencia histórica; no garantiza resultados." — Verificación (código): sí ajusta; ver sección "Verificaciones". |
-| 50 | "Modo sombra · motor de señales v2" / "…no sustituye la probabilidad del portafolio hasta validar el Win Rate." | index.html:100 | ES | Texto **interno** visible para todos los usuarios ("modo sombra", "v2", "Win Rate"). | Ocultarlo para quien no es admin, o "Laboratorio (experimental): cálculo en evaluación que no cambia las cifras de arriba." | P1 | OCULTAR 1.7 el panel para todos los usuarios en index.html (el superadmin lo sigue viendo en admin.html) — ver nota en "Verificaciones". |
+| 49 | "$1$ representa subida y $0$ bajada. La nota geopolítica ajusta la frecuencia empírica…" | index.html:100 | ES | Los `$…$` se ven literales (no se carga KaTeX ni MathJax). "Frecuencia empírica" es jerga. | "1 = día de subida, 0 = día de bajada. La noticia del día ajusta ligeramente la frecuencia histórica; no garantiza resultados." | P1 | APROBADO con la variante: "1 = día de subida, 0 = día de bajada. Las noticias recientes ajustan ligeramente la frecuencia histórica; no garantiza resultados." (verificado: sí ajusta). |
+| 50 | "Modo sombra · motor de señales v2" / "…no sustituye la probabilidad del portafolio hasta validar el Win Rate." | index.html:100 | ES | Texto **interno** visible para todos los usuarios ("modo sombra", "v2", "Win Rate"). | Ocultarlo para quien no es admin, o "Laboratorio (experimental): cálculo en evaluación que no cambia las cifras de arriba." | P1 | OCULTAR 1.7 para todos en index.html, sin borrar el código (opción a). Mover a admin.html en Fase 5 (opción c). |
 | 51 | "Correlación alta y confirmada por volumen con {X} (r=0.83) — camino alterno disponible…" / "Sin correlaciones ≥0.8…" | index.html:308 | ES | Jerga ("r=", "confirmada por volumen"). | "{X} suele moverse en la misma dirección que este activo; en la gráfica verás su camino alterno." | P2 | APROBADO |
 | 52 | "Postura de riesgo: los cálculos de volatilidad usan sigma base (conservador) salvo que abras la tolerancia manualmente." Botones "Conservador" / "Abierto" | index.html:83 | ES | Jerga ("sigma base"). "Conservador" se confunde con el debate político. Inconsistente con la homepage ("Agresivo", #75). | "Rango de escenarios: Estándar / Amplio. 'Amplio' muestra movimientos 35 % mayores." | P1 | APROBADO |
 | 53 | Toast: "Postura abierta: la volatilidad se amplifica 1.35× en los cálculos." / "Postura conservadora activa (sigma base)." | index.html:436 | ES | Igual que #52. | "Rango amplio activado." / "Rango estándar activado." | P2 | APROBADO |
@@ -186,6 +188,21 @@ La línea indicada es la misma en `es.json`, `en.json` y `zh.json`, porque los t
 
 > Nota de documentación (no es texto de la interfaz): `README.md:55` dice "GDELT se consulta desde el navegador", pero hoy la consulta pasa por `/api/news` en el servidor. Es P2 y se corrige solo en el README.
 
+## I. Hallazgos adicionales (revisión de la homepage, 2026-10-01)
+
+Encontrados al preparar los diffs de la homepage. No estaban en la auditoría original. La línea de `locales/*.json` es la misma en los tres idiomas.
+
+| # | Texto actual | Archivo y línea | Idioma | Problema | Texto propuesto | Prioridad | Decisión |
+|---|---|---|---|---|---|---|---|
+| 83 | "…es un motor analítico vivo impulsado por matemáticas de nivel institucional, diseñado para descifrar el caos de los mercados globales y traducirlo en claridad para ti." | locales/*.json:29 (`modals.algorithm`) | ES/EN/ZH | Promesa exagerada. "Nivel institucional" ya se quitó del `hero.lead`. | "…es un motor analítico basado en matemáticas aplicadas, diseñado para ordenar la información de los mercados globales y traducirla en claridad para ti." | P1 | APROBADO |
+| 84 | "Para lograrlo, opera bajo una arquitectura de alta precisión que combina diversos componentes clave:" | locales/*.json:29 (`modals.algorithm`) | ES/EN/ZH | Promesa ("alta precisión"). | "Para lograrlo, combina varios componentes:" | P2 | APROBADO |
+| 85 | "…comportamientos recurrentes que el ojo humano o las herramientas tradicionales jamás alcanzan a ver." | locales/*.json:29 (`modals.algorithm`) | ES/EN/ZH | Superlativo que no se puede verificar. | "…comportamientos recurrentes en el historial de precios." | P1 | APROBADO |
+| 86 | "…matemáticas aplicadas de nivel institucional…" / "…claridad absoluta para el día a día." | locales/*.json:25 (`modals.valores`) | ES/EN/ZH | Mismo criterio que el `hero.lead`. | "…matemáticas aplicadas…" / "…más claridad para el día a día." | P2 | APROBADO |
+| 87 | "…con absoluta independencia, libres de comisiones abusivas o intermediarios con agendas ocultas." | locales/*.json:25 (`modals.valores`) | ES/EN/ZH | Sugiere que la plataforma sustituye a un intermediario de inversión. | "…con absoluta independencia, con información clara y sin letra pequeña." | P1 | APROBADO CON CAMBIO: "…con absoluta independencia y con información clara." (EN "…with complete independence and clear information.") |
+| 88 | "Llevar herramientas financieras de nivel avanzado a todos los hogares del mundo de forma completamente gratuita." | locales/*.json:21 (`modals.vision`) | ES/EN/ZH | Promesa de gratuidad a perpetuidad (misma lógica que #45). | Quitar "de forma completamente gratuita". | P1 | APROBADO CON CAMBIO: "Llevar herramientas de análisis financiero a todos los hogares del mundo." |
+| 89 | `alt="Detalle de pesos óptimos de portafolio"` | homepage/index.html:302 | ES | "Óptimos" (misma lógica que #54). | "Detalle del reparto del portafolio" | P2 | APROBADO |
+| 90 | `<title>`, meta description, `alt` y `aria-label` sin `data-i18n` | homepage/index.html (l. 6-7 y atributos) | ES | Siempre quedan en español aunque el usuario elija EN o ZH. Traducirlos requiere tocar JS. | Añadir `data-i18n` para atributos y el `<title>` | P2 | DIFERIR a Fase 8 (junto con `og:*`) |
+
 ---
 
 ## Sección aparte: `NEWS_API_KEY`
@@ -225,6 +242,7 @@ La línea indicada es la misma en `es.json`, `en.json` y `zh.json`, porque los t
 - **Condición:** el activo debe estar en el portafolio. Si no, aparece el toast "Agrega este activo al portafolio antes de crear una alerta." (l. 341).
 - **Sin probar en un dispositivo real:** no hay iPhone ni Android en este entorno.
 - **Recomendación:** aplicar el texto APROBADO, condicionado a una prueba en un teléfono real (iOS Safari y Android Chrome) en el paso 1.9. Si falla en esa prueba, se usa el texto alternativo y el soporte táctil pasa a Fase 4.
+- **Decisión (2026-10-01):** de acuerdo.
 
 ### #16 y #17: "API en vivo (hoy)" y "caché 60 min"
 
@@ -238,7 +256,18 @@ La línea indicada es la misma en `es.json`, `en.json` y `zh.json`, porque los t
 | Cachés | (1) **Cloudflare edge** (`caches.default`) durante 60 min por símbolo y por centro de datos (l. 8, 46-60). (2) **`sessionStorage`** del navegador durante 60 min (`LIVE_QUOTE_CACHE_MS`, index.html:518). (3) `Cache-Control: max-age=300` en la respuesta. |
 | ¿Se guarda en Supabase? | **No.** Nunca se escribe en `asset_historical_prices`. |
 
-**Implicación para el texto:** las dos cachés se suman, así que el precio mostrado puede tener **hasta ~2 horas** de antigüedad, más el retraso propio de FMP. El texto propuesto "Precio de hoy (hasta 60 min de retraso)" se queda corto. Alternativa más exacta: **"Precio de hoy (aproximado, puede tener más de 1 hora de retraso)"**. Pendiente de tu decisión.
+**Implicación para el texto:** las dos cachés se suman, así que el precio mostrado puede tener **hasta ~2 horas** de antigüedad, más el retraso propio de FMP. El texto propuesto "Precio de hoy (hasta 60 min de retraso)" se queda corto. Alternativa más exacta: **"Precio de hoy (aproximado, puede tener más de 1 hora de retraso)"**.
+
+**Decisión (2026-10-01):** ocultar el botón "Actualizar en vivo" en 1.7, sin borrar el código. Ya no se muestran textos de precio intradía.
+
+**Otros llamadores de `/api/market/…?live=1`:** ninguno. Solo el botón (index.html:86) pasa `live = true` a `obtenerHistoricoActivo`. Los demás llamadores piden siempre el histórico sin `live`:
+
+- `selectAsset` (l. 486)
+- `loadPortfolioHistoryData` (l. 325, portafolio)
+- `syncAssetDataWithSupabase` (l. 516)
+- explorador de activos (l. 729, `interval`/`exchange`/`assetType`)
+
+Tampoco lo usan `admin.html`, la homepage, `sw.js`, las alertas push (Python lee Supabase directamente) ni otras Functions.
 
 ### #49: ¿la noticia ajusta la frecuencia de los patrones?
 
@@ -248,7 +277,9 @@ La línea indicada es la misma en `es.json`, `en.json` y `zh.json`, porque los t
   - La tabla lo muestra en las columnas "Ajuste noticia" y "P(alza) ajustada".
 - **Respaldo en el navegador:** si `/api/patterns` falla, usa `newsDebateScore × 10` (index.html:310).
 - **Resultado:** se aplica la rama "Si sí: APROBADO".
-- **Matiz:** el ajuste no viene de "la noticia del día", sino del promedio de las noticias recientes. Variante más exacta: **"1 = día de subida, 0 = día de bajada. Las noticias recientes ajustan ligeramente la frecuencia histórica; no garantiza resultados."** Pendiente de tu decisión.
+- **Matiz:** el ajuste no viene de "la noticia del día", sino del promedio de las noticias recientes. Variante más exacta: **"1 = día de subida, 0 = día de bajada. Las noticias recientes ajustan ligeramente la frecuencia histórica; no garantiza resultados."**
+
+**Decisión (2026-10-01):** aceptada.
 
 ### Nota sobre #50 ("el superadmin lo sigue viendo en admin.html")
 
@@ -259,4 +290,4 @@ La línea indicada es la misma en `es.json`, `en.json` y `zh.json`, porque los t
   - (a) Ocultarlo para todos, aceptando esa pérdida.
   - (b) Ocultarlo solo cuando no hay sesión de superadmin (`adminSession`).
   - (c) Moverlo a `admin.html`, lo que sería un cambio de Fase 5.
-- Pendiente de tu decisión.
+- **Decisión (2026-10-01):** (a) ahora, ocultándolo para todos en `index.html` sin borrar el código; y (c) en la Fase 5.
