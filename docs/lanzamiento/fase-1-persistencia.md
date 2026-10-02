@@ -6,13 +6,14 @@
 - **Tablas:** `privacy_consents`, `push_subscriptions`, `user_suggestions`, `profiles`.
 - **Números de línea:** corresponden a `3627414`. `index.html` se desplazó +11 líneas respecto a la auditoría por el bloque CSS de 1.7.
 - **Actualización 2026-10-02:** con los resultados del SQL de producción, **se descarta la hipótesis de la migración faltante (H1)**. La revisión de las Functions de escritura y la nueva hipótesis principal están en la **sección 10**.
+- **Cierre del diagnóstico 2026-10-02:** una prueba controlada en Preview escribió correctamente en `privacy_consents`. **El flujo de consentimiento funciona; la tabla estaba vacía porque no había invitados nuevos.** Resultados, conclusiones y alcance de la mini-fase 1.5c en la **sección 11**.
 
 ## Resumen
 
 | Tabla | ¿Debería tener filas hoy? | Causa más probable de que esté vacía | ¿Falla en silencio? |
 |---|---|---|---|
 | `profiles` | **No.** Vacía por diseño. | Solo la llena el trigger `on_auth_user_created` al crear un usuario en Supabase Auth. El registro está desactivado: `setAuthMode` fuerza siempre `'guest'` (index.html:229). | No aplica |
-| `privacy_consents` | **Sí.** Debería haber una fila por cada invitado nuevo que acepta el aviso. | ~~H1: falta la migración FASE 2~~ (**descartada** el 2026-10-02: las columnas existen). Hipótesis principal actual: `SUPABASE_URL` no tiene la forma canónica en Cloudflare, y es común a todas las Functions que escriben (ver sección 10). | **Sí.** El invitado ve "Consentimiento de privacidad registrado." aunque el servidor falle. |
+| `privacy_consents` | Solo si hay invitados nuevos. | **Resuelto (sección 11):** el flujo funciona. La prueba en Preview escribió 1 fila. Estaba vacía porque no había invitados nuevos. ~~H1: migración faltante~~ y ~~H3: URL mal formada~~ quedan descartadas para Preview. | **Sí.** El invitado ve "Consentimiento de privacidad registrado." aunque el servidor falle (riesgo a corregir en 1.5c). |
 | `push_subscriptions` | Solo si alguien completó toda la cadena: fijó una meta, concedió permiso y `VAPID_PUBLIC_KEY` está configurada. | Puede ser falta de uso real, falta de `VAPID_PUBLIC_KEY`, tabla o migración ausente, o filas borradas por la cascada (404/410). | **Sí.** No se revisa la respuesta del POST. |
 | `user_suggestions` | Solo si alguien envió una sugerencia. | Lo más probable es que nadie haya enviado una. Si la Function fallara, el usuario vería un error (este flujo sí revisa la respuesta). | No |
 
@@ -425,9 +426,81 @@ Comprobaciones visuales (no compartas los valores):
 - **Defensa en 1.5c:** el helper compartido `supabaseUrl(env)` (sección 8.1, punto 2) quita la dependencia del formato de la variable. Hay que hacer que `track-view` deje de responder 200 cuando la inserción falla y registrar el error de Supabase en las cuatro Functions.
 - **Después:** repetir las pruebas de punta a punta de la sección 8.2.
 
+## 11. Resultados y conclusión del diagnóstico (2026-10-02)
+
+### 11.1 Resultados
+
+**SQL en producción (solo estructura y conteos):**
+
+| Tabla | Filas / inserciones históricas | Nota |
+|---|---|---|
+| `privacy_consents` | 0 / 0 | Tiene las columnas de la migración FASE 2 (`email`, `full_name`, `idioma`, `ccpa_do_not_sell`) |
+| `push_subscriptions` | 0 / 0 | — |
+| `user_suggestions` | 0 / 0 | — |
+| `profiles` | 0 / 0 | — |
+| `page_views` | 2 / 2 | Las dos son visitas del responsable desde Preview: 2026-10-01 18:26 UTC (`platform`) y 2026-10-02 02:42 UTC (`homepage`) |
+
+- **RLS:** activo en las 5 tablas. No hay políticas de INSERT; no hacen falta, porque las Functions escriben con `service_role`.
+- **Permisos y restricciones:** correctos.
+- **Triggers:** solo `on_auth_user_created` y `on_auth_user_updated` en `auth.users`.
+
+**Configuración:**
+- **Preview no tenía `SUPABASE_ANON_KEY`.** Se agregó y ahora `/api/health` de Preview la muestra en `true`. Mientras faltó, en Preview:
+  - `/api/public-config` respondía 503, así que no había cliente Supabase en el navegador ni `VAPID_PUBLIC_KEY`, y push no podía funcionar.
+  - `market` no podía reconstruir la URL desde la llave anon y usaba `SUPABASE_URL` tal cual.
+- **Preview escribe en la base de producción** (mismo proyecto de Supabase). Toda prueba desde Preview genera datos reales y hay que limpiarlos después.
+
+**Prueba controlada en Preview:**
+- **Escenario:** ventana de incógnito, invitado nuevo "QA Prueba", correo con sufijo `qa1` (sin "+").
+- **Resultado:** `privacy_consents` recibió **1 fila** con `version_aviso_privacidad = 2026-10-01` a las 17:58:16 UTC. Se recorre así toda la cadena navegador → `/api/privacy-consent` → Supabase con `service_role`.
+- **Limpieza:** la fila se borró por `id` y la tabla volvió a 0.
+
+**Seguridad:**
+- **Prueba:** la contraseña de demo del JS (index.html:261) se probó como `X-Admin-Secret` contra `/api/montecarlo` en producción y respondió **401**. Por tanto **no coincide con `ADMIN_API_SECRET`**, así que los endpoints admin no quedan abiertos con ese valor.
+- **Pendiente:** quitar la contraseña del JS queda para la **Fase 5**.
+
+### 11.2 Conclusiones
+
+| Tabla | Conclusión |
+|---|---|
+| `privacy_consents` | **El flujo funciona.** Estaba vacía porque no había invitados nuevos: las únicas visitas registradas son del responsable. Sigue el riesgo de **falla silenciosa** (S1) si el servidor llegara a fallar. |
+| `profiles` | **Vacía por diseño** mientras el registro de cuentas esté desactivado (index.html:229). |
+| `push_subscriptions` | No se probó. En Preview no podía funcionar mientras faltó `SUPABASE_ANON_KEY` (sin VAPID). Se prueba en **1.10**. |
+| `user_suggestions` | No se probó. El flujo avisa si falla. Se prueba en **1.10**. |
+
+Estado de las hipótesis:
+- **H1** (migración faltante): descartada.
+- **H2** (faltaban variables en un entorno): **confirmada para Preview** (`SUPABASE_ANON_KEY`), ya corregida.
+- **H3** (URL mal formada): **descartada para Preview**, porque la escritura con la URL cruda funcionó.
+- **H-B** (la llave no es de servicio): descartada, porque la inserción pasó con RLS activo y sin políticas de INSERT.
+- **H-D** (poco tráfico): **confirmada como causa del vacío**.
+
+**Riesgo residual (Production):** la prueba de escritura se hizo con las variables de **Preview**; las de Production son un conjunto aparte. `page_views` no tiene ninguna fila de una visita a `thalgorithm.com`, así que la escritura en Production **no está demostrada**. Para 1.10, antes del lanzamiento, propongo una de estas dos comprobaciones:
+- La prueba T3 de la sección 10.6 contra `thalgorithm.com` (solo lectura).
+- Una visita a `thalgorithm.com` comprobando que `page_views` sube en 1. Escribe una fila de visita normal.
+
+### 11.3 Alcance acordado
+
+| Qué | Dónde | Detalle |
+|---|---|---|
+| Aviso honesto y reintento cuando falla el consentimiento (S1) | **Mini-fase 1.5c**, en una rama nueva desde `main` **después del merge de la Fase 1** | No mostrar "registrado" si el servidor falla; guardar el consentimiento como pendiente y reintentarlo en la siguiente carga |
+| Revisar la respuesta en el alta y la baja de push (S3, S5) | **Mini-fase 1.5c** | Mensajes separados para la meta y para la alerta |
+| Pruebas de punta a punta de push y sugerencias | **1.10** | Con correos de prueba identificables y su limpieza (sección 8.2), sabiendo que Preview escribe en producción |
+| Comprobar la escritura en Production (riesgo residual 11.2) | **1.10** | Prueba T3 o visita con control de `page_views` |
+| Lectura del panel de superadmin con `service_role` (S7) | **Fase 5** | — |
+| Quitar del JS la contraseña de demo del backoffice | **Fase 5** | Ya se comprobó que no abre los endpoints admin (401) |
+
+**Fuera del alcance acordado; quedan como recomendaciones registradas:**
+- Helper compartido de URL normalizada en las Functions que escriben (8.1, punto 2).
+- Registro del error de Supabase en los logs (S9).
+- Que `track-view` deje de responder 200 cuando la inserción falla (10.4).
+
+No son necesarios para el lanzamiento, porque la escritura funciona, pero facilitarían diagnosticar fallas futuras. Se pueden retomar en la Fase 5.
+
 ## Observación fuera de alcance (seguridad, para registrar)
 
 - **Credencial demo en el JS público.** El acceso al backoffice compara contra una contraseña escrita en el JS público (index.html:261, `admin-password` y su valor de demo).
 - **El secreto admin depende de esa contraseña.** Ese mismo valor se guarda como `adminApiSecret` y se envía como cabecera `X-Admin-Secret` a los endpoints admin. Para que esos endpoints respondan, el secreto `ADMIN_API_SECRET` de Cloudflare tendría que ser igual a una contraseña que cualquiera puede leer en el código fuente.
 - AGENTS.md ya trata ese login como demo. Aun así, conviene revisar en la Fase 5 que `ADMIN_API_SECRET` **no** coincida con ese valor, y mover el acceso admin a una autenticación real.
+- **Verificado el 2026-10-02:** esa contraseña, enviada como `X-Admin-Secret` a `/api/montecarlo` en producción, devuelve **401**. **No coincide con `ADMIN_API_SECRET`**, así que los endpoints admin no quedan abiertos con ese valor. Como consecuencia, el panel de rendimiento del superadmin no puede leer los endpoints admin con esa contraseña, lo que es coherente con lo anterior. Quitar la contraseña del JS y la autenticación real del backoffice: **Fase 5**.
 - No se hizo ningún cambio.
