@@ -5,7 +5,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Consent audit is unavailable.' }, 503);
   const body = await request.json().catch(() => ({}));
-  const version = String(body.version || '2026-09-01').slice(0, 40);
+  const version = String(body.version || '2026-10-01').slice(0, 40);
   const language = ['es', 'en', 'zh'].includes(body.language) ? body.language : 'es';
   const ccpaOptOut = body.ccpaOptOut === true;
   const timestamp = new Date().toISOString();

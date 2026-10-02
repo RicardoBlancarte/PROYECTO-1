@@ -17,12 +17,13 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 
 ## Resumen
 
-- **106 hallazgos:** 39 P0, 42 P1 y 25 P2.
+- **108 hallazgos:** 39 P0, 42 P1 y 27 P2.
   - #27 subió de P1 a P0 en la revisión del 2026-10-01.
   - Las filas #83 a #90 se añadieron en esa misma fecha (sección I).
   - Las filas #91 a #93 vienen de la revisión visual de capturas (sección J).
   - Las filas #94 a #96 se añadieron al aplicar las secciones A, B y C (sección K).
   - Las filas #97 a #106 se añadieron al aplicar las secciones E, F y H (sección L).
+  - Las filas #107 y #108 corresponden a los arreglos rápidos 1.7 (sección M).
 - **Decisiones registradas:** 2026-10-01, en la columna *Decisión*. Códigos: **APROBADO** = aplicar el texto propuesto en 1.6; **OCULTAR 1.7** = esconder el elemento en los arreglos rápidos; **DIFERIR** = no se toca en la Fase 1. Las verificaciones solicitadas están al final, en la sección "Verificaciones".
 - **Hallazgos que bloquean el lanzamiento:**
   1. **Top picks** ("Mejores oportunidades", "Top Portfolio", "mejores activos para invertir hoy"). Ordena por **volatilidad** (`sigma × 0.21`), no por retorno, y siempre marca "Alcista" (#1–#5, #67–#68, #72).
@@ -212,7 +213,7 @@ Resultado de la revisión visual que hizo el usuario en el Preview de la homepag
 
 | # | Texto actual | Archivo y línea | Idioma | Problema | Texto propuesto | Prioridad | Decisión |
 |---|---|---|---|---|---|---|---|
-| 91 | Subtítulos incrustados en la imagen del bloque 2 (hombre con celular): "The algorithm reached the goal, it's time... send the order" / "该是时候了…下达指令" | homepage/assets/shanghai-hero.jpg.png (homepage/index.html:279) | EN/ZH | Invita a ejecutar una orden de inversión: suena a recomendación y promete algo que la plataforma no hace. | Versión recortada de la imagen sin la franja de subtítulos | P0 | 1.7: crear una versión recortada como archivo NUEVO, sin borrar ni sobrescribir el original. Mostrar el resultado antes de cambiar la referencia en homepage/index.html. |
+| 91 | Subtítulos incrustados en la imagen del bloque 2 (hombre con celular): "The algorithm reached the goal, it's time... send the order" / "该是时候了…下达指令" | homepage/assets/shanghai-hero.jpg.png (homepage/index.html:279) | EN/ZH | Invita a ejecutar una orden de inversión: suena a recomendación y promete algo que la plataforma no hace. | Versión recortada de la imagen sin la franja de subtítulos | P0 | 1.7 APLICADO: archivo NUEVO `homepage/assets/shanghai-hero-sin-subtitulos.png` (1056×632; se recortaron los 88 px inferiores con los subtítulos). El original no se tocó. Se cambió la referencia (homepage/index.html:279) y la proporción `#block2 .sb-media` a 1056/632 para que `object-fit:cover` no corte los lados. Queda en el monitor de la foto texto diminuto ("Probabilidad 23.3%"); se revisa en 1.9. |
 | 92 | Captura de Top picks (bloque 8) con "Mejores oportunidades del motor Markov", "Alcista" y "Proyección óptima" | homepage/assets/top portafolios.png (homepage/index.html:365) | ES | Muestra exactamente los textos retirados en #1, #3 y #4. | Nueva captura tomada del Preview después de los cambios de la Fase 1 | P0 | La retoma el usuario al final de la Fase 1 desde el Preview. |
 | 93 | Captura de la gráfica (bloque 3) con la línea "Markov" y "Probabilidad 23.3%"; captura del mapa con "Hola, Ricardo." | homepage/assets/grafica.png.png, prob tomorrow.png (homepage/index.html:291-292); homepage/assets/mapa global.png (l. 310) | ES | Muestran una cifra de probabilidad que se oculta en #9 y la etiqueta "Markov" retirada en #13. La del mapa muestra el nombre de un usuario real. | Nuevas capturas | P1 | Las retoma el usuario al final de la Fase 1; la gráfica, otra vez en la Fase 2. |
 
@@ -238,6 +239,22 @@ Resultado de la revisión visual que hizo el usuario en el Preview de la homepag
 | 104 | Enlace a la homepage: "Homepage" → "Inicio" (#57) y title/aria-label "Ir al homepage" | index.html:62, 80 | ES | "Inicio" se confunde con "Página principal" del menú lateral, que lleva a la vista principal de la terminal. | "Acerca de"; title/aria-label "Ir a la página de The Algorithm" | P2 | APROBADO |
 | 105 | "TH Algorithm" dentro del aviso de privacidad (es/en/zh) | index.html:126-201 | ES/EN/ZH | Inconsistente con el nombre canónico (#80), pero puede ser el nombre de la entidad legal. | Decidir con el abogado | P2 | DIFERIR a Fase 7 |
 | 106 | Versión del aviso: `PRIVACY_VERSION = '2026-09-01'`, etiqueta "v. 2026-09-01" y "Última actualización: Septiembre de 2026" / "Last updated: September 2026" / "最后更新日期：2026年9月" | index.html:118, 126, 152, 178, 540; functions/api/privacy-consent.js:8 (valor por defecto) | ES/EN/ZH | El texto del aviso cambia en la Fase 1 (#58-#65). La versión se guarda con cada consentimiento; el código no compara versiones, así que no obliga a pedir de nuevo el consentimiento. | `PRIVACY_VERSION = '2026-10-01'`, "v. 2026-10-01" y "Última actualización: Octubre de 2026" (es/en/zh) | P1 | 1.7 |
+
+## M. Arreglos rápidos 1.7 (2026-10-01)
+
+| # | Texto actual | Archivo y línea | Idioma | Problema | Texto propuesto | Prioridad | Decisión |
+|---|---|---|---|---|---|---|---|
+| 107 | Win Rate del motor legacy en el panel de rendimiento del superadmin: tag "MOTOR ACTUAL x %", gráficas "Win Rate por activo" y "Evolución del acierto predictivo", tabla de Win Rate, aviso "Cargando Win Rate..." y nota de promoción | index.html:213 (`#admin-dashboard-modal`); se llena en l. 417-420 (`loadWinRateKpi`, `renderWinRateKpi`, `renderShadowWinRate`) | ES | Está fuera de `#shadow-engine-block`. Solo lo ve el superadmin (la barra se activa en `bootAdmin`). Usa la misma fórmula de sigma × 0.21 (#95), así que sus cifras tampoco tienen unidad estable. | Ocultar | P2 | 1.7 APLICADO con CSS: `#winrate-global-tag`, `#winrate-notice`, `#winrate-promote-note`, `#winrate-table` y el contenedor de las gráficas (clase `f1-oculto`). Siguen visibles el tag "MOTOR SOMBRA (v2)" y el botón Recalcular. No se tocó functions/api/winrate.js. |
+| 108 | Workflow diario: `runs-on: ubuntu-latest`; Python `3.10`; `pip install yfinance pandas numpy scipy supabase requests pywebpush` sin versiones | .github/workflows/daily_update.yml:16, 24, 28 | — | `ubuntu-latest` cambia de imagen sin aviso. Las dependencias sin versión pueden romper la cascada diaria con una actualización externa. | `runs-on: ubuntu-24.04`; fijar versiones de Python y dependencias | P2 | 1.7 APLICADO solo `runs-on: ubuntu-24.04` (YAML validado). Python y dependencias: DIFERIR a Fase 5 (fijar versiones). |
+
+**Resumen de lo aplicado en 1.7**
+
+- **Ocultos con CSS:** un solo bloque al final del `<style>` de index.html, con un comentario por cada #. Incluye #3, #4, #48, #50, #97, #98, #107, más la clase `f1-oculto` para #8, #9, #16, #19, #38 y #107. Ningún código se borró. Para volver a mostrar algo, basta con quitar su selector o la clase.
+- **#96:** constante `SHOW_SHADOW_ENGINE = false` (index.html, junto a `shadowState`), que se usa en `renderPortfolioChart` para no dibujar la serie de correlación.
+- **#5 y #6:** `enviarAlertaWhatsApp` usa el texto nuevo, `encodeURIComponent(mensaje)` y `window.open(…, '_blank', 'noopener,noreferrer')`.
+- **#106:** `PRIVACY_VERSION = '2026-10-01'`, "v. 2026-10-01", "Última actualización: Octubre de 2026" / "Last updated: October 2026" / "最后更新日期：2026年10月". Valor por defecto en functions/api/privacy-consent.js:8 = '2026-10-01'.
+- **#91:** imagen recortada nueva y referencia actualizada.
+- **#108:** runner `ubuntu-24.04`.
 
 ---
 
