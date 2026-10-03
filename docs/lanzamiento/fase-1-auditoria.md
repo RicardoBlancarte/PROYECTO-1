@@ -17,7 +17,7 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
 
 ## Resumen
 
-- **127 hallazgos:** 43 P0, 47 P1 y 37 P2.
+- **128 hallazgos:** 44 P0, 47 P1 y 37 P2.
   - #27 subió de P1 a P0 en la revisión del 2026-10-01.
   - Las filas #83 a #90 se añadieron en esa misma fecha (sección I).
   - Las filas #91 a #93 vienen de la revisión visual de capturas (sección J).
@@ -26,6 +26,7 @@ Si en la columna *problema* aparece **[lógica]**, el texto propuesto no basta: 
   - Las filas #107 y #108 corresponden a los arreglos rápidos 1.7 (sección M).
   - Las filas #109 a #121 vienen de la revisión visual 1.9 (sección N).
   - Las filas #122 a #126 vienen de la prueba en tablet y celular (sección O); la #127, de la preparación del 1.11.
+  - La fila #128 es la falla de la cascada diaria en `main` (sección P).
 - **Decisiones registradas:** 2026-10-01, en la columna *Decisión*. Códigos: **APROBADO** = aplicar el texto propuesto en 1.6; **OCULTAR 1.7** = esconder el elemento en los arreglos rápidos; **DIFERIR** = no se toca en la Fase 1. Las verificaciones solicitadas están al final, en la sección "Verificaciones".
 - **Hallazgos que bloquean el lanzamiento:**
   1. **Top picks** ("Mejores oportunidades", "Top Portfolio", "mejores activos para invertir hoy"). Ordena por **volatilidad** (`sigma × 0.21`), no por retorno, y siempre marca "Alcista" (#1–#5, #67–#68, #72).
@@ -292,6 +293,13 @@ Líneas de index.html en `d2afa4e`.
 | 125 | En pantalla angosta, los botones de periodo 1D–2A se apilan en una columna, y el texto "{activo} · N días de historial · rango estimado: …" queda comprimido junto a la gráfica | index.html:339 (`ensurePortfolioControls`), 96 (`#portfolio-focus`; el texto se arma en l. 338, `renderPortfolioChart`) | — | Diseño responsivo de los controles de la gráfica. | Revisar el CSS de los controles y del encabezado de la gráfica en móvil | P2 | DIFERIR a Fase 4 |
 | 126 | Al volver de WhatsApp (Chrome en Android recarga la pestaña), la terminal vuelve a pedir el registro; el portafolio sí se conserva. Al registrarse de nuevo con el mismo correo, `privacy_consents` no recibe otra fila. | index.html:262 (guarda `horizon_guest` en `localStorage`), 749 (arranque), 555 (`ensurePrivacyConsent`), 273 (`logout`) | — | **Sesión:** el invitado se guarda en **`localStorage`** (`horizon_guest`, l. 262), que sobrevive a la recarga, pero **nadie lo lee al arrancar**: la l. 749 solo restaura sesiones de Supabase Auth y `bootGuest` solo se llama desde el formulario. **Portafolio:** se conserva porque vive en claves de `localStorage` con el correo como sufijo (`getGuestItem`, l. 241). **Consentimiento:** el registro repetido **no reenvía** el consentimiento a propósito, porque `algo_privacy_accepted_v1::<correo>` ya existe en ese navegador y el modal no se abre; es correcto si el primer envío llegó al servidor. Si ese primer envío hubiera fallado en silencio (S1 de fase-1-persistencia.md), nunca se reintentaría (lo cubre la mini-fase 1.5c). | Al arrancar, si `horizon_guest` tiene nombre y correo válidos y no hay sesión de Supabase ni de admin, llamar a `bootGuest` automáticamente. Para no reabrir la sesión de otra persona en un equipo compartido, "Salir" (l. 273) debería borrar `horizon_guest`; hoy no lo hace. | P2 | DIFERIR a Fase 4 (prioridad baja). **Parte obligatoria del arreglo, aunque no se implemente la entrada automática:** "Salir" (l. 273) debe borrar `horizon_guest` de `localStorage`, por privacidad en equipos compartidos. Hoy deja nombre y correo del último invitado en el navegador. |
 | 127 | `asset_montecarlo_simulation.computed_at` no se actualiza en cada corrida de Monte Carlo | montecarlo_engine.py:673-683 (`persist_result`); schema.sql:497 (`computed_at … default timezone('utc', now())`) | — | **[lógica]** El payload del upsert (`on_conflict="symbol,horizon"`) no incluye `computed_at`, así que la columna solo toma su valor por defecto en la **primera** inserción y luego no cambia. Quien use `max(computed_at)` para comprobar si los datos son recientes se engaña. Hoy la frescura se verifica por el `seed`, que depende del último cierre (`derive_seed`, l. 418-420 y 565; consulta del 1.11). | Incluir `computed_at` (fecha y hora UTC del cálculo) en el payload de `persist_result` | P1 | DIFERIR a Fase 2 (con Monte Carlo v2) |
+
+
+## P. Cascada diaria (GitHub Actions, rama `main`, 2026-10-02)
+
+| # | Texto actual | Archivo y línea | Idioma | Problema | Texto propuesto | Prioridad | Decisión |
+|---|---|---|---|---|---|---|---|
+| 128 | La rutina nocturna falla desde el 29-sep. Error de la corrida #24: `APIError 23502: null value in column "close" of relation "asset_historical_prices" violates not-null constraint`, en la fila AAPL 2026-10-02 con open/high/low/close nulos y volumen 31,878,433. Último cierre guardado: 2026-09-28. | actualizar_automatico.py:104-134 (descarga y upsert de precios), 165-167 (señales) | — | **[lógica]** Para cada activo descarga `yf.download(period="5d", interval="1d")` y usa **solo la última fila** (l. 113). Si yfinance entrega la fila del día sin precios (NaN) pero con volumen, el código la convierte en `close: None` (l. 123) y la agrega. Los 30 activos se suben en **un solo upsert** (l. 131-133); una sola fila inválida hace que Supabase rechace **el lote completo**, y como la llamada no tiene `try`, el script termina. **No se guardan precios de ningún activo** ni se ejecutan señales, Win Rate, alertas push ni Monte Carlo. La señal del lote (l. 166) tampoco tiene `try`. **No hay recuperación automática:** cada corrida solo toma la última fila, así que los días perdidos (29-sep a 2-oct) no se recuperan solos al arreglar el error. | (1) Si la fila del día no tiene `Close`, omitirla y registrar activo y fecha en el log. (2) Un upsert por activo, con `try` y log de activo y fecha si falla. (3) `try` alrededor del lote de señales. No se toca el esquema ni la restricción NOT NULL. La recuperación de los días perdidos requiere una decisión aparte, porque escribe en `asset_historical_prices`. | P0 | PENDIENTE: diff propuesto; requiere llegar a `main` (la cascada corre desde `main`) |
 
 ---
 
