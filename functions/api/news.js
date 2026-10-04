@@ -1,6 +1,6 @@
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300' } });
 const LLM_MODEL = 'claude-haiku-4-5-20251001';
-const DEBATE_SYSTEM_PROMPT = 'Eres un motor de analisis financiero que simula un debate entre dos analistas macro: uno de sesgo liberal (progresista) y uno de sesgo conservador. Para el titular de noticia dado, produce la puntuacion de impacto de mercado de CADA analista de forma independiente, en una escala de -10 (muy bajista) a +10 (muy alcista). Responde EXCLUSIVAMENTE con un objeto JSON valido, sin texto adicional ni markdown, con esta forma exacta: {"liberal_impact": number, "liberal_summary": string, "conservative_impact": number, "conservative_summary": string, "neutral_summary": string}. Los "summary" deben ser una frase breve en espanol (menos de 25 palabras).';
+const DEBATE_SYSTEM_PROMPT = 'Eres un motor de analisis financiero que evalua un titular de noticia bajo dos escenarios: uno de continuidad (el entorno actual se mantiene) y uno de cambio (el evento escala o altera el entorno). Para el titular dado, produce la puntuacion de impacto de mercado de CADA escenario de forma independiente, en una escala de -10 (muy bajista) a +10 (muy alcista). Los campos conservative_* corresponden al escenario de continuidad y los campos liberal_* al escenario de cambio. Responde EXCLUSIVAMENTE con un objeto JSON valido, sin texto adicional ni markdown, con esta forma exacta: {"liberal_impact": number, "liberal_summary": string, "conservative_impact": number, "conservative_summary": string, "neutral_summary": string}. Los "summary" deben ser una frase breve en espanol (menos de 25 palabras), en lenguaje sencillo, sin terminos politicos ni recomendaciones de compra o venta.';
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
@@ -87,9 +87,9 @@ function heuristicScore(headline) {
   return {
     liberalImpact, conservativeImpact,
     netImpact: Math.max(-10, Math.min(10, liberalImpact + conservativeImpact)),
-    conservativeSummary: critical ? 'Riesgo de continuidad y prima de riesgo elevada.' : 'Señal de estabilidad operativa.',
-    liberalSummary: critical ? 'Riesgo de disrupción y efectos macro amplios.' : 'Señal de coordinación y crecimiento.',
-    neutralSummary: critical ? 'Impacto negativo cautelar; ampliar bandas de incertidumbre.' : 'Impacto positivo moderado; confirmar con datos de mercado.',
+    conservativeSummary: critical ? 'Si nada cambia, el riesgo se mantiene alto.' : 'Si nada cambia, la situación se mantiene estable.',
+    liberalSummary: critical ? 'Si el evento escala, el impacto podría ser amplio.' : 'Si el entorno cambia, podría haber efectos positivos moderados.',
+    neutralSummary: critical ? 'Posible impacto negativo; el rango de precios podría ampliarse.' : 'Impacto positivo moderado; confirmar con datos de mercado.',
     method: 'heuristic'
   };
 }
