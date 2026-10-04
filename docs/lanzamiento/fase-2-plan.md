@@ -1,201 +1,295 @@
 # Fase 2 — Monte Carlo v2 en la gráfica: hallazgos y plan
 
-- **Fecha:** 2026-10-03
+- **Fecha:** 2026-10-03 (revisión 2, con las decisiones D1-D5 del usuario)
 - **Rama:** `lanzamiento-f2-montecarlo` (desde `main` en `77f0b69`)
-- **Alcance de hoy:** solo investigación y plan. No se editó código de producción.
-- **Referencias:** [fase-1-auditoria.md](fase-1-auditoria.md) (#3, #4, #8, #9, #47, #120, #127, #131) y [fase-1-persistencia.md](fase-1-persistencia.md).
+- **Alcance de hoy:** solo investigación y plan. No se editó código de producción ni se ejecutó SQL.
+- **Referencias:** [fase-1-auditoria.md](fase-1-auditoria.md) (#3, #4, #8, #9, #47, #120, #127, #128, #131) y [fase-1-persistencia.md](fase-1-persistencia.md).
 
 ---
 
-## 1. Hallazgos
+## 0. Decisiones del usuario (2026-10-03) y respuestas
+
+| # | Decisión | Estado |
+|---|---|---|
+| D1 | No usar `model_notes`. "Pasado mañana" como **cuarto horizonte de 2 sesiones** en filas normales, más una columna nueva `base_close_date date`, nula y aditiva. | **Bloqueo encontrado:** el cuarto horizonte **sí requiere cambio de esquema**, porque hay un `CHECK`. Ver 0.1. SQL en la sección 3, **PENDIENTE DE APROBACIÓN, sin ejecutar**. |
+| D2 | Aprobado correr el motor desde la rama, **solo después de que confirmes la corrida del lunes 5-oct desde `main`**. | Procedimiento de confirmación en la sección 6.2. |
+| D3 | Aprobado: la tabla #47 pasa a Monte Carlo en esta fase. | Diseño en 2.6. |
+| D4 | Si #3 y #4 muestran cifras de la fórmula falsa, se ocultan con `f1-oculto`. | Sí son de la fórmula falsa, pero **ya están ocultas** desde la Fase 1 con una regla CSS equivalente. Ver 0.3. |
+| D5 | Textos nuevos. | Adoptados en 2.4. El aviso de "Recalcular" se cita textual en 0.4. |
+| Otros | Si `base_close_date` no coincide con el último cierre mostrado → "No disponible". La tasa histórica muestra cuántas sesiones usó si son menos de 252. Anotar la caducidad de la tabla NYSE (Fase 5) y `patterns.js` (Fase 3). | Incorporado en 2.3, 2.4 y la sección 9. |
+
+### 0.1 ¿Hay restricciones que limiten los horizontes a 1, 5 y 21?
+
+**Sí. El cuarto horizonte no se puede guardar sin cambiar el esquema.**
+
+| Dónde | Qué limita | Efecto de un horizonte `two_day` |
+|---|---|---|
+| **`schema.sql:470`**: `horizon text not null check (horizon in ('daily', 'weekly', 'monthly'))` | **CHECK de la tabla.** Postgres le pone nombre automático; lo esperado es `asset_montecarlo_simulation_horizon_check`, pero hay que confirmarlo con la consulta de la sección 3. | **El upsert falla** (`23514 check_violation`). El motor lo atrapa por símbolo y horizonte (`montecarlo_engine.py:707-708`), así que la cascada no se cae, pero **ninguna fila `two_day` se guarda**. |
+| `montecarlo_engine.py:55`: `STEPS_BY_HORIZON = {"daily": 1, "weekly": 5, "monthly": 21}` | El motor solo calcula esas llaves (valida en l. 489 y recorre en l. 697). | Agregar `"two_day": 2` basta para que se calcule. |
+| `montecarlo_engine.py:688` (docstring "x 3 horizontes") | Solo documentación. | Hay que actualizar el texto. |
+| `montecarlo_engine.py:699`: `fetch_b1_crosscheck(..., horizon)` | Lee `asset_sensitivity_factor`, cuyo CHECK (`schema.sql:398`) solo admite los 3 horizontes. | Para `two_day` no hay fila: `b1_crosscheck` queda `null` (la columna es nula). No falla. |
+| `functions/api/montecarlo.js:16` (admin) | Lista blanca de 3 horizontes; cualquier otro valor **cae en silencio a `daily`**. | El panel admin no podría leer `two_day`. Propuesta: agregarlo a la lista (una línea; diff a mostrar). |
+| `functions/api/markov-matrix.js:29`, `patterns.js:7`, `patterns-vectors.js:28`, `sensitivity-factor.js:20-38` y los CHECK de `asset_pattern_snapshots`, `asset_pattern_vectors*`, `asset_sensitivity_factor` y `user_state.prediction_horizon` | Son de **otras** tablas y motores. | No se tocan. No dependen de esta tabla. |
+| `test_montecarlo_synthetic.py` | Solo prueba `daily` (l. 146-147). | Se agrega un caso `two_day`. |
+
+**¿Qué asume 90 filas (30 activos × 3 horizontes)?**
+
+- **Código:** nada cuenta ni valida 90 filas. Ni el motor, ni la cascada, ni el workflow, ni `health.js`, ni el panel admin.
+- **Log:** el motor escribe una línea por símbolo y horizonte (`Monte Carlo (SYM, horizon): P(sube)=…`, l. 705). Hoy son 90 líneas cuando todo va bien; con `two_day` serán **120**. No hay ningún resumen ni conteo automático.
+- **Controles y documentos:** la revisión 1 de este plan decía "90 upserts" en la prueba de `workflow_dispatch`. Ya está corregido a 120. Ningún otro documento de `docs/lanzamiento/` lo asume.
+- **Para no confundirse:** `MIN_RETURNS = 90` (`montecarlo_engine.py:56`) **no tiene relación** con esto. Es el mínimo de retornos de historial por activo para simular (se omite si hay ≤ 90 cierres, l. 693).
+
+### 0.2 Alternativa sin cambio de esquema
+
+No existe una que cumpla D1. Las filas `weekly` y `monthly` usan otra semilla y otro número de pasos, y no sirven como "pasado mañana". Las únicas alternativas sin `ALTER` eran guardar el punto de 2 sesiones en `model_notes` (descartado en D1) o reutilizar un valor existente del CHECK con otro significado (no recomendado).
+
+### 0.3 D4: qué muestran hoy las columnas #3 y #4
+
+`renderTopPicks()` (`index.html:324`) ordena los activos por `effectiveSigma × 0.21` y arma:
+
+| Columna | Contenido | ¿Fórmula falsa? |
+|---|---|---|
+| #4 "Movimiento estimado (1 día)" (2ª) | `Alcista (x.x%)` con `x = σ × 0.21`. Siempre ≥ 0, así que **siempre dice "Alcista"**. | **Sí** |
+| #3 "Proyección óptima" (3ª) | `precio × (1 + σ × 0.21)`. Siempre por encima del precio actual. | **Sí** |
+
+- **Ya están ocultas desde la Fase 1** con `.top-picks-table th:nth-child(2|3), td:nth-child(2|3)` en el mismo bloque CSS de `f1-oculto` (`index.html:62-63`). No se ven, y `display:none` también las saca del árbol de accesibilidad.
+- **El botón "Compartir" no filtra esas cifras:** `enviarAlertaWhatsApp` recibe `tendencia` y `precio`, pero el mensaje solo usa el nombre del activo (`index.html:323`).
+- **Propuesta:** dejarlas como están (cero cambios). Si prefieres la clase literal `f1-oculto`, son dos ediciones pequeñas: el `<thead>` en el HTML y la plantilla de `renderTopPicks`. El resultado visible es el mismo. **Pendiente de tu confirmación.**
+
+### 0.4 Aviso del botón "Recalcular" (textual)
+
+`index.html:689`:
+
+```js
+$('recalculate').onclick = () => {
+  if (!$('news-input').value.trim()) return showToast('Escribe un evento geopolítico primero.', true);
+  $('nlp-score').textContent = '+0.65';
+  $('bias').textContent = 'Fuertemente alcista';
+  $('brief').textContent = 'El nuevo evento modifica positivamente la prima de riesgo. Proyección recalculada.';
+  $('last-update').textContent = 'Ahora';
+  renderPortfolioChart();
+  showToast('Abanico Markov recalculado.');
+};
+```
+
+- **Hoy nadie lo ve.** El botón está en la sección "Market brief" (`<section class="panel hidden">`, l. 116), dentro del `<aside class="stack f1-oculto">` (l. 114-117) que la Fase 1 ocultó completo (#109). Además, todos sus valores son fijos: `+0.65`, "Fuertemente alcista".
+- **Propuesta:** no tocarlo en la Fase 2 y registrarlo para la Fase 3, cuando vuelva "Estado de mercado". Llama a `renderPortfolioChart()`, que seguirá funcionando con el abanico nuevo.
+- **Si prefieres corregir ya el aviso**, texto propuesto: "Evento registrado. El rango estimado se recalcula cada noche con el último cierre." **Pendiente de tu aprobación.**
+
+---
+
+## 1. Hallazgos (revisión 1, vigentes)
 
 ### a) Esquema real de `asset_montecarlo_simulation`
 
-Definido en `schema.sql:468-501`. Clave primaria `(symbol, horizon)`, es decir, **una fila por activo y horizonte** que se sobrescribe cada noche (no guarda histórico).
+`schema.sql:468-501`. Clave primaria `(symbol, horizon)`: **una fila por activo y horizonte**, sobrescrita cada noche.
 
-| Grupo | Columnas |
-|---|---|
-| Identidad | `symbol`, `horizon` (`check in ('daily','weekly','monthly')`), `n_paths` (10 000), `seed` |
-| Volatilidad GARCH | `garch_omega`, `garch_alpha`, `garch_beta`, `garch_persistence`, `garch_half_life_days`, `degrees_of_freedom` |
-| Pool de remuestreo | `lambda_pool`, `effective_sample_size`, `n_min_threshold`, `pool_size` |
-| **Resultado** | **`probability_up`** (`check between 0 and 1`), **`quantiles`** (jsonb) |
-| Riesgo | `var_95`, `cvar_95`, `var_99`, `cvar_99`, `semi_deviation` |
-| Asimetría | `sample_skewness_classical`, `sample_skewness_robust`, `realized_skewness_simulated` |
-| Otros | `news_uncertainty_variance` (siempre 0), `b1_crosscheck`, `b2_crosscheck`, `model_notes` (jsonb), `computed_at` |
+- **Percentiles:** `quantiles = {p5, p10, p25, p50, p75, p90, p95}`, en **retorno simple** sobre el último cierre (`montecarlo_engine.py:447-473`).
+- **Horizontes:** `daily = 1`, `weekly = 5`, `monthly = 21` sesiones (una sesión = una fila de `asset_historical_prices`).
+- **"Probabilidad de cerrar arriba del precio actual": existe.** Es `probability_up = mean(retorno_log_acumulado > 0)` (l. 446), exactamente la fracción de trayectorias que terminan arriba del último cierre. Con 10 000 trayectorias el error es ≤ 0.5 puntos: se muestra **sin decimales**.
+- **No existen** el punto de 2 sesiones ni la fecha del cierre base. Solo entra en la semilla (`derive_seed`, l. 418 y 565). Se resuelve con D1.
 
-- **Percentiles guardados:** `quantiles = {p5, p10, p25, p50, p75, p90, p95}`, en **retorno simple** (`exp(x) − 1`) sobre el último cierre (`montecarlo_engine.py:447-473`). Las versiones en log están en `model_notes.log_units`.
-- **Los 3 horizontes:** `STEPS_BY_HORIZON = {"daily": 1, "weekly": 5, "monthly": 21}` (`montecarlo_engine.py:55`). Cada paso es una fila de `asset_historical_prices`, o sea, **una sesión**.
-- **"Probabilidad de cerrar arriba del precio actual": sí existe.** Es `probability_up = mean(retorno_log_acumulado > 0)` (`montecarlo_engine.py:446`). Como `log(P_T/P_0) > 0 ⇔ P_T > P_0`, es **exactamente** la fracción de trayectorias que terminan por encima del último cierre. Con 10 000 trayectorias el error estándar es ≤ 0.5 puntos, así que se debe mostrar **sin decimales** (p. ej. "54 %").
-- **Lo que no existe:**
-  1. **El paso 2 del horizonte diario ("pasado mañana").** No hay ninguna fila con 2 pasos y **no se puede derivar con exactitud** de la fila `daily`: la volatilidad GARCH del segundo paso depende del shock del primero, y la suma de dos pasos remuestreados no es una convolución simple de los cuantiles guardados. **Requiere guardar un dato nuevo** (ver sección 3).
-  2. **La fecha del cierre que se usó (`as_of_date`).** Solo entra en la semilla (`derive_seed`, l. 418 y 565), no se guarda. Sin ella el navegador no puede saber si la simulación corresponde al último cierre que está mostrando.
+### b) Días hábiles
 
-### b) ¿"Mañana" y "pasado mañana" en días hábiles?
+- **Son sesiones, de forma implícita.** El motor no usa calendario; cada paso es la siguiente fila de precios, y esa tabla solo tiene días con mercado.
+- **Viernes:** el paso 1 es el lunes (o el martes si el lunes es feriado).
+- **Feriados:** el cron (`0 22 * * 1-5`) corre igual, pero no llega fila nueva y el resultado se repite idéntico. Con `base_close_date` la página muestra "Datos al cierre del …", así que no engaña.
+- **Cripto (Fase 3):** opera 7 días, así que un paso sería un día natural y habrá que etiquetarlo distinto.
 
-- **Sí, en sesiones, de forma implícita.** El motor no usa calendario: cada paso es "la siguiente fila" de `asset_historical_prices`, y esa tabla solo tiene filas de días con mercado (yfinance no devuelve fines de semana ni feriados para acciones ni futuros).
-- **Viernes:** la corrida del viernes a las 22:00 UTC usa el cierre del viernes; el paso 1 es el **lunes** (o el martes si el lunes es feriado).
-- **Feriados de EE. UU.:** el workflow (`.github/workflows/daily_update.yml`, `cron: '0 22 * * 1-5'`) también corre en feriados. Ese día yfinance no trae fila nueva, el último cierre no cambia, la semilla es la misma y el resultado se repite idéntico. No hay error, pero tampoco hay nada que avise.
-- **Hora:** 22:00 UTC es 18:00 ET en horario de verano y 17:00 ET en invierno. En ambos casos es después del cierre de NYSE (16:00 ET) y del settlement de los futuros de CME.
-- **Cripto (BTC-USD, cuando se agregue en la Fase 3):** opera 7 días y yfinance sí trae fines de semana, así que ahí un paso sería un **día natural**. Habrá que etiquetarlo distinto.
-- **Consecuencia para la interfaz:** el texto correcto es **"Próxima sesión"** y **"En 2 sesiones"**, no "mañana". La fecha concreta solo se puede mostrar si el navegador la calcula desde `as_of_date`, saltando fines de semana y una tabla de feriados de NYSE (ver 2.4).
-
-### c) Tarjetas ocultas #8 y #9
+### c) Tarjetas #8 y #9
 
 | Pieza | Ubicación |
 |---|---|
-| HTML | `index.html:96`: dos `<div class="bubble f1-oculto">` con `MÁS PROBABLE MAÑANA` → `#tomorrow-price` / `#tomorrow-prob`, y `MÁS PROBABLE PASADO MAÑANA` → `#next-price` / `#next-prob`. |
-| CSS que las oculta | `index.html:58-67`: bloque "Fase 1 (1.7)", selector `.f1-oculto { display:none !important; }`. Las animaciones de `#tomorrow-price` / `#tomorrow-prob` están en `index.html:31`. |
-| JS que las llena | `renderActiveAssetCards()` en `index.html:331`. Lo llaman `renderPortfolioChart()` (l. 338, dos veces), el cambio de horizonte (l. 339) y el cambio de activo (l. 497). |
-| Origen de datos hoy | **Ninguno real.** `tomorrow = precio × (1 + σ × step)` y `next = tomorrow × (1 + σ × step × 2.05)`, con `step` y `prob1/prob2` **fijos** en `PREDICTION_HORIZON` (`index.html:325`). σ viene de `effectiveSigma(asset)` (l. 446) × un factor de noticias. Siempre sube, y la "probabilidad" es `prob1 / (1 + 2σ)`. |
-| Mismo patrón en la gráfica | `renderPortfolioChart()` (l. 338): `markov`, `next`, `p10` y `p90` salen de la misma fórmula, y P10/P90 son **simétricos alrededor de un centro que siempre sube**. Por eso el abanico actual nunca puede bajar. |
-| Mismo patrón en la tabla | `renderProbabilityTable()` (l. 306), panel "Rango estimado para mañana" (#47), visible hoy. |
+| HTML | `index.html:96`: dos `<div class="bubble f1-oculto">` con `#tomorrow-price`/`#tomorrow-prob` y `#next-price`/`#next-prob` |
+| CSS | `.f1-oculto` en el bloque "Fase 1 (1.7)", `index.html:58-67`; animaciones en l. 31 |
+| JS | `renderActiveAssetCards()`, `index.html:331` |
+| Datos hoy | **Ninguno real:** `precio × (1 + σ × step)`, con `step`, `prob1` y `prob2` fijos en `PREDICTION_HORIZON` (l. 325). La gráfica (l. 338) y la tabla #47 (l. 306) usan la misma fórmula. |
 
-### d) Tasa histórica de días al alza por activo
+### d) Tasa histórica de días al alza
 
-- **Definición ya usada en el proyecto:** día al alza = `close_t > close_{t-1}` (estricto), igual que `asset_signals.signal` (`actualizar_automatico.py:92` y `241`).
-- **Ventana propuesta:** las **últimas 252 sesiones** (≈ 1 año bursátil), mostrando también `n` para que se vea la muestra. Con 252 días, el error estándar de una proporción cercana a 50 % es ≈ 3 puntos, suficiente como referencia.
-- **Desde dónde (solo lectura), recomendado:** en el navegador, desde la serie `received.close` que `loadPortfolioHistoryData()` (l. 336) **ya descarga** de `/api/market/{symbol}` para la gráfica. No hace falta ninguna consulta nueva ni tocar tablas.
-- **Alternativa:** en el endpoint público, con `asset_signals?symbol=eq.X&order=date.desc&limit=252`. **Cuidado:** ordenar `desc` y poner `limit` explícito. `patterns.js:19` lee `asset_signals` en orden `asc` y sin límite, así que si un símbolo pasa de 1 000 filas (`max_rows` por defecto de Supabase), recibiría solo las más antiguas. Es el mismo tipo de error que #131.
-- **Uso:** es contexto, no predicción. Junto a la probabilidad Monte Carlo: "Históricamente subió el 52 % de las sesiones (últimas 252)". También sirve como prueba de cordura: si `probability_up` diaria se aleja mucho de esa tasa en muchos activos a la vez, hay algo que revisar.
+- **Definición:** día al alza = `close_t > close_{t-1}`, igual que `asset_signals.signal` (`actualizar_automatico.py:92` y `241`).
+- **Ventana:** las últimas 252 sesiones.
+- **Fuente:** en el navegador, con la serie que `loadPortfolioHistoryData()` (l. 336) **ya descarga** de `/api/market/{symbol}`. Sin consultas nuevas.
+- **Pocas sesiones:** si hay menos de 252, se usan las disponibles y el texto lo dice (2.4).
 
-### e) #127 — `persist_result` y `computed_at`
+### e) #127
 
-- **Ubicación:** `montecarlo_engine.py:673-683`.
-- **Causa:** el payload se arma con una lista fija de llaves que **no incluye `computed_at`**. El `upsert(..., on_conflict="symbol,horizon")` de PostgREST genera un `INSERT … ON CONFLICT DO UPDATE SET` **solo con las columnas enviadas**. El `default timezone('utc', now())` de `schema.sql:497` solo se aplica en el `INSERT` de la primera vez; en cada actualización la columna conserva su valor original.
-- **Corrección (sin cambio de esquema):** agregar `"computed_at": datetime.now(timezone.utc).isoformat()` al payload.
+En `montecarlo_engine.py:673-683` el payload no incluye `computed_at`, y el upsert de PostgREST solo actualiza las columnas enviadas. El valor por defecto (`schema.sql:497`) solo se aplica en el primer `INSERT`. Corrección: enviar `computed_at` en UTC. **No cambia el esquema.**
 
-### f) `/api/montecarlo` hoy y endpoint público propuesto
+### f) Endpoint público
 
-**Estado actual** (`functions/api/montecarlo.js`):
-- Protegido con `checkAdminAuth` (`functions/_shared/admin-auth.js`): 503 si falta el secreto, 401 sin header `X-Admin-Secret`. Verificado el 2026-10-02 (fase-1-persistencia.md:505).
-- Devuelve `select=*` (los ~30 campos, incluidos `b1_crosscheck` y `b2_crosscheck`) para un solo horizonte, con `Cache-Control: no-store`.
-- Fugas de nombres en errores dentro del mismo grupo de funciones: `admin-auth.js` responde "ADMIN_API_SECRET no configurada" y `market/[symbol].js` responde "Supabase historical store is not configured" o "No historical close rows…". El nuevo endpoint no debe seguir ese patrón.
-- La tabla tiene RLS activado y **ninguna política**: solo la lee el `service_role`. Se mantiene así; **no se propone abrir RLS al rol `anon`**.
+- **`/api/montecarlo` hoy:** responde 401 sin `X-Admin-Secret` y devuelve `select=*`. No se toca, salvo la lista blanca de 0.1.
+- **Propuesta:** `GET /api/escenarios?symbol=X`, detallado en 2.2.
 
-**Propuesta: `functions/api/escenarios.js` → `GET /api/escenarios?symbol=AAPL`**
+### g) Activos sin Monte Carlo
 
-- **Archivo nuevo y separado.** `/api/montecarlo` (admin) no se toca.
-- **Una sola consulta** para los 3 horizontes, con un `select` explícito y nada de `*`:
-  `horizon,probability_up,quantiles,computed_at,fan:model_notes->fan,as_of:model_notes->>as_of_date`
-- **Validación:** `symbol` con `/^[A-Z0-9^=.\-]{1,15}$/` tras `toUpperCase()`. Cualquier otro método o parámetro se ignora.
-- **Respuesta (nombres públicos, no de columnas):**
+- El motor solo recorre los 30 símbolos de `actualizar_automatico.py:27-35`.
+- Del selector no tienen simulación `BTC-USD`, `^GSPC` (claves `sp500` y `country`), `EWZ` y `EWJ`; en el explorador faltan además `ETH-USD` y `^DJI`. Misma causa que #120.
+- Tampoco habrá datos si un activo tiene ≤ 90 cierres, si el paso falla para ese símbolo, o si `base_close_date` no coincide con el último cierre mostrado.
+- En todos esos casos se muestra **"No disponible"** (2.3).
+
+---
+
+## 2. Diseño (revisión 2)
+
+### 2.1 Motor (`montecarlo_engine.py`)
+
+1. **#127:** `computed_at` en el payload de `persist_result`.
+2. **Cuarto horizonte:** `STEPS_BY_HORIZON = {"daily": 1, "two_day": 2, "weekly": 5, "monthly": 21}`. Tiene semilla propia (`derive_seed` incluye el horizonte) y sale por el mismo camino de cálculo que los demás. Las filas `daily`, `weekly` y `monthly` **no cambian**: misma semilla y mismos pasos.
+3. **`base_close_date`:** `str(dates[-1])` en el resultado y en el payload.
+4. **Historial completo:** `fetch_price_history` lee en orden `asc` con `limit=5000`. Si un símbolo supera el `max_rows` de Supabase (1 000 por defecto), recibiría solo las filas **más antiguas**, sin error. Hoy no pasa (~504-760 filas). Se cambia a `desc` con `limit` y se invierte en Python. Si fallara, `base_close_date` lo delataría y la página mostraría "No disponible".
+5. **Textos:** el docstring "x 3 horizontes" pasa a "x 4 horizontes".
+6. **Panel admin:** `functions/api/montecarlo.js:16` acepta `two_day` en la lista blanca.
+
+**Costo:** +1 simulación de 2 pasos por activo, es decir, +2 pasos sobre los 27 actuales (≈ +7 % de trabajo de simulación).
+
+### 2.2 Endpoint público `functions/api/escenarios.js`
+
+- **Ruta:** `GET /api/escenarios?symbol=AAPL`. Archivo **nuevo y separado** del admin. Usa `service_role` del lado del servidor y **no se abre RLS a `anon`**.
+- **Consulta única:** `symbol=eq.X&select=horizon,probability_up,quantiles,base_close_date,computed_at` → hasta 4 filas.
+- **Validación:** `symbol` con `/^[A-Z0-9^=.\-]{1,15}$/` tras `toUpperCase()`.
+- **Respuesta:** solo p10, p25, p50, p75 y p90 (los que usa la interfaz); nada de VaR, GARCH, semillas ni crosschecks.
 
 ```json
 {
   "symbol": "AAPL",
-  "asOf": "2026-10-02",
+  "baseCloseDate": "2026-10-02",
   "updatedAt": "2026-10-02T22:14:05Z",
   "horizons": {
-    "daily":   { "points": [ { "sessions": 1, "probUp": 0.54, "q": { "p5": -0.031, "p25": -0.009, "p50": 0.001, "p75": 0.011, "p95": 0.029 } },
-                             { "sessions": 2, "probUp": 0.53, "q": { "...": 0 } } ] },
-    "weekly":  { "points": [ { "sessions": 5,  "...": 0 }, { "sessions": 10, "...": 0 } ] },
-    "monthly": { "points": [ { "sessions": 21, "...": 0 }, { "sessions": 42, "...": 0 } ] }
+    "daily":   { "sessions": 1,  "probUp": 0.54, "q": { "p10": -0.021, "p25": -0.009, "p50": 0.001, "p75": 0.011, "p90": 0.022 } },
+    "two_day": { "sessions": 2,  "probUp": 0.53, "q": { "...": 0 } },
+    "weekly":  { "sessions": 5,  "...": 0 },
+    "monthly": { "sessions": 21, "...": 0 }
   }
 }
 ```
 
-  Solo se exponen p5, p25, p50, p75 y p95 (los que dibuja la interfaz). VaR, CVaR, GARCH, semillas, crosschecks y notas del modelo no salen.
-- **Errores genéricos, sin nombres de variables ni de tablas:**
-  - 400 `{"error":"Solicitud no válida."}`
-  - 404 `{"error":"No disponible para este activo."}`
-  - 503 / 502 `{"error":"Servicio no disponible por el momento."}`
+- **Varias fechas base:** si las filas traen `base_close_date` distintas (p. ej. `two_day` quedó viejo), `baseCloseDate` va **por horizonte** y la página compara cada uno por separado.
+- **Errores genéricos**, sin nombres de tablas ni de variables:
+  - 400 "Solicitud no válida."
+  - 404 "No disponible para este activo."
+  - 5xx "Servicio no disponible por el momento."
 - **Cache-Control:**
-  - 200: `public, max-age=900, stale-while-revalidate=3600` (los datos cambian una vez al día; mismo `max-age` que `patterns.js`).
-  - 404: `public, max-age=300`.
+  - 200: `public, max-age=900, stale-while-revalidate=3600`;
+  - 404: `public, max-age=300`;
   - 5xx: `no-store`.
-- Sin CORS adicional (mismo origen). `_routes.json` ya incluye `/api/*`.
 
-### g) Activos sin filas de Monte Carlo
+### 2.3 Regla de "No disponible"
 
-- **Fuente de la lista:** `montecarlo_engine.run_for_all_assets(supabase, assets)` recorre **solo** la lista `assets` de `actualizar_automatico.py:27-35`: 20 acciones y 10 futuros.
-- **Activos del selector sin Monte Carlo** (`fmpSymbols`, `index.html:524`):
-  - `btc` → `BTC-USD`
-  - `sp500` y `country` → `^GSPC`
-  - `bovespa` → `EWZ`
-  - `nikkei` → `EWJ`
+Para cada horizonte se muestra "No disponible" si se cumple cualquiera de estas condiciones:
 
-  En el explorador (`ASSET_CATALOG`) faltan además `ETH-USD` y `^DJI`. Es la misma causa que #120: **no tienen filas en `asset_historical_prices`** y agregarlos requiere tu aprobación (diferido a la Fase 3).
-- **Otros casos en que no habrá datos:**
-  - un símbolo con menos de 91 cierres (`MIN_RETURNS`, l. 56; se omite en l. 693);
-  - un fallo del paso de Monte Carlo para ese símbolo u horizonte (se registra y se sigue, l. 707-710);
-  - una simulación desactualizada (`asOf` distinto del último cierre que muestra la gráfica, p. ej. si la cascada falla como en #128).
-- **Cómo se mostraría:**
-  - **Tarjetas #8/#9:** se ven con el precio en "—" y el subtítulo "No disponible para este activo" (o "Simulación desactualizada" si el problema es la fecha). No se vuelve a la fórmula con σ.
-  - **Gráfica:** solo el historial, sin abanico, con una nota bajo la leyenda: "Rango estimado no disponible para este activo." Para BTC, ^GSPC, EWZ y EWJ la gráfica ya sale vacía hoy por #120, así que el mensaje existente se mantiene.
-  - **Tabla #47:** si se incluye en esta fase (decisión D3), las mismas tres filas con "—".
+- no hay fila;
+- el endpoint falla;
+- `base_close_date` ≠ última fecha de la serie que dibuja la gráfica (`received.dates.at(-1)`).
 
----
+En esos casos no se vuelve a la fórmula con σ. Esta regla cubre tres situaciones:
 
-## 2. Diseño propuesto
+- los activos sin simulación (1.g);
+- una cascada que falló (#128);
+- **el periodo entre la corrida de la rama y el merge.** La cascada de `main` (motor viejo) actualiza `daily`, `weekly` y `monthly` sin enviar `base_close_date`. El upsert solo cambia las columnas enviadas, así que `base_close_date` conserva la fecha de la corrida de la rama y deja de coincidir. Las filas `two_day` no se actualizan. Resultado: la página muestra "No disponible" en lugar de cifras mezcladas, que es el comportamiento seguro.
 
-### 2.1 Motor (`montecarlo_engine.py`), sin cambio de esquema
+### 2.4 Tarjetas #8/#9 (textos de D5)
 
-1. **#127:** incluir `computed_at` en el payload de `persist_result`.
-2. **Segundo punto del abanico:** cada horizonte simula **2 × steps** pasos con la **misma semilla**:
-   - diario: 1 → 2 sesiones;
-   - semanal: 5 → 10;
-   - mensual: 21 → 42.
+- Se quita `f1-oculto` **solo** de esas dos burbujas.
+- **Las tarjetas siempre muestran 1 y 2 sesiones**, sin importar el selector Día/Semana/Mes, que solo afecta a la gráfica.
 
-   `simular_trayectorias` devuelve el acumulado en cada punto de control. Las columnas actuales (`probability_up`, `quantiles`, VaR, etc.) se calculan en `steps`, como hoy, y quedan **idénticas bit a bit**: los sorteos del generador para los primeros `steps` pasos no cambian y `news_uncertainty_variance = 0` no consume sorteos extra. Esto se comprueba en la prueba sintética.
-3. **Nuevas llaves dentro de `model_notes`** (jsonb existente, sin `ALTER TABLE`):
-   - `model_notes.fan = [{"sessions": s, "probability_up": …, "quantiles": {p5…p95}}]` para `s ∈ {steps, 2·steps}`, en retorno simple;
-   - `model_notes.as_of_date = str(dates[-1])`.
-4. **Lectura completa del historial:** `fetch_price_history` lee con `order=date.asc&limit=5000`. Si un símbolo supera el `max_rows` de Supabase (1 000 por defecto), recibiría solo las filas **más antiguas** y simularía sobre un cierre viejo, sin ningún error (el mismo tipo de error que #131). Hoy no ocurre (~504-760 filas), pero se propone leer `desc` con `limit` e invertir el orden en Python. `as_of_date` haría visible el problema en cualquier caso.
+| Elemento | Tarjeta #8 (`daily`) | Tarjeta #9 (`two_day`) |
+|---|---|---|
+| Título | **"Próxima sesión (lun 5-oct)"** | **"Dentro de 2 sesiones (mar 6-oct)"**, PENDIENTE DE TU APROBACIÓN |
+| Cifra grande | Mediana: `cierre × (1 + p50)` | Ídem |
+| Línea 1 | **"La mitad de los escenarios simulados cae entre $X y $Y"** (p25-p75) | Ídem |
+| Línea 2 | **"Escenarios que cierran arriba del último cierre: 54 %"** (`probUp`, sin decimales) | Ídem |
 
-### 2.2 Endpoint público
+**Debajo de las tarjetas, una sola vez:**
 
-`functions/api/escenarios.js`, como se describe en 1.f.
+- **"Cerró al alza en X de las últimas 252 sesiones (Y %)"**. Si hay menos de 252, el número real: "Cerró al alza en 61 de las últimas 118 sesiones (52 %)".
+- **"Datos al cierre del vie 2-oct"**, a partir de `base_close_date`.
 
-### 2.3 Tarjetas #8/#9 (`index.html`)
+**Formato de fecha:** día abreviado + `d-mmm` en español (`lun 5-oct`), con `toLocaleDateString('es-MX', …)` y la fecha tratada como UTC para que la zona horaria no la mueva un día.
 
-- Se quita `f1-oculto` **solo** de esas dos burbujas. Los demás elementos ocultos en la Fase 1 siguen igual.
-- **Contenido** (horizonte diario, o el que esté elegido en Día/Semana/Mes):
-  - Título: "PRÓXIMA SESIÓN · lun 5 oct" / "EN 2 SESIONES · mar 6 oct". Para Semana y Mes: "EN 5 SESIONES" / "EN 10 SESIONES", etc.
-  - Precio grande: **mediana**, `cierre × (1 + p50)`.
-  - Línea 1: "Rango probable (50 %): $X – $Y", con p25 y p75.
-  - Línea 2: "Probabilidad de cerrar arriba de hoy: 54 %" (`probUp`, sin decimales).
-  - Línea 3 (contexto, d): "Subió el 52 % de las últimas 252 sesiones".
-- **Textos** coherentes con #8 y #9 de la Fase 1: nada de "más probable". La mediana es "escenario central", no una predicción.
-- **Fuente de datos:** `/api/escenarios`, con caché en `localStorage` mediante el mismo `readCache`/`writeCache` (15 min) que usan patrones y correlación, y la misma protección `if (currentAssetKey !== key) return;` contra respuestas que lleguen tarde.
+**Sin datos:** cifra "—" y subtítulo "No disponible para este activo". La línea "Datos al cierre…" se oculta.
 
-### 2.4 Fechas de sesión (b)
+### 2.5 Fechas de sesión
 
-- Función pequeña `nextSessions(asOf, n)`: salta sábados, domingos y una constante `NYSE_HOLIDAYS` para 2026-2027.
+- Función `nextSessions(baseCloseDate, n)`: salta sábados, domingos y la constante `NYSE_HOLIDAYS`.
   - **2026:** 01-01, 01-19, 02-16, 04-03, 05-25, 06-19, 07-03, 09-07, 11-26, 12-25.
   - **2027:** 01-01, 01-18, 02-15, 03-26, 05-31, 06-18, 07-05, 09-06, 11-25, 12-24.
-- Para futuros de CME el calendario es casi el mismo. Las diferencias son de horario, no de fecha de cierre.
-- Hay que renovar la lista antes de 2028. Queda anotado junto a la constante.
+- Para futuros de CME las fechas de cierre coinciden en la práctica.
+- **La tabla caduca el 31-dic-2027** y se anota para la Fase 5 (sección 9).
 
-### 2.5 Abanico en la gráfica (`renderPortfolioChart`)
+### 2.6 Abanico en la gráfica
 
-- **Se reemplaza la fórmula con σ.** Para el horizonte elegido, los 2 puntos futuros (que ya existen en la gráfica: Día 1/2, Semana 1/2, Mes 1/2) salen de `points[0]` y `points[1]`:
-  - **Escenario central** = p50;
-  - **Banda interna** p25-p75, relleno más intenso;
-  - **Banda externa** p5-p95, relleno tenue, con `fill` entre datasets de Chart.js (ya cargado);
-  - Se conservan "Escenario bajo/alto", ahora como p5/p95, para no romper la leyenda (`renderPortfolioChartLegend`).
-- **El centro puede quedar por debajo de "Hoy"** y las bandas son asimétricas (FHS conserva el sesgo del pool).
-- **Sin datos**, o con `asOf` distinto del último cierre de la serie: no hay abanico y aparece la nota de 1.g.
-- **Efectos colaterales que hay que resolver en el mismo commit:**
-  - `newsDebateScore` y `RISK_MULTIPLIER` ya no mueven el abanico (Monte Carlo usa `news_uncertainty_variance = 0`).
-  - El botón "Recalcular" (l. 689) muestra el aviso "Abanico Markov recalculado." Se propone cambiarlo a "Noticia registrada; el rango estimado se recalcula cada noche." Requiere tu aprobación de texto.
-  - El camino "Correlación (sombra)" sigue detrás de `SHOW_SHADOW_ENGINE` y no se toca.
+Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no existen "Semana 2" ni "Mes 2" (10 y 42 sesiones), porque no hay filas para ellos.
+
+| Selector | Puntos futuros (sesiones) | Filas |
+|---|---|---|
+| Día | 1, 2 | `daily`, `two_day` |
+| Semana | 1, 2, 5 | `daily`, `two_day`, `weekly` |
+| Mes | 1, 2, 5, 21 | `daily`, `two_day`, `weekly`, `monthly` |
+
+- **Etiquetas del eje X:** las fechas de `nextSessions` (`lun 5-oct` …).
+- **Escenario central** = p50.
+- **"Escenario bajo/alto"** = p10/p90, los mismos percentiles que la tabla #47, para que la leyenda sea coherente.
+- **Banda interna** p25-p75, sombreada con `fill` entre datasets (Chart.js ya está cargado).
+- **El centro puede quedar debajo de "Hoy"** y las bandas son asimétricas.
+- **Puntos de semillas distintas:** cada punto viene de una simulación independiente, así que puede haber diferencias de ruido de ±0.5 puntos entre horizontes. Es despreciable frente al ancho del abanico.
+- **Sin datos** (2.3) en un horizonte: se omite ese punto. Si no hay ninguno, no se dibuja abanico y aparece la nota "Rango estimado no disponible para este activo."
+- **`newsDebateScore` y `RISK_MULTIPLIER` ya no mueven el abanico.** Monte Carlo usa `news_uncertainty_variance = 0`.
+- **Esto es una DECISIÓN (D6):** confirma la tabla de puntos por selector.
+
+### 2.7 Tabla #47 (`renderProbabilityTable`, D3)
+
+- **Filas** (horizonte `daily`):
+  - "Escenario central" = p50;
+  - "Escenario bajo (10 %)" = p10;
+  - "Escenario alto (90 %)" = p90.
+
+  Los rótulos actuales coinciden exactamente con los percentiles guardados.
+- **Se mantiene oculto** lo que ya ocultó la Fase 1: columna de señal (#98), columna de confianza (#48) y fila de la mediana (#98).
+- **Columna "Efecto de noticias":** sigue con `countryBriefs`, no se toca.
+- **Subtítulo actual:** "Escenarios bajo, central y alto calculados con la volatilidad del activo." Deja de ser cierto. Propuesto: **"Escenarios simulados a partir del historial del activo."** PENDIENTE DE TU APROBACIÓN.
+- **Sin datos:** las tres filas con "—" y "No disponible para este activo".
 
 ---
 
-## 3. Cambios de esquema
+## 3. Cambios de esquema — PENDIENTE DE MI APROBACIÓN (no ejecutar)
 
-**Opción A (recomendada): ninguno.** Todo lo nuevo vive en `model_notes` (jsonb existente) y en el valor de `computed_at`, que ya existe. No se toca `asset_historical_prices`.
-
-**Opción B — PENDIENTE DE MI APROBACIÓN (solo si prefieres columnas propias en lugar de `model_notes`):**
+**Paso previo (solo lectura):** confirmar el nombre real del CHECK.
 
 ```sql
--- PENDIENTE DE APROBACIÓN. No aplicar sin confirmación del usuario.
-alter table public.asset_montecarlo_simulation
-  add column if not exists as_of_date date,
-  add column if not exists fan jsonb;
+select conname, pg_get_constraintdef(oid) as definicion
+from pg_constraint
+where conrelid = 'public.asset_montecarlo_simulation'::regclass
+  and contype = 'c';
+-- Esperado: dos filas. La de horizon debería llamarse
+-- asset_montecarlo_simulation_horizon_check; la otra es la de probability_up.
 ```
 
-Son columnas nulas y aditivas, sin tocar RLS ni la clave primaria. La ventaja es la claridad: `model_notes` hoy es diagnóstico interno. La desventaja es que exige una migración en producción antes de desplegar el motor.
+**Migración** (usar el nombre confirmado arriba):
+
+```sql
+-- PENDIENTE DE APROBACIÓN DEL USUARIO. No ejecutar sin confirmación.
+begin;
+
+alter table public.asset_montecarlo_simulation
+  add column if not exists base_close_date date;
+
+alter table public.asset_montecarlo_simulation
+  drop constraint asset_montecarlo_simulation_horizon_check;
+
+alter table public.asset_montecarlo_simulation
+  add constraint asset_montecarlo_simulation_horizon_check
+  check (horizon in ('daily', 'two_day', 'weekly', 'monthly'));
+
+commit;
+```
+
+- **Aditiva y compatible con el motor actual de `main`:** no envía `base_close_date` (queda `null`) y solo usa los 3 horizontes, que siguen siendo válidos. Puede aplicarse antes o después de la corrida del lunes.
+- **No toca** RLS, la clave primaria, otras tablas ni `asset_historical_prices`.
+- **Validación inmediata:** el `add constraint` revisa las filas existentes. Todas tienen `daily`, `weekly` o `monthly`, así que no puede fallar por datos.
+- **Orden obligatorio:** la migración va **antes** de la corrida de la rama. Si no, el upsert del motor nuevo fallaría con "columna inexistente" para todos los símbolos (atrapado y registrado en el log, sin datos nuevos).
+- **Caché de PostgREST:** Supabase recarga el esquema solo tras un DDL. Si `/api/escenarios` respondiera con columna desconocida, ejecutar `notify pgrst, 'reload schema';`.
+- **`schema.sql`** se actualiza en el mismo commit 2: la columna y el CHECK en la definición de la tabla, más el bloque de migración comentado.
 
 ---
 
@@ -203,30 +297,33 @@ Son columnas nulas y aditivas, sin tocar RLS ni la clave primaria. La ventaja es
 
 | Archivo | Cambio |
 |---|---|
-| `montecarlo_engine.py` | `computed_at` (#127); simular 2 × steps; `model_notes.fan` y `as_of_date`; lectura `desc` del historial |
-| `test_montecarlo_synthetic.py` | Prueba de que las columnas principales no cambian bit a bit; prueba de que la p50 queda < 0 con deriva negativa; prueba de que el ancho crece con σ |
+| `montecarlo_engine.py` | `computed_at` (#127); horizonte `two_day`; `base_close_date`; lectura `desc` del historial; docstring |
+| `test_montecarlo_synthetic.py` | Caso `two_day` (determinismo con la misma semilla; ancho ≈ √2 × el diario); caso con deriva negativa que da p50 < 0; ancho mayor con σ mayor |
+| `functions/api/montecarlo.js` | Lista blanca + `two_day` (una línea) |
 | `functions/api/escenarios.js` | **Nuevo**, endpoint público |
-| `index.html` | Tarjetas #8/#9 (HTML l. 96, quitar `f1-oculto` en 2 burbujas); `renderActiveAssetCards` (l. 331); `renderPortfolioChart` (l. 338); leyenda (l. 340); `nextSessions` y `NYSE_HOLIDAYS`; aviso de "Recalcular" (l. 689) |
-| `schema.sql` | Solo comentario de documentación sobre las llaves nuevas de `model_notes` (o el `ALTER` de la opción B, si se aprueba) |
-| `docs/lanzamiento/fase-2-plan.md` | Este documento; al final, la sección de resultados |
+| `index.html` | Tarjetas #8/#9 (l. 96, `renderActiveAssetCards` l. 331); abanico (`renderPortfolioChart` l. 338, leyenda l. 340); tabla #47 (l. 306 y subtítulo l. 109); `nextSessions` y `NYSE_HOLIDAYS`; tasa histórica y "Datos al cierre del …" |
+| `schema.sql` | Columna `base_close_date` y CHECK con `two_day` (documentación de la migración aprobada) |
+| `docs/lanzamiento/fase-2-plan.md` | Este documento y, al final, los resultados |
 
-No se tocan `functions/api/montecarlo.js`, `actualizar_automatico.py`, el workflow, `asset_historical_prices` ni las políticas RLS.
+No se tocan `actualizar_automatico.py`, el workflow, `asset_historical_prices`, RLS, el botón "Recalcular" (0.4) ni las columnas #3/#4 (0.3), salvo que lo pidas.
 
 ---
 
-## 5. Orden de commits
+## 5. Orden de trabajo y commits
 
-Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por ruta.
+Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por ruta. Nada directo a `main`.
 
+0. **(Tú, tras aprobar)** Consulta del nombre del CHECK y migración de la sección 3 en Supabase.
 1. `fix(montecarlo): #127 computed_at en el upsert de persist_result`
-2. `feat(montecarlo): punto de 2×steps y as_of_date en model_notes (+ pruebas sintéticas)`. Incluye la lectura `desc` del historial.
-3. `feat(api): /api/escenarios público de solo lectura con Cache-Control`
-4. `feat(ui): tarjetas #8/#9 con Monte Carlo v2 (mediana, rango 50 %, prob. de cerrar arriba)`
-5. `feat(ui): abanico Monte Carlo v2 en la gráfica y estado "no disponible"`
-6. *(Solo si apruebas D3)* `feat(ui): tabla #47 de escenarios con cuantiles Monte Carlo`
-7. `docs(lanzamiento): resultados de la Fase 2`
+2. `feat(montecarlo): horizonte two_day (2 sesiones) y base_close_date; lectura desc del historial; pruebas; schema.sql; lista admin`
+3. **(Tras tu confirmación de D2)** `workflow_dispatch` en la rama con `only_montecarlo = true` (sección 6.2).
+4. `feat(api): /api/escenarios público de solo lectura con Cache-Control`
+5. `feat(ui): tarjetas #8/#9 con Monte Carlo v2, tasa histórica y fecha de datos`
+6. `feat(ui): abanico Monte Carlo v2 en la gráfica y estado "No disponible"`
+7. `feat(ui): tabla #47 con cuantiles Monte Carlo`
+8. `docs(lanzamiento): resultados de la Fase 2`
 
-**Orden de despliegue:** los commits 1 y 2 se validan y el motor se vuelve a correr **antes** de publicar 4 y 5. Mientras `fan` no exista, la interfaz debe mostrar la tarjeta y el punto 2 como "no disponible", y eso también se prueba.
+**Probar el Preview la misma noche de la corrida 3** (antes de las 22:00 UTC siguientes). Después, la cascada de `main` vuelve a desalinear `base_close_date` (2.3) y el Preview mostrará "No disponible" hasta el merge. Eso es correcto, pero impide validar las cifras. Si hace falta, se repite la corrida 3.
 
 ---
 
@@ -234,50 +331,118 @@ Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por
 
 > **Recordatorio:** el Preview de Cloudflare Pages y `workflow_dispatch` en la rama **escriben en la base de producción**.
 
-1. **Local, sin red:**
-   - `py test_montecarlo_synthetic.py`: las pruebas nuevas confirman que las columnas no cambian, que la mediana puede ser negativa y que el abanico se ensancha con la volatilidad.
-   - `node --check functions/api/escenarios.js`.
-2. **Motor en la rama, con tu aprobación previa:**
-   - `workflow_dispatch` sobre `lanzamiento-f2-montecarlo` con `only_montecarlo = true`.
-   - Ese camino sale antes de descargar precios (`actualizar_automatico.py:37-41`): **solo escribe `asset_montecarlo_simulation`** (90 upserts) y no toca `asset_historical_prices`, señales, Win Rate ni push.
-   - Efecto en producción: `computed_at` se actualiza, aparecen `model_notes.fan` y `as_of_date`, y las columnas principales quedan iguales (mismo cierre, misma semilla).
-   - Verificación por SQL (tú la corres en Supabase):
+### 6.1 Local, sin red
 
-     ```sql
-     select symbol, horizon, computed_at, model_notes->>'as_of_date' as as_of,
-            quantiles->>'p50' as p50, probability_up,
-            (quantiles->>'p95')::numeric - (quantiles->>'p5')::numeric as ancho_90
-     from public.asset_montecarlo_simulation
-     where horizon = 'daily'
-     order by ancho_90 desc;
-     ```
+- `py test_montecarlo_synthetic.py`: pruebas nuevas (determinismo de `two_day`, mediana negativa con deriva negativa, ancho creciente con σ) y las existentes sin cambios.
+- `node --check functions/api/escenarios.js` y `node --check functions/api/montecarlo.js`.
 
-3. **Preview del sitio** (la URL de la rama en Cloudflare Pages):
-   - `/api/escenarios?symbol=AAPL` → 200, solo los campos públicos, con `Cache-Control` correcto.
-   - `?symbol=BTC-USD` → 404 genérico; `?symbol=<script>` → 400; ningún error menciona tablas ni variables.
-   - En la terminal: AAPL, KO, TSLA, NG=F, GC=F (tarjetas y abanico); BTC, S&P 500, Bovespa y Nikkei ("no disponible"); cambio rápido de activo (sin datos cruzados); horizontes Día/Semana/Mes; escritorio y celular; consola sin errores.
-   - **En el Preview no:** registrarte con correos reales, enviar sugerencias, activar push ni fijar metas. Todo eso escribe en `privacy_consents`, `user_suggestions`, `push_subscriptions` y `page_views` de producción. Entrar como invitado basta.
+### 6.2 D2: confirmar la corrida del lunes 5-oct desde `main` y luego correr solo Monte Carlo
+
+**A. Lunes 5-oct, corrida programada de `main` (22:00 UTC, motor viejo).** En el log del paso "Ejecutar script de actualización" deben aparecer:
+
+- `Descarga de precios con ventana 5d.`
+- Por activo: `SYM: N filas nuevas…; último día 2026-10-05 …`, sin `APIError 23502` (#128).
+- `Precios: N filas nuevas en total; …`
+- `Señales binarias (asset_signals) actualizadas en Supabase.`
+- `Web Push: ttl=… s; …` y, si cambió alguna fase, `Push aceptado para …`.
+- 90 líneas `Monte Carlo (SYM, daily|weekly|monthly): P(sube)=…`, sin `Error en Monte Carlo`.
+- Termina sin traceback y el job sale en verde.
+
+Verificación SQL (tú):
+
+```sql
+select max(date) from public.asset_historical_prices;               -- 2026-10-05
+select horizon, count(*), min(computed_at), max(computed_at), min(seed)
+from public.asset_montecarlo_simulation group by horizon;           -- 30 por horizonte
+```
+
+**B. Corrida de la rama** (Actions → "Actualizacion Diaria de Activos" → Run workflow → rama `lanzamiento-f2-montecarlo` → marcar `only_montecarlo`). Cómo confirmar en el log que **solo corrió Monte Carlo**:
+
+1. En el encabezado expandido del paso "Ejecutar script de actualización", la sección `env:` muestra `ONLY_MONTECARLO: 1`.
+2. **No** aparece ninguna de estas líneas, que solo imprime el camino completo:
+   - `Descarga de precios con ventana`
+   - `filas nuevas`
+   - `Precio omitido`
+   - `Consistencia`
+   - `Backfill histórico de señales`
+   - `Señales binarias`
+   - `Win Rate`
+   - `Web Push:`
+   - `Push aceptado`
+   - `Suscripción expirada`
+   - `PAGES_BASE_URL no configurado`
+
+   El script sale con `sys.exit(0)` en `actualizar_automatico.py:37-40`, **antes** de definir o llamar cualquiera de esas funciones.
+3. **Solo** aparecen líneas `Monte Carlo (…)`: **120** (30 × 4 horizontes) y ninguna `Error en Monte Carlo`. También pueden aparecer `Monte Carlo: historial insuficiente…` si algún activo tiene ≤ 90 cierres.
+4. La duración del paso es claramente menor que la de la corrida completa.
+5. Verificación SQL posterior (tú):
+
+```sql
+-- No debe cambiar respecto de la consulta del lunes:
+select max(date), max(created_at) from public.asset_historical_prices;
+select max(updated_at) from public.push_subscriptions;
+-- Debe reflejar la corrida de la rama:
+select horizon, count(*), max(computed_at), min(base_close_date), max(base_close_date)
+from public.asset_montecarlo_simulation group by horizon order by horizon;   -- 4 horizontes x 30
+```
+
+### 6.3 Preview del sitio
+
+- **Endpoint:**
+  - `/api/escenarios?symbol=AAPL` → 200, 4 horizontes, solo los campos públicos, `Cache-Control` correcto;
+  - `?symbol=BTC-USD` → 404 genérico;
+  - `?symbol=<script>` → 400;
+  - ningún error menciona tablas ni variables;
+  - `/api/montecarlo` sin secreto → sigue respondiendo 401.
+- **Terminal:**
+  - AAPL, KO, PG, TSLA, NG=F y GC=F: tarjetas, abanico Día/Semana/Mes y tabla #47;
+  - BTC, S&P 500, Bovespa y Nikkei: "No disponible";
+  - cambio rápido de activo, sin datos cruzados;
+  - escritorio y celular;
+  - consola sin errores.
+- **En el Preview no:** registrarse con correos reales, enviar sugerencias, activar push ni fijar metas (escriben en `privacy_consents`, `user_suggestions`, `push_subscriptions` y `page_views` de producción). Basta con entrar como invitado.
 
 ---
 
 ## 7. Criterio de salida
 
-La Fase 2 se cierra cuando se cumple todo esto:
+1. **El abanico puede bajar.** Al menos un activo de producción tiene `p50 < 0` en `daily` o `two_day`, y la gráfica dibuja su centro por debajo de "Hoy". La prueba sintética con deriva negativa lo confirma de forma determinista.
+2. **Se ensancha en activos volátiles.** El ancho `p90 − p10` de `daily` de TSLA y NG=F es claramente mayor que el de KO y PG, en una proporción parecida a la de sus volatilidades, y crece de 1 a 2, 5 y 21 sesiones:
 
-1. **El abanico puede bajar.** En producción, al menos un activo tiene `p50 < 0` en el horizonte diario y la gráfica lo dibuja por debajo de "Hoy". La prueba sintética con deriva negativa lo confirma de forma determinista.
-2. **Se ensancha en activos volátiles.** El ancho `p95 − p5` diario de TSLA y NG=F es claramente mayor que el de KO y PG, en una proporción parecida a la de sus volatilidades. Se ve en la consulta SQL y en la gráfica.
-3. **Tarjetas #8/#9:** muestran la mediana, el rango del 50 % y la probabilidad de Monte Carlo. No queda ningún valor de `PREDICTION_HORIZON.prob1/prob2` ni `σ × step` en la pantalla.
-4. **"No disponible"** se muestra correctamente para BTC, ^GSPC, EWZ y EWJ, y cuando `asOf` no coincide con el último cierre.
+```sql
+select symbol, horizon,
+       (quantiles->>'p90')::numeric - (quantiles->>'p10')::numeric as ancho_80,
+       (quantiles->>'p50')::numeric as p50, probability_up, base_close_date
+from public.asset_montecarlo_simulation
+where symbol in ('TSLA', 'NG=F', 'KO', 'PG')
+order by symbol, horizon;
+```
+
+3. **Tarjetas #8/#9 y tabla #47:** solo muestran cifras de Monte Carlo con los textos de D5. No queda en pantalla nada de `PREDICTION_HORIZON.prob1/prob2` ni `σ × step`.
+4. **"No disponible":** funciona para los activos sin simulación y cuando `base_close_date` ≠ el último cierre mostrado.
 5. **#127:** `computed_at` refleja la última corrida.
-6. **`/api/escenarios`:** público, de solo lectura, con `Cache-Control`, sin `select=*` y sin nombres internos en los errores. `/api/montecarlo` sigue respondiendo 401 sin secreto.
+6. **`/api/escenarios`:** público, de solo lectura, con `Cache-Control`, sin `select=*` y sin nombres internos en los errores.
 7. Consola limpia en escritorio y celular.
 
 ---
 
-## 8. Decisiones que necesito de ti
+## 8. Decisiones pendientes
 
-- **D1.** ¿Opción A (sin cambio de esquema, todo en `model_notes`) u opción B (`ALTER TABLE`, PENDIENTE DE APROBACIÓN)? Recomiendo A.
-- **D2.** ¿Autorizas el `workflow_dispatch` con `only_montecarlo = true` sobre la rama? Escribe en `asset_montecarlo_simulation` de producción.
-- **D3.** ¿La tabla "Rango estimado para mañana" (#47, `renderProbabilityTable`) también pasa a Monte Carlo en esta fase? Hoy usa la misma fórmula falsa y está visible. Recomiendo que sí (commit 6).
-- **D4.** Las columnas de la tabla de activos (#3 "Proyección óptima" y #4) decían "vuelve en Fase 2 con Monte Carlo". Para traerlas haría falta un endpoint por lotes (30 símbolos). Propongo **diferirlas a la Fase 3** y mantener esta fase centrada en la gráfica y las tarjetas.
-- **D5.** ¿Apruebas los textos nuevos: "Próxima sesión", "Rango probable (50 %)", "Probabilidad de cerrar arriba de hoy", "Subió el X % de las últimas 252 sesiones" y el aviso nuevo de "Recalcular"?
+- **D1-SQL.** Aprobar la migración de la sección 3 (columna + CHECK con `two_day`) y ejecutarla tú.
+- **D2.** Confirmar la corrida del lunes 5-oct (6.2.A) antes de la corrida de la rama.
+- **D4.** ¿Dejar #3/#4 como están (ya ocultas) o cambiar a la clase literal `f1-oculto`? Recomiendo dejarlas.
+- **D5-bis.** Textos que faltaban:
+  - título de la tarjeta #9, "Dentro de 2 sesiones (mar 6-oct)";
+  - subtítulo de la tabla #47, "Escenarios simulados a partir del historial del activo.";
+  - si se corrige ya, el aviso de "Recalcular": "Evento registrado. El rango estimado se recalcula cada noche con el último cierre." (recomiendo diferirlo a la Fase 3).
+- **D6.** Puntos del abanico por selector: Día 1-2; Semana 1-2-5; Mes 1-2-5-21 (2.6).
+
+---
+
+## 9. Pendientes para fases posteriores
+
+- **Fase 5 — tabla de feriados NYSE:** `NYSE_HOLIDAYS` en `index.html` cubre 2026-2027 y **caduca el 31-dic-2027**. Renovarla o moverla a un dato del servidor.
+- **Fase 3 — `functions/api/patterns.js:19`:** lee `asset_signals` en orden `asc` y **sin `limit`**. Si un símbolo supera el `max_rows` de Supabase (1 000), recibiría solo las señales más antiguas (mismo tipo de error que #131). Corregir con `order=date.desc` + `limit` e invertir el orden.
+- **Fase 3 — botón "Recalcular"** (0.4): valores fijos (`+0.65`, "Fuertemente alcista") y el aviso "Abanico Markov recalculado.". Revisar cuando vuelva "Estado de mercado".
+- **Fase 3 — columnas #3/#4:** si vuelven, con un endpoint por lotes de Monte Carlo.
+- **Fase 3 — cripto:** un paso es un día natural (1.b).
