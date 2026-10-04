@@ -249,7 +249,7 @@ Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no exi
 
 - **Eje horizontal proporcional a las sesiones (aprobado en D6):** nunca equidistante. La distancia entre "Hoy" y el punto de 21 sesiones es 21 veces la de "Hoy" a 1 sesión. Se usa un eje `linear` de Chart.js con datos `{x, y}`: el historial va en `x = −(n−1) … 0` (una unidad por sesión) y el futuro en `x = 1, 2, 5, 21`. Las marcas del eje muestran la fecha (`lun 5-oct` …, con `nextSessions`) en los puntos futuros y la fecha del historial en los pasados.
 - **Escenario central** = p50.
-- **"Escenario bajo/alto"** = p10/p90, los mismos percentiles que la tabla #47, para que la leyenda sea coherente.
+- **Sin líneas p10/p90 en la gráfica** (ronda 7): quedan las bandas p5-p95 y p25-p75 y la mediana. p10/p90 siguen en la tabla #47. El punto del último cierre se llama **"Último cierre"** (no "Hoy") y el pulso lo localiza por `dataset.role = 'last-close'`, no por el texto visible.
 - **Banda interna** p25-p75, sombreada con `fill` entre datasets (Chart.js ya está cargado).
 - **Banda externa p5-p95** (ronda 5), con relleno tenue: es el abanico completo. Las líneas p10/p90 quedan dentro de ella.
 - **El centro puede quedar debajo de "Hoy"** y las bandas son asimétricas.
@@ -504,6 +504,8 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
 
 ## 9. Pendientes para fases posteriores
 
+- **Fase 4 — dibujar el historial primero y agregar el abanico al llegar** (ronda 7): hoy `renderPortfolioChart` espera a `/api/escenarios` antes de dibujar, hasta el límite de 8 s (`ESCENARIOS_TIMEOUT_MS`), para hacerlo una sola vez. Con la caché de sesión casi siempre es instantáneo, pero sin caché y con red lenta la gráfica tarda en aparecer. Cambiarlo a: historial inmediato y abanico agregado cuando llega la respuesta (`chart.update()` sin reanimar).
+- **Fase 8 — formato de moneda por idioma** (ronda 7): hoy todo se formatea con `es-MX` y `USD`, lo que se ve como "USD 99.80". Es correcto en México, donde "$" es el peso, y se mantiene. Cuando la terminal tenga en/zh, el formato debe seguir el idioma elegido (p. ej. `en-US` → "$99.80").
 - **Fase 5 — caché en el borde o límite de frecuencia para `/api/escenarios`** (ronda 5): hoy, cada solicitud que no esté en la caché del navegador consulta Supabase con `service_role`. El `Cache-Control: public` permite que el CDN guarde la respuesta, pero en Pages Functions no está garantizado sin la Cache API. Opciones:
   - Cache API de Cloudflare (`caches.default`), con clave por símbolo y TTL hasta la próxima corrida;
   - o un límite de frecuencia por IP.
