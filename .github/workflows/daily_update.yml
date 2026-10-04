@@ -10,6 +10,11 @@ on:
         required: false
         type: boolean
         default: false
+      backfill_1mo:
+        description: 'Backfill de precios: descargar 1 mes y SOLO insertar las fechas que falten en asset_historical_prices (nunca reescribe filas existentes, salvo el upsert del día más reciente).'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   run-update:
@@ -35,5 +40,6 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           ONLY_MONTECARLO: ${{ (github.event.inputs.only_montecarlo == 'true') && '1' || '' }}
+          PRICE_PERIOD: ${{ (github.event.inputs.backfill_1mo == 'true') && '1mo' || '5d' }}
         run: |
           python actualizar_automatico.py
