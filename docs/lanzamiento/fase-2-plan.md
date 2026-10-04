@@ -574,6 +574,12 @@ Los commits de documentación (plan, migración y pendientes) van aparte: `db1eb
 | `homepage/index.html:292` | `alt="Escenario de referencia para mañana"` (imagen `assets/prob tomorrow.png`) |
 | `homepage/locales/es.json:43` | "Los 3 activos con mayor rango de movimiento estimado para mañana." |
 | `homepage/locales/en.json:43` (equivalente en inglés) | "The 3 assets with the widest estimated move for tomorrow." |
+| `homepage/locales/zh.json:43` (equivalente en chino, verificado) | "明日预计波动幅度最大的三项资产。" ("明日" = "mañana") |
+
+**Decisión (ronda 9): no se cambian en la Fase 2.**
+
+- **Fase 3, junto con la decisión de Top Picks:** cambiar "para mañana" por "para la próxima sesión" en `index.html:676` (tour), `homepage/index.html:258`, `homepage/locales/es.json:43`, `homepage/locales/en.json:43` (p. ej. "for the next session") y `homepage/locales/zh.json:43` (p. ej. "下一交易日").
+- **Fase 8, con las capturas #92/#93 de la Fase 1 (sección J):** regenerar `homepage/assets/prob tomorrow.png` y su `alt` (`homepage/index.html:292`, hoy "Escenario de referencia para mañana") a partir de la terminal ya con Monte Carlo v2. La captura actual muestra la tarjeta vieja con "Probabilidad 23.3%" (#93).
 
 ### 10.5 CI y despliegue al hacer push
 
