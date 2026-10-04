@@ -13,7 +13,7 @@ export async function onRequestGet(context) {
   if (authError) return authError;
   const url = new URL(context.request.url);
   const symbol = (url.searchParams.get('symbol') || '').slice(0, 32).toUpperCase();
-  const horizon = ['daily', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';
+  const horizon = ['daily', 'two_day', 'weekly', 'monthly'].includes(url.searchParams.get('horizon')) ? url.searchParams.get('horizon') : 'daily';
   if (!symbol || !context.env.SUPABASE_URL || !context.env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Servicio no disponible.' }, 503);
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
 

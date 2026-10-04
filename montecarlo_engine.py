@@ -53,7 +53,10 @@ NU_MIN = 2.5
 # misma validacion para confirmar que la separacion ya es clara a la profundidad real.
 # Para reactivar la calibracion: cambiar a "calibrated" (requiere volver a validar primero).
 LAMBDA_POOL_MODE = "fixed_low_power_n760"
-STEPS_BY_HORIZON = {"daily": 1, "weekly": 5, "monthly": 21}
+# Pasos = sesiones (filas de asset_historical_prices). "two_day" (Fase 2 de lanzamiento) es
+# "dentro de 2 sesiones": horizonte propio con su semilla, no derivable de la fila daily
+# (el sigma GARCH del paso 2 depende del shock del paso 1).
+STEPS_BY_HORIZON = {"daily": 1, "two_day": 2, "weekly": 5, "monthly": 21}
 MIN_RETURNS = 90  # piso de seguridad: ventana + MLE + ESS estables necesitan margen.
 
 
@@ -617,6 +620,9 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
         "sample_skewness_robust": bowley_skewness(returns),
         "news_uncertainty_variance": 0.0,
         "pool_size": int(len(source_days)),
+        # Fecha del cierre sobre el que se simulo: la interfaz la compara con el ultimo cierre
+        # que muestra y, si difieren, presenta "No disponible" en vez de cifras mezcladas.
+        "base_close_date": str(dates[-1]),
         "b1_crosscheck": b1_row,
         "b2_crosscheck": b2_row,
         "model_notes": model_notes,
@@ -631,15 +637,20 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
 # ---------------------------------------------------------------------------
 
 def fetch_price_history(supabase, symbol, limit=5000):
+    # Orden DESC + inversion local: si el symbol supera el max_rows de PostgREST (1000 por
+    # defecto en Supabase), un orden ASC devolveria solo las filas MAS ANTIGUAS y se simularia
+    # sobre un cierre viejo sin ningun error (mismo tipo de fallo que #131). Asi, en el peor
+    # caso se truncan las mas antiguas y el ultimo cierre siempre es el real.
     rows = (
         supabase.table("asset_historical_prices")
         .select("date,close,volume")
         .eq("symbol", symbol)
-        .order("date", desc=False)
+        .order("date", desc=True)
         .limit(limit)
         .execute()
         .data
     ) or []
+    rows.reverse()
     closes = [float(r["close"]) for r in rows]
     volumes = [float(r["volume"] or 0) for r in rows]
     dates = [r["date"] for r in rows]
@@ -678,8 +689,8 @@ def persist_result(supabase, result):
         "degrees_of_freedom", "effective_sample_size", "n_min_threshold", "pool_size",
         "probability_up", "quantiles", "var_95", "cvar_95", "var_99", "cvar_99",
         "semi_deviation", "sample_skewness_classical", "sample_skewness_robust",
-        "realized_skewness_simulated", "news_uncertainty_variance", "b1_crosscheck",
-        "b2_crosscheck", "model_notes",
+        "realized_skewness_simulated", "news_uncertainty_variance", "base_close_date",
+        "b1_crosscheck", "b2_crosscheck", "model_notes",
     )}
     # #127: el upsert (ON CONFLICT DO UPDATE) solo actualiza las columnas enviadas; el default
     # de computed_at solo aplica en el primer INSERT, asi que se envia explicito en cada corrida.
@@ -689,8 +700,8 @@ def persist_result(supabase, result):
 
 def run_for_all_assets(supabase, assets, n_paths=10000):
     """Unica funcion de este modulo con efectos secundarios (red). Recorre el catalogo
-    completo x 3 horizontes. Aislamiento de fallos: un error en un simbolo u horizonte se
-    registra y se sigue con el resto -- nunca tumba la cascada completa."""
+    completo x 4 horizontes (STEPS_BY_HORIZON). Aislamiento de fallos: un error en un simbolo
+    u horizonte se registra y se sigue con el resto -- nunca tumba la cascada completa."""
     for symbol, _asset_type in assets:
         try:
             closes, volumes, dates = fetch_price_history(supabase, symbol)

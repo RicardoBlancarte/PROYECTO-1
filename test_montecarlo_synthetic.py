@@ -16,6 +16,9 @@ en produccion para INTC/META que llevo a reemplazar la recursion EWMA por GARCH(
   4. run_montecarlo_for_symbol() en modo PRODUCCION: lambda_pool=1.0 exacto, campos GARCH
      presentes, determinismo, cuantiles/VaR/CVaR coherentes (ahora en retorno SIMPLE, no log),
      ESS.
+  5. Fase 2 de lanzamiento: horizonte two_day (determinista, ancho ~sqrt(2) x daily),
+     base_close_date, y el criterio de salida del abanico (puede bajar con deriva negativa; se
+     ensancha con mayor volatilidad).
 
 Corre: py test_montecarlo_synthetic.py
 """
@@ -219,6 +222,58 @@ def run():
     print(f"\nResumen: P(sube)={result['probability_up']:.4f}  VaR95(simple)={result['var_95']:.4%}  "
           f"CVaR95(simple)={result['cvar_95']:.4%}  ESS={result['effective_sample_size']:.2f}  "
           f"N_min={result['n_min_threshold']:.4f}")
+
+    # --- 5. Fase 2 de lanzamiento: horizonte two_day, base_close_date y forma del abanico ---
+    print("\n--- 5. Fase 2: two_day, base_close_date y criterio de salida del abanico ---")
+    two_day = mc.run_montecarlo_for_symbol("SINTETICO_A", "two_day", closes_a, volumes_a, dates_a, n_paths=10000)
+    two_day_repeat = mc.run_montecarlo_for_symbol("SINTETICO_A", "two_day", closes_a, volumes_a, dates_a, n_paths=10000)
+    results.append(check(
+        "5a. two_day determinista y con semilla propia (distinta de daily)",
+        two_day["quantiles"] == two_day_repeat["quantiles"] and two_day["seed"] != result["seed"],
+        f"seed two_day={two_day['seed']}  seed daily={result['seed']}",
+    ))
+    width = lambda r: r["quantiles"]["p90"] - r["quantiles"]["p10"]  # noqa: E731
+    ratio_two_day = width(two_day) / width(result)
+    results.append(check(
+        "5b. Ancho p90-p10 de two_day ~ sqrt(2) veces el de daily (entre 1.2 y 1.7)",
+        1.2 < ratio_two_day < 1.7,
+        f"ratio={ratio_two_day:.3f}",
+    ))
+    weekly = mc.run_montecarlo_for_symbol("SINTETICO_A", "weekly", closes_a, volumes_a, dates_a, n_paths=10000)
+    width_90 = lambda r: r["quantiles"]["p95"] - r["quantiles"]["p5"]  # noqa: E731
+    results.append(check(
+        "5b2. Ancho p95-p5 creciente con el horizonte: daily < two_day < weekly (mismo activo)",
+        width_90(result) < width_90(two_day) < width_90(weekly),
+        f"daily={width_90(result):.5f}  two_day={width_90(two_day):.5f}  weekly={width_90(weekly):.5f}",
+    ))
+    results.append(check(
+        "5c. base_close_date = fecha del ultimo cierre usado",
+        result["base_close_date"] == dates_a[-1] and two_day["base_close_date"] == dates_a[-1],
+        f"base_close_date={result['base_close_date']}  ultimo={dates_a[-1]}",
+    ))
+
+    # Criterio de salida 1: el abanico PUEDE BAJAR. Mismos shocks con deriva negativa conocida
+    # (-0.4 % por sesion, ~0.27 sigma): la FHS conserva la media de los shocks estandarizados.
+    drift = -0.004
+    returns_neg = returns_a + drift
+    closes_neg = np.concatenate([[100.0], 100.0 * np.exp(np.cumsum(returns_neg))])
+    down = mc.run_montecarlo_for_symbol("SINTETICO_NEG", "daily", closes_neg, volumes_a, dates_a, n_paths=10000)
+    results.append(check(
+        "5d. Con deriva negativa, la mediana (p50) diaria queda por debajo del ultimo cierre",
+        down["quantiles"]["p50"] < 0 and down["probability_up"] < 0.5,
+        f"p50={down['quantiles']['p50']:.5f}  P(sube)={down['probability_up']:.4f}",
+    ))
+
+    # Criterio de salida 2: el abanico SE ENSANCHA en activos volatiles (sigma 3x, misma semilla).
+    _, closes_vol, volumes_vol, dates_vol = build_constant_vol_synthetic(
+        760, sigma0 * 3, 6.0, 6.0, (1.15, 1.15), (1.15, 1.15), seed=42)
+    volatile = mc.run_montecarlo_for_symbol("SINTETICO_VOL", "daily", closes_vol, volumes_vol, dates_vol, n_paths=10000)
+    ratio_vol = width(volatile) / width(result)
+    results.append(check(
+        "5e. Con sigma 3x, el ancho p90-p10 diario es claramente mayor (ratio > 2)",
+        ratio_vol > 2.0,
+        f"ratio={ratio_vol:.3f}",
+    ))
 
     total, passed = len(results), sum(results)
     print(f"\n{passed}/{total} chequeos pasaron.")
