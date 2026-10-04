@@ -518,3 +518,64 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
   - Cuando tengan historial, un paso de Monte Carlo será un día natural (1.b).
   - `nextSessions` (`index.html`) necesitará un **calendario por tipo de activo**. Hoy salta fines de semana y feriados NYSE para todos, así que para cripto mostraría fechas de sesión equivocadas: "Próxima sesión (lun …)" un sábado, cuando en realidad la próxima es el domingo.
 - **Fase 3 — `functions/api/market/[symbol].js` (ronda 6):** `readDailyRows` lee `asset_historical_prices` con `order=date.asc&limit=1826`. Si el `max_rows` de Supabase (1 000 por defecto) recorta la respuesta, la gráfica recibiría los cierres **más antiguos**: mismo tipo de error que #131 y que `patterns.js`. Hoy no ocurre (~504-760 filas). Si ocurriera, el último cierre mostrado no coincidiría con `baseCloseDate` y las tarjetas y el abanico mostrarían "No disponible", que es el comportamiento seguro, pero la gráfica de historial quedaría vieja. Corregir con `order=date.desc` + `limit` e invertir el orden.
+
+---
+
+## 10. Resultados de la implementación (2026-10-04)
+
+Rama `lanzamiento-f2-montecarlo`, sin push. Cada commit de producción se mostró al usuario y se aprobó antes de agregarlo al índice. No se ejecutó SQL ni se corrió el workflow.
+
+### 10.1 Commits de producción
+
+| # | Commit | Contenido |
+|---|---|---|
+| 1 | `31bdd49` | #127: `computed_at` explícito en el upsert de `persist_result`. |
+| 2 | `19eb14c` | Horizonte `two_day` (2 sesiones, semilla propia), `base_close_date`, lectura `desc` del historial, `schema.sql` (CHECK + columna, definición y bloque idempotente), `two_day` en la lista de `/api/montecarlo` (admin), sección 5 de las pruebas sintéticas. |
+| 3 | `7cc1845` | `/api/escenarios`: público, solo lectura, `select` explícito, p5…p95, `baseCloseDate` por horizonte, errores genéricos, `Cache-Control`. |
+| 4 | `62e2c64` | Tarjetas #8/#9: "Precio central de los escenarios", rango p25–p75, "Escenarios que cierran arriba del último cierre", fechas de sesión desde `baseCloseDate` (NYSE 2026-2027, en UTC), tasa histórica con la N real, "Datos al cierre del …". Sin pulso. |
+| 5 | `bf945d2` | Abanico: eje lineal proporcional en sesiones (1, 2, 5, 21), bandas p5–p95 y p25–p75 y la mediana en tramos rectos (sin p10/p90). Punto "Último cierre" con `role='last-close'`; el pulso solo ahí. Tooltip de la mediana con p25–p75 y p5–p95. Tiempo límite de 8 s. |
+| 6 | `8e70636` | Tabla #47: p50/p10/p90 de la fila `daily`, columna "Qué representa", título "Rango estimado para la próxima sesión", sin `innerHTML`. Se retira la fila "mediana" duplicada y su regla CSS #98. |
+
+Los commits de documentación (plan, migración y pendientes) van aparte: `db1ebb4`, `3294482`, `d3c3861`, `2661f71`, `170bdd7`, `cb13b54`, `7899e65`, `a4a96d4` y este.
+
+### 10.2 Pruebas locales (sin red ni base)
+
+| Prueba | Resultado |
+|---|---|
+| `py test_montecarlo_synthetic.py` | **22/22**. Las filas `daily`/`weekly`/`monthly` del sintético no cambian byte a byte respecto de antes del commit 2. `two_day`: determinista, ancho ≈ √2 × `daily` (1.432); p95−p5 crece en el orden `daily` < `two_day` < `weekly`. Con deriva negativa, p50 < 0 (criterio 1); con σ×3, ancho ×3.08 (criterio 2). |
+| Arnés de `/api/escenarios` (`fetch` simulado, Node de VS Code) | **30/30**: campos públicos exactos, p5…p95, filas incompletas omitidas, 404, 7 entradas inválidas → 400, 502/503 genéricos sin nombres internos, `Cache-Control`. |
+| Arnés de tarjetas y tabla (DOM falso, America/Mexico_City y Asia/Shanghai) | **49/49 en ambas zonas, sin diferencias**: fechas y feriados, reloj fijo en "lunes 10:00" sin efecto, textos aprobados, "No disponible" por horizonte, 404, red caída, `fetch` colgado (se aborta), respuestas tardías, caché, tabla #47 y sintaxis del `<script>` completo (incluida la línea completa de `PREDICTION_HORIZON`). |
+| Edge headless, con Chart.js 4.4.4 real y el código extraído del `index.html` (4 escenarios) | Eje proporcional exacto (21.000, 5.000 y 2.000). El abanico **baja** (mediana final 96.5 < 100) y **se ensancha** (p5–p95: 0 → 12.4 → 17.6 → 27.8 → 56.9). Sin abanico con 404. Con el lienzo estable, **ningún dataset se mueve entre cuadros** (dos corridas). El anillo cae sobre el último cierre aun renombrando la etiqueta visible. |
+
+**Errores encontrados y corregidos durante la revisión:**
+- un comentario `//` a mitad de línea que anulaba `CHART_RANGE_POINTS`, lo que habría roto la gráfica (commit 5, corregido antes del commit);
+- una afirmación incorrecta sobre "$" contra "USD": `es-MX` muestra "USD 99.80" en cualquier navegador.
+
+### 10.3 Pendiente para cerrar la Fase 2
+
+1. **Lunes 5-oct (usuario):**
+   - verificar la corrida de `main` (6.2.A);
+   - ejecutar [fase-2-migracion.sql](fase-2-migracion.sql) con sus verificaciones (pasos 0 a 2);
+   - autorizar la corrida de la rama (6.2.B) y verificarla con las consultas de 6.2.B.5.
+2. **Preview** (6.3), el mismo día de la corrida de la rama:
+   - endpoint;
+   - tarjetas, abanico y tabla con datos reales;
+   - hover de tooltips;
+   - celular.
+3. **Criterio de salida (sección 7) con datos reales:** `p50 < 0` en algún activo, y ancho TSLA/NG=F > KO/PG.
+4. **Merge** solo después de la migración (regla de la sección 3).
+
+### 10.4 Menciones de "para mañana" fuera del alcance (sin cambiar; decisión pendiente)
+
+| Archivo:línea | Texto |
+|---|---|
+| `index.html:676` (tour, paso `#top-picks`) | "Aquí verás los 3 activos con mayor rango de movimiento estimado para mañana. Es información, no una recomendación." |
+| `homepage/index.html:258` | "Los 3 activos con mayor rango de movimiento estimado para mañana." (`data-i18n="attributes.5.desc"`) |
+| `homepage/index.html:292` | `alt="Escenario de referencia para mañana"` (imagen `assets/prob tomorrow.png`) |
+| `homepage/locales/es.json:43` | "Los 3 activos con mayor rango de movimiento estimado para mañana." |
+| `homepage/locales/en.json:43` (equivalente en inglés) | "The 3 assets with the widest estimated move for tomorrow." |
+
+### 10.5 CI y despliegue al hacer push
+
+- **GitHub Actions:** el único workflow es `.github/workflows/daily_update.yml`. Se dispara con `schedule` (`0 22 * * 1-5`) y `workflow_dispatch`, y **no** con `push` ni `pull_request`. El `schedule` solo corre en la rama por defecto (`main`), así que un push de esta rama no ejecuta ningún workflow.
+- **Cloudflare Pages:** con la integración de Git, un push de la rama genera un **despliegue Preview**, que usa la base de **producción**. El endpoint nuevo solo lee, pero las acciones de 6.3 marcadas como "en el Preview no" siguen aplicando. Antes de la migración, `/api/escenarios` responde 502 en el Preview (columna `base_close_date` inexistente) y la página muestra "No disponible": es el comportamiento esperado.
