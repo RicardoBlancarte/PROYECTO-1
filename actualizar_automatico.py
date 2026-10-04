@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import sys
@@ -101,37 +102,117 @@ def backfill_asset_signals():
 
 backfill_asset_signals()
 
-daily_data = []
+# Precios diarios. Cada corrida descarga una ventana (PRICE_PERIOD: "5d" por defecto, "1mo"
+# para el backfill manual desde workflow_dispatch). Por activo:
+#   - Control de consistencia: si algún día de la ventana (anterior al más reciente) ya existe
+#     en la base, se compara su close guardado con el descargado (el más reciente de esos días).
+#     Si difieren más de la tolerancia, no se escribe nada de ese activo y se registra. La
+#     tolerancia es CONSISTENCY_TOLERANCE_PCT para acciones e índices y FUTURES_TOLERANCE_PCT
+#     para futuros (=F): su serie continua cambia de contrato al vencimiento, así que entre ambas
+#     tolerancias se registra un "Aviso de cambio de contrato" y se continúa. El día más reciente
+#     no sirve de referencia porque se puede corregir con upsert.
+#   - La fecha más reciente de la ventana se guarda con upsert (se puede corregir cada noche).
+#   - Las fechas anteriores que falten se insertan sin reescribir las existentes.
+# Si un día llega sin cierre (Close NaN) se omite y se registra; la siguiente corrida lo vuelve
+# a intentar dentro de su ventana. Cada activo se procesa aislado: un error no detiene la cascada.
+PRICE_PERIOD = os.environ.get("PRICE_PERIOD") or "5d"
+if PRICE_PERIOD not in ("5d", "1mo"):
+    print(f"PRICE_PERIOD '{PRICE_PERIOD}' no permitido; se usa '5d'.")
+    PRICE_PERIOD = "5d"
+CONSISTENCY_TOLERANCE_PCT = 0.5   # acciones e índices
+FUTURES_TOLERANCE_PCT = 10.0      # futuros (=F): cambio de contrato al vencimiento
+print(f"Descarga de precios con ventana {PRICE_PERIOD}.")
+
+
+def to_float(value):
+    return float(value) if pd.notna(value) else None
+
+
+new_rows_by_symbol = {}
+inconsistent_symbols = []
 for symbol, asset_type in assets:
     try:
-        df = yf.download(symbol, period="5d", interval="1d", progress=False)
+        df = yf.download(symbol, period=PRICE_PERIOD, interval="1d", progress=False)
         if df.empty:
+            print(f"{symbol}: yfinance no devolvió datos; se omite.")
             continue
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.droplevel(1)
         df = df.reset_index()
-        last_row = df.iloc[-1]
-        date_str = str(last_row['Date']).split(' ')[0]
-        
-        daily_data.append({
-            "symbol": symbol,
-            "asset_type": asset_type,
-            "date": date_str,
-            "open": float(last_row['Open']) if pd.notna(last_row['Open']) else None,
-            "high": float(last_row['High']) if pd.notna(last_row['High']) else None,
-            "low": float(last_row['Low']) if pd.notna(last_row['Low']) else None,
-            "close": float(last_row['Close']) if pd.notna(last_row['Close']) else None,
-            "volume": int(last_row['Volume']) if pd.notna(last_row['Volume']) else 0
-        })
-    except Exception as e:
-        print(f"Error con {symbol}: {e}")
 
-if daily_data:
-    # Inserción directa en Supabase (upsert para evitar duplicados si corre dos veces)
-    response = supabase.table("asset_historical_prices").upsert(
-        daily_data, on_conflict="symbol,date"
-    ).execute()
-    print("Datos actualizados automáticamente en Supabase.")
+        candidates = []
+        for _, row in df.iterrows():
+            date_str = str(row['Date']).split(' ')[0]
+            if pd.isna(row['Close']):
+                print(f"Precio omitido: {symbol} {date_str} llegó sin cierre (Close NaN) desde yfinance.")
+                continue
+            candidates.append({
+                "symbol": symbol,
+                "asset_type": asset_type,
+                "date": date_str,
+                "open": to_float(row['Open']),
+                "high": to_float(row['High']),
+                "low": to_float(row['Low']),
+                "close": float(row['Close']),
+                "volume": int(row['Volume']) if pd.notna(row['Volume']) else 0
+            })
+        if not candidates:
+            new_rows_by_symbol[symbol] = 0
+            continue
+
+        oldest = min(row["date"] for row in candidates)
+        existing = (
+            supabase.table("asset_historical_prices")
+            .select("date,close")
+            .eq("symbol", symbol)
+            .gte("date", oldest)
+            .execute()
+            .data
+        ) or []
+        stored_close = {str(r["date"]): float(r["close"]) for r in existing}
+
+        latest = max(candidates, key=lambda r: r["date"])
+        # Control de consistencia contra el día ya guardado más reciente, anterior al último día.
+        overlap = sorted((row for row in candidates if row["date"] in stored_close and row["date"] != latest["date"]), key=lambda r: r["date"])
+        if not overlap:
+            print(f"Consistencia: {symbol} sin día guardado anterior en la ventana para comparar.")
+        else:
+            ref = overlap[-1]
+            saved = stored_close[ref["date"]]
+            diff_pct = abs(ref["close"] - saved) / saved * 100 if saved else float("inf")
+            is_future = symbol.endswith("=F")
+            tolerance = FUTURES_TOLERANCE_PCT if is_future else CONSISTENCY_TOLERANCE_PCT
+            if diff_pct > tolerance:
+                print(f"Inconsistencia: {symbol} {ref['date']} guardado {saved} vs descargado {ref['close']} ({diff_pct:.2f} %, tolerancia {tolerance} %); no se escribe nada de {symbol}.")
+                inconsistent_symbols.append(symbol)
+                continue
+            if is_future and diff_pct > CONSISTENCY_TOLERANCE_PCT:
+                print(f"Aviso de cambio de contrato: {symbol} {ref['date']} guardado {saved} vs descargado {ref['close']} ({diff_pct:.2f} %); se continúa (tolerancia de futuros {FUTURES_TOLERANCE_PCT} %).")
+            else:
+                print(f"Consistencia OK: {symbol} {ref['date']} {saved} vs {ref['close']} ({diff_pct:.2f} %).")
+
+        older_missing = [row for row in candidates if row["date"] != latest["date"] and row["date"] not in stored_close]
+        if older_missing:
+            supabase.table("asset_historical_prices").insert(older_missing).execute()
+        supabase.table("asset_historical_prices").upsert(latest, on_conflict="symbol,date").execute()
+
+        latest_is_new = latest["date"] not in stored_close
+        new_dates = [row["date"] for row in older_missing] + ([latest["date"]] if latest_is_new else [])
+        new_rows_by_symbol[symbol] = len(new_dates)
+        detail = f" ({', '.join(sorted(new_dates))})" if new_dates else ""
+        latest_note = "nuevo" if latest_is_new else "actualizado con upsert"
+        print(f"{symbol}: {len(new_dates)} filas nuevas{detail}; último día {latest['date']} {latest_note}.")
+    except Exception as e:
+        print(f"Error con precios de {symbol}: {e}")
+
+print(f"Precios: {sum(new_rows_by_symbol.values())} filas nuevas en total; "
+      f"{len(new_rows_by_symbol)} de {len(assets)} activos procesados sin error; "
+      f"{len(inconsistent_symbols)} omitidos por inconsistencia{(': ' + ', '.join(inconsistent_symbols)) if inconsistent_symbols else ''}.")
+
+# Si algún activo recibió más de un día (backfill o recuperación de huecos), se recalculan sus
+# señales ahora con la misma función idempotente de arriba, en vez de esperar a la siguiente corrida.
+if any(count > 1 for count in new_rows_by_symbol.values()):
+    backfill_asset_signals()
 
 # FASE 4 — paso 1 de la cascada: señal binaria (1 alza / 0 baja-o-igual) por activo, derivada
 # por lectura de asset_historical_prices (nunca al revés). El backfill histórico ya corrió
@@ -163,8 +244,11 @@ for symbol, asset_type in assets:
         print(f"Error de señal con {symbol}: {e}")
 
 if signal_rows:
-    supabase.table("asset_signals").upsert(signal_rows, on_conflict="symbol,date").execute()
-    print("Señales binarias (asset_signals) actualizadas en Supabase.")
+    try:
+        supabase.table("asset_signals").upsert(signal_rows, on_conflict="symbol,date").execute()
+        print("Señales binarias (asset_signals) actualizadas en Supabase.")
+    except Exception as e:
+        print(f"Error guardando señales binarias (asset_signals): {e}")
 
 # FASE 4 — paso 2 de la cascada: recálculo diario del Win Rate (punto 9.8) de ambos motores,
 # leyendo los endpoints ya desplegados en Cloudflare Pages (que hacen el backtest real) y
@@ -200,7 +284,18 @@ def send_push_alerts():
         print("VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY no configuradas; se omiten las notificaciones push.")
         return
 
-    subscriptions = supabase.table("push_subscriptions").select("*").execute().data or []
+    # TTL de 24 h: con el valor por defecto de pywebpush (0), el servicio de push descarta el
+    # mensaje si el dispositivo no está conectado en ese instante (Android en reposo).
+    push_options = {"ttl": 86400}
+    if "headers" in inspect.signature(webpush).parameters:
+        push_options["headers"] = {"Urgency": "high"}
+    print(f"Web Push: ttl={push_options['ttl']} s; Urgency: {'high' if 'headers' in push_options else 'no soportado por esta versión de pywebpush'}.")
+
+    try:
+        subscriptions = supabase.table("push_subscriptions").select("*").execute().data or []
+    except Exception as e:
+        print(f"Error leyendo push_subscriptions; se omiten las alertas push: {e}")
+        return
     if not subscriptions:
         return
 
@@ -243,7 +338,7 @@ def send_push_alerts():
 
             if valid_transition:
                 try:
-                    webpush(
+                    response = webpush(
                         subscription_info={
                             "endpoint": sub["endpoint"],
                             "keys": {"p256dh": sub["keys_p256dh"], "auth": sub["keys_auth"]},
@@ -255,15 +350,17 @@ def send_push_alerts():
                         }),
                         vapid_private_key=VAPID_PRIVATE_KEY,
                         vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+                        **push_options,
                     )
-                    print(f"Push enviado para {symbol}: {last_phase} -> {phase}")
+                    print(f"Push aceptado para {symbol}: {last_phase} -> {phase} (HTTP {response.status_code}, …{sub['endpoint'][-10:]})")
                 except WebPushException as e:
                     status = getattr(e.response, "status_code", None)
                     if status in (404, 410):
                         supabase.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
-                        print(f"Suscripción expirada/revocada eliminada ({symbol}).")
+                        print(f"Suscripción expirada/revocada eliminada ({symbol}, HTTP {status}, …{sub['endpoint'][-10:]}).")
                         continue
-                    print(f"Error enviando push ({symbol}): {e}")
+                    body = (getattr(e.response, "text", "") or "")[:200].replace("\n", " ")
+                    print(f"Error enviando push ({symbol}): HTTP {status} {body}".rstrip())
 
             if phase != last_phase:
                 supabase.table("push_subscriptions").update({
