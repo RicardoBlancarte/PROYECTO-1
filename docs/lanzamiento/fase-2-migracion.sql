@@ -9,13 +9,21 @@
 --      simuló. La página la compara con el último cierre mostrado ("No disponible" si difiere).
 --   2. CHECK de horizon: agrega 'two_day' (2 sesiones, "pasado mañana").
 -- No toca RLS, la clave primaria, otras tablas ni asset_historical_prices.
+--
+-- REGLA: esta migración se aplica SIEMPRE antes de cualquier corrida del motor de la rama
+-- lanzamiento-f2-montecarlo o de cualquier merge a main. persist_result ya envía
+-- base_close_date y escribe horizon = 'two_day'; sin la migración, el upsert falla para
+-- todos los símbolos.
+-- REGLA: si el PASO 0 devuelve un nombre de CHECK distinto, primero se corrigen schema.sql
+-- y este archivo (commit aparte, con el diff revisado). No se ejecuta nada con el nombre
+-- equivocado.
 
 
 -- ---------------------------------------------------------------------------
 -- PASO 0 (solo lectura): confirmar el nombre real del CHECK de horizon.
 -- Esperado: dos filas; la de horizon debería llamarse
 -- asset_montecarlo_simulation_horizon_check (la otra es la de probability_up).
--- Si el nombre es distinto, ajustarlo en el PASO 1 antes de ejecutar.
+-- Si el nombre es distinto: DETENERSE y corregir schema.sql y este archivo antes de seguir.
 -- ---------------------------------------------------------------------------
 select conname, pg_get_constraintdef(oid) as definicion
 from pg_constraint

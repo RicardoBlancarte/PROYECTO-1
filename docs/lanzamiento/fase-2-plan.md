@@ -155,7 +155,7 @@ En `montecarlo_engine.py:673-683` el payload no incluye `computed_at`, y el upse
 5. **Textos:** el docstring "x 3 horizontes" pasa a "x 4 horizontes".
 6. **Panel admin:** `functions/api/montecarlo.js:16` acepta `two_day` en la lista blanca.
 
-**Costo:** +1 simulación de 2 pasos por activo, es decir, +2 pasos sobre los 27 actuales (≈ +7 % de trabajo de simulación).
+**Costo** (corregido en la ronda 4): `run_montecarlo_for_symbol` vuelve a calibrar GARCH y a calcular Mahalanobis en **cada** horizonte. Agregar `two_day` suma ≈ 1/3 del trabajo fijo por activo, más 2 pasos de simulación (antes decía "+7 %", que solo contaba la simulación). Esperado: el tramo de Monte Carlo dura ≈ 1.2× a 1.4× (6.2.B.4).
 
 ### 2.2 Endpoint público `functions/api/escenarios.js`
 
@@ -310,7 +310,8 @@ commit;
 - **Aditiva y compatible con el motor actual de `main`:** no envía `base_close_date` (queda `null`) y solo usa los 3 horizontes, que siguen siendo válidos. Puede aplicarse antes o después de la corrida del lunes.
 - **No toca** RLS, la clave primaria, otras tablas ni `asset_historical_prices`.
 - **Validación inmediata:** el `add constraint` revisa las filas existentes. Todas tienen `daily`, `weekly` o `monthly`, así que no puede fallar por datos.
-- **Orden obligatorio:** la migración va **antes** de la corrida de la rama. Si no, el upsert del motor nuevo fallaría con "columna inexistente" para todos los símbolos (atrapado y registrado en el log, sin datos nuevos).
+- **REGLA (ronda 4): la migración se aplica SIEMPRE antes de cualquier corrida de este motor o de cualquier merge a `main`.** Desde el commit 2, `persist_result` envía `base_close_date` y puede escribir `horizon = 'two_day'`. Sin la migración, el upsert falla para **todos** los símbolos: por columna inexistente (`PGRST204`) o por el CHECK (`23514`). El error queda atrapado y registrado en el log, pero no entra ningún dato nuevo, y tras un merge la cascada nocturna de `main` dejaría de actualizar Monte Carlo.
+- **REGLA (ronda 4): si el Paso 0 devuelve un nombre de CHECK distinto de `asset_montecarlo_simulation_horizon_check`**, se corrigen **primero** `schema.sql` y `fase-2-migracion.sql` (commit aparte, con el diff revisado) y solo después se ejecuta la migración. No se ejecuta nada con el nombre equivocado.
 - **Caché de PostgREST:** Supabase recarga el esquema solo tras un DDL. Si `/api/escenarios` respondiera con columna desconocida, ejecutar `notify pgrst, 'reload schema';`.
 - **`schema.sql`** se actualiza en el mismo commit 2: la columna y el CHECK en la definición de la tabla, más el bloque de migración comentado.
 
@@ -345,6 +346,8 @@ Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por
    - c) `workflow_dispatch` en la rama con `only_montecarlo = true` (6.2.B).
 
    Los commits 4-7 pueden programarse antes, porque no dependen de la base.
+
+   **Regla (sección 3):** la migración va siempre antes de cualquier corrida de este motor o de cualquier merge a `main`.
 4. `feat(api): /api/escenarios público de solo lectura con Cache-Control`
 5. `feat(ui): tarjetas #8/#9 con Monte Carlo v2, tasa histórica y fecha de datos`
 6. `feat(ui): abanico Monte Carlo v2 en la gráfica y estado "No disponible"`
@@ -375,6 +378,7 @@ Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por
 - `Web Push: ttl=… s; …` y, si cambió alguna fase, `Push aceptado para …`.
 - 90 líneas `Monte Carlo (SYM, daily|weekly|monthly): P(sube)=…`, sin `Error en Monte Carlo`.
 - Termina sin traceback y el job sale en verde.
+- **Anotar la duración del tramo de Monte Carlo** (referencia para B.4). En el log de GitHub Actions, activa "Show timestamps" (menú ⚙ del log) y resta la hora de la **primera** línea `Monte Carlo (` de la de la **última**.
 
 Verificación SQL (tú):
 
@@ -402,7 +406,10 @@ from public.asset_montecarlo_simulation group by horizon;           -- 30 por ho
 
    El script sale con `sys.exit(0)` en `actualizar_automatico.py:37-40`, **antes** de definir o llamar cualquiera de esas funciones.
 3. **Solo** aparecen líneas `Monte Carlo (…)`: **120** (30 × 4 horizontes) y ninguna `Error en Monte Carlo`. También pueden aparecer `Monte Carlo: historial insuficiente…` si algún activo tiene ≤ 90 cierres.
-4. La duración del paso es claramente menor que la de la corrida completa.
+4. **Duración:**
+   - El paso completo dura claramente menos que la corrida completa de `main`, porque no hay descarga de precios, señales, Win Rate ni push.
+   - **El tramo de Monte Carlo** (primera a última línea `Monte Carlo (`, con "Show timestamps") se compara con el tramo anotado en A. Esperado: **≈ 1.2× a 1.4×** el de `main`. Cada horizonte vuelve a calibrar GARCH y a calcular las distancias de Mahalanobis, así que agregar `two_day` suma cerca de un tercio del trabajo fijo por activo, más 2 pasos de simulación.
+   - Si supera **2×**, o si resulta **menor** que el de `main` (señal de activos omitidos), se detiene y se revisa antes de seguir.
 5. Verificación SQL posterior (tú):
 
 ```sql
@@ -412,6 +419,24 @@ select max(updated_at) from public.push_subscriptions;
 -- Debe reflejar la corrida de la rama:
 select horizon, count(*), max(computed_at), min(base_close_date), max(base_close_date)
 from public.asset_montecarlo_simulation group by horizon order by horizon;   -- 4 horizontes x 30
+
+-- base_close_date = último cierre REAL de cada activo, en los 4 horizontes.
+-- Esperado: 0 filas. Cualquier fila es un activo u horizonte simulado sobre otro cierre.
+-- CUÁNDO: el MISMO DÍA, justo después de la corrida de la rama. A partir de la siguiente
+-- corrida nocturna de main (motor viejo, antes del merge) esta consulta MOSTRARÁ
+-- diferencias POR DISEÑO: main agrega un cierre nuevo y actualiza daily/weekly/monthly sin
+-- enviar base_close_date, y no toca two_day. Eso activa "No disponible" en la página
+-- (sección 2.3) y NO es una falla.
+with ultimo as (
+  select symbol, max(date) as ultimo_cierre
+  from public.asset_historical_prices
+  group by symbol
+)
+select m.symbol, m.horizon, m.base_close_date, u.ultimo_cierre
+from public.asset_montecarlo_simulation m
+left join ultimo u using (symbol)
+where m.base_close_date is distinct from u.ultimo_cierre
+order by m.symbol, m.horizon;
 ```
 
 ### 6.3 Preview del sitio
