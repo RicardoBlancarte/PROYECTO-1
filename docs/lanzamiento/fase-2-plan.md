@@ -162,23 +162,29 @@ En `montecarlo_engine.py:673-683` el payload no incluye `computed_at`, y el upse
 - **Ruta:** `GET /api/escenarios?symbol=AAPL`. Archivo **nuevo y separado** del admin. Usa `service_role` del lado del servidor y **no se abre RLS a `anon`**.
 - **Consulta única:** `symbol=eq.X&select=horizon,probability_up,quantiles,base_close_date,computed_at` → hasta 4 filas.
 - **Validación:** `symbol` con `/^[A-Z0-9^=.\-]{1,15}$/` tras `toUpperCase()`.
-- **Respuesta:** solo p10, p25, p50, p75 y p90 (los que usa la interfaz); nada de VaR, GARCH, semillas ni crosschecks.
+- **Respuesta** (implementada en el commit 3, `7cc1845`): los cuantiles **p5, p10, p25, p50, p75, p90 y p95** (el abanico usa p5-p95; ronda 5). Nada de VaR, GARCH, semillas ni crosschecks.
 
 ```json
 {
   "symbol": "AAPL",
-  "baseCloseDate": "2026-10-02",
-  "updatedAt": "2026-10-02T22:14:05Z",
+  "updatedAt": "2026-10-02T22:14:05+00:00",
   "horizons": {
-    "daily":   { "sessions": 1,  "probUp": 0.54, "q": { "p10": -0.021, "p25": -0.009, "p50": 0.001, "p75": 0.011, "p90": 0.022 } },
-    "two_day": { "sessions": 2,  "probUp": 0.53, "q": { "...": 0 } },
-    "weekly":  { "sessions": 5,  "...": 0 },
-    "monthly": { "sessions": 21, "...": 0 }
+    "daily":   { "sessions": 1,  "baseCloseDate": "2026-10-02", "probUp": 0.54,
+                 "q": { "p5": -0.031, "p10": -0.021, "p25": -0.009, "p50": 0.001, "p75": 0.011, "p90": 0.022, "p95": 0.029 } },
+    "two_day": { "sessions": 2,  "baseCloseDate": "2026-10-02", "probUp": 0.53, "q": { "...": 0 } },
+    "weekly":  { "sessions": 5,  "baseCloseDate": "2026-10-02", "...": 0 },
+    "monthly": { "sessions": 21, "baseCloseDate": "2026-10-02", "...": 0 }
   }
 }
 ```
 
-- **Varias fechas base:** si las filas traen `base_close_date` distintas (p. ej. `two_day` quedó viejo), `baseCloseDate` va **por horizonte** y la página compara cada uno por separado.
+- **`baseCloseDate` va SIEMPRE por horizonte** (aprobado en la ronda 5), no una sola vez arriba. La página compara cada horizonte con el último cierre que muestra (2.3). `updatedAt` es el `computed_at` más reciente entre los horizontes publicados.
+- **Filas omitidas** (ese horizonte se muestra "No disponible"):
+  - las que no traen `base_close_date` (escritas por el motor viejo);
+  - las de un horizonte desconocido;
+  - las que tienen `probability_up` fuera de [0, 1] o algún cuantil faltante o no numérico.
+
+  Si no queda ninguna, responde 404.
 - **Errores genéricos**, sin nombres de tablas ni de variables:
   - 400 "Solicitud no válida."
   - 404 "No disponible para este activo."
@@ -245,6 +251,7 @@ Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no exi
 - **Escenario central** = p50.
 - **"Escenario bajo/alto"** = p10/p90, los mismos percentiles que la tabla #47, para que la leyenda sea coherente.
 - **Banda interna** p25-p75, sombreada con `fill` entre datasets (Chart.js ya está cargado).
+- **Banda externa p5-p95** (ronda 5), con relleno tenue: es el abanico completo. Las líneas p10/p90 quedan dentro de ella.
 - **El centro puede quedar debajo de "Hoy"** y las bandas son asimétricas.
 - **Puntos de semillas distintas:** cada punto viene de una simulación independiente, así que puede haber diferencias de ruido de ±0.5 puntos entre horizontes. Es despreciable frente al ancho del abanico.
 - **Sin datos** (2.3) en un horizonte: se omite ese punto. Si no hay ninguno, no se dibuja abanico y aparece la nota "Rango estimado no disponible para este activo."
@@ -439,6 +446,12 @@ where m.base_close_date is distinct from u.ultimo_cierre
 order by m.symbol, m.horizon;
 ```
 
+6. **"No disponible" pasajero tras cada corrida nocturna (esperado, ronda 5).** Después de cada corrida, la serie de precios de la gráfica ya trae el cierre nuevo, pero el navegador puede seguir usando una respuesta de `/api/escenarios` con el `baseCloseDate` anterior:
+   - `max-age` de 15 min + `stale-while-revalidate` de 1 h en el endpoint;
+   - más la caché local de 15 min de la página.
+
+   Mientras tanto, la comparación de 2.3 no coincide y se muestra "No disponible" **hasta ~1 h**. Es el comportamiento seguro, no una falla. Para comprobar las cifras nuevas antes, se recarga sin caché o se espera.
+
 ### 6.3 Preview del sitio
 
 - **Endpoint:**
@@ -491,6 +504,9 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
 
 ## 9. Pendientes para fases posteriores
 
+- **Fase 5 — caché en el borde o límite de frecuencia para `/api/escenarios`** (ronda 5): hoy, cada solicitud que no esté en la caché del navegador consulta Supabase con `service_role`. El `Cache-Control: public` permite que el CDN guarde la respuesta, pero en Pages Functions no está garantizado sin la Cache API. Opciones:
+  - Cache API de Cloudflare (`caches.default`), con clave por símbolo y TTL hasta la próxima corrida;
+  - o un límite de frecuencia por IP.
 - **Fase 5 — tabla de feriados NYSE:** `NYSE_HOLIDAYS` en `index.html` cubre 2026-2027 y **caduca el 31-dic-2027**. Renovarla o moverla a un dato del servidor.
 - **Fase 3 — `functions/api/patterns.js:19`:** lee `asset_signals` en orden `asc` y **sin `limit`**. Si un símbolo supera el `max_rows` de Supabase (1 000), recibiría solo las señales más antiguas (mismo tipo de error que #131). Corregir con `order=date.desc` + `limit` e invertir el orden.
 - **Fase 3 — ELIMINAR el botón "Recalcular"** (0.4; decisión de la ronda 3): no se corrige. Tiene valores fijos (`+0.65`, "Fuertemente alcista", "Proyección recalculada") y el aviso "Abanico Markov recalculado.".
