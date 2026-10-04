@@ -31,6 +31,7 @@ parametrica (esa es simetrica por construccion y no captura asimetria sin un par
 """
 
 import hashlib
+from datetime import datetime, timezone
 from math import lgamma, log, pi
 
 import numpy as np
@@ -680,6 +681,9 @@ def persist_result(supabase, result):
         "realized_skewness_simulated", "news_uncertainty_variance", "b1_crosscheck",
         "b2_crosscheck", "model_notes",
     )}
+    # #127: el upsert (ON CONFLICT DO UPDATE) solo actualiza las columnas enviadas; el default
+    # de computed_at solo aplica en el primer INSERT, asi que se envia explicito en cada corrida.
+    payload["computed_at"] = datetime.now(timezone.utc).isoformat()
     supabase.table("asset_montecarlo_simulation").upsert(payload, on_conflict="symbol,horizon").execute()
 
 
