@@ -1,6 +1,6 @@
 # Fase 2 — Monte Carlo v2 en la gráfica: hallazgos y plan
 
-- **Fecha:** 2026-10-03 (revisión 2, con las decisiones D1-D5 del usuario)
+- **Fecha:** 2026-10-03 (revisión 3, con las decisiones de las rondas 2 y 3 del usuario)
 - **Rama:** `lanzamiento-f2-montecarlo` (desde `main` en `77f0b69`)
 - **Alcance de hoy:** solo investigación y plan. No se editó código de producción ni se ejecutó SQL.
 - **Referencias:** [fase-1-auditoria.md](fase-1-auditoria.md) (#3, #4, #8, #9, #47, #120, #127, #128, #131) y [fase-1-persistencia.md](fase-1-persistencia.md).
@@ -8,6 +8,20 @@
 ---
 
 ## 0. Decisiones del usuario (2026-10-03) y respuestas
+
+### Ronda 3 (vigente; prevalece sobre la ronda 2 donde difieran)
+
+| # | Decisión |
+|---|---|
+| D1 | **SQL aprobado.** Lo ejecuta el usuario el **lunes 5-oct, DESPUÉS de verificar la corrida desde `main`** y antes de la corrida de la rama. `schema.sql` (CHECK de la l. 470 y columna `base_close_date`) se actualiza **en el mismo commit que el motor**. La migración queda en [fase-2-migracion.sql](fase-2-migracion.sql), con las dos consultas de verificación posterior (sección 3). |
+| D2 | Sin cambios: la corrida de la rama solo se hace cuando el usuario avise. |
+| D4 | Las columnas #3/#4 **se quedan como están** (ya ocultas desde la Fase 1). |
+| "Recalcular" | **Fase 3, para ELIMINAR** (valores fijos, "Fuertemente alcista"), no corregir. No se toca en la Fase 2. |
+| Textos | Tarjeta #9: **"Dentro de 2 sesiones (mar 6-oct)"**, con fecha calculada. Subtítulo de #47: **"Escenarios simulados a partir del historial del activo. No son una predicción."** |
+| D6 | Aprobado: puntos 1-2 / 1-2-5 / 1-2-5-21, con el **eje horizontal proporcional a las sesiones**, nunca equidistante (2.6). |
+| Ejecución | Se programa en la rama siguiendo la sección 5. Antes de cada commit se muestra el diff de los archivos de producción y se espera aprobación. `git add` por ruta. Sin push, sin SQL y sin workflow hasta que el usuario avise. |
+
+### Ronda 2
 
 | # | Decisión | Estado |
 |---|---|---|
@@ -195,7 +209,7 @@ En esos casos no se vuelve a la fórmula con σ. Esta regla cubre tres situacion
 
 | Elemento | Tarjeta #8 (`daily`) | Tarjeta #9 (`two_day`) |
 |---|---|---|
-| Título | **"Próxima sesión (lun 5-oct)"** | **"Dentro de 2 sesiones (mar 6-oct)"**, PENDIENTE DE TU APROBACIÓN |
+| Título | **"Próxima sesión (lun 5-oct)"** | **"Dentro de 2 sesiones (mar 6-oct)"** (aprobado; fecha calculada con `nextSessions`) |
 | Cifra grande | Mediana: `cierre × (1 + p50)` | Ídem |
 | Línea 1 | **"La mitad de los escenarios simulados cae entre $X y $Y"** (p25-p75) | Ídem |
 | Línea 2 | **"Escenarios que cierran arriba del último cierre: 54 %"** (`probUp`, sin decimales) | Ídem |
@@ -227,7 +241,7 @@ Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no exi
 | Semana | 1, 2, 5 | `daily`, `two_day`, `weekly` |
 | Mes | 1, 2, 5, 21 | `daily`, `two_day`, `weekly`, `monthly` |
 
-- **Etiquetas del eje X:** las fechas de `nextSessions` (`lun 5-oct` …).
+- **Eje horizontal proporcional a las sesiones (aprobado en D6):** nunca equidistante. La distancia entre "Hoy" y el punto de 21 sesiones es 21 veces la de "Hoy" a 1 sesión. Se usa un eje `linear` de Chart.js con datos `{x, y}`: el historial va en `x = −(n−1) … 0` (una unidad por sesión) y el futuro en `x = 1, 2, 5, 21`. Las marcas del eje muestran la fecha (`lun 5-oct` …, con `nextSessions`) en los puntos futuros y la fecha del historial en los pasados.
 - **Escenario central** = p50.
 - **"Escenario bajo/alto"** = p10/p90, los mismos percentiles que la tabla #47, para que la leyenda sea coherente.
 - **Banda interna** p25-p75, sombreada con `fill` entre datasets (Chart.js ya está cargado).
@@ -235,7 +249,7 @@ Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no exi
 - **Puntos de semillas distintas:** cada punto viene de una simulación independiente, así que puede haber diferencias de ruido de ±0.5 puntos entre horizontes. Es despreciable frente al ancho del abanico.
 - **Sin datos** (2.3) en un horizonte: se omite ese punto. Si no hay ninguno, no se dibuja abanico y aparece la nota "Rango estimado no disponible para este activo."
 - **`newsDebateScore` y `RISK_MULTIPLIER` ya no mueven el abanico.** Monte Carlo usa `news_uncertainty_variance = 0`.
-- **Esto es una DECISIÓN (D6):** confirma la tabla de puntos por selector.
+- **D6 aprobado** (ronda 3).
 
 ### 2.7 Tabla #47 (`renderProbabilityTable`, D3)
 
@@ -247,12 +261,21 @@ Con el cuarto horizonte, los puntos futuros salen de **filas reales**. Ya no exi
   Los rótulos actuales coinciden exactamente con los percentiles guardados.
 - **Se mantiene oculto** lo que ya ocultó la Fase 1: columna de señal (#98), columna de confianza (#48) y fila de la mediana (#98).
 - **Columna "Efecto de noticias":** sigue con `countryBriefs`, no se toca.
-- **Subtítulo actual:** "Escenarios bajo, central y alto calculados con la volatilidad del activo." Deja de ser cierto. Propuesto: **"Escenarios simulados a partir del historial del activo."** PENDIENTE DE TU APROBACIÓN.
+- **Subtítulo actual:** "Escenarios bajo, central y alto calculados con la volatilidad del activo." Deja de ser cierto. Nuevo (aprobado): **"Escenarios simulados a partir del historial del activo. No son una predicción."**
 - **Sin datos:** las tres filas con "—" y "No disponible para este activo".
 
 ---
 
-## 3. Cambios de esquema — PENDIENTE DE MI APROBACIÓN (no ejecutar)
+## 3. Cambios de esquema — APROBADOS (D1, ronda 3); los ejecuta el usuario
+
+- **Archivo:** [fase-2-migracion.sql](fase-2-migracion.sql) (paso 0: nombre del CHECK; paso 1: migración; paso 2: verificación).
+- **Cuándo:** el lunes 5-oct, **después** de verificar la corrida de `main` (6.2.A) y **antes** de la corrida de la rama (6.2.B). El agente no ejecuta SQL.
+- **`schema.sql`:** se actualiza en el **mismo commit que el motor** (commit 2), con la columna `base_close_date` y el CHECK de la l. 470 con `two_day`.
+- **Verificación posterior** (paso 2 del archivo):
+  - **2a.** Definición del CHECK. Esperado: `CHECK ((horizon = ANY (ARRAY['daily'::text, 'two_day'::text, 'weekly'::text, 'monthly'::text])))`.
+  - **2b.** `information_schema.columns` para `base_close_date`. Esperado: `data_type = date`, `is_nullable = YES` y `column_default` nulo.
+
+El SQL de abajo es el mismo que el del archivo.
 
 **Paso previo (solo lectura):** confirmar el nombre real del CHECK.
 
@@ -268,7 +291,7 @@ where conrelid = 'public.asset_montecarlo_simulation'::regclass
 **Migración** (usar el nombre confirmado arriba):
 
 ```sql
--- PENDIENTE DE APROBACIÓN DEL USUARIO. No ejecutar sin confirmación.
+-- Aprobado (D1, ronda 3). Lo ejecuta el usuario el 5-oct tras verificar la corrida de main.
 begin;
 
 alter table public.asset_montecarlo_simulation
@@ -302,7 +325,8 @@ commit;
 | `functions/api/montecarlo.js` | Lista blanca + `two_day` (una línea) |
 | `functions/api/escenarios.js` | **Nuevo**, endpoint público |
 | `index.html` | Tarjetas #8/#9 (l. 96, `renderActiveAssetCards` l. 331); abanico (`renderPortfolioChart` l. 338, leyenda l. 340); tabla #47 (l. 306 y subtítulo l. 109); `nextSessions` y `NYSE_HOLIDAYS`; tasa histórica y "Datos al cierre del …" |
-| `schema.sql` | Columna `base_close_date` y CHECK con `two_day` (documentación de la migración aprobada) |
+| `schema.sql` | Columna `base_close_date` y CHECK de la l. 470 con `two_day`, en el mismo commit que el motor |
+| `docs/lanzamiento/fase-2-migracion.sql` | Migración aprobada y verificaciones (la ejecuta el usuario) |
 | `docs/lanzamiento/fase-2-plan.md` | Este documento y, al final, los resultados |
 
 No se tocan `actualizar_automatico.py`, el workflow, `asset_historical_prices`, RLS, el botón "Recalcular" (0.4) ni las columnas #3/#4 (0.3), salvo que lo pidas.
@@ -313,10 +337,14 @@ No se tocan `actualizar_automatico.py`, el workflow, `asset_historical_prices`, 
 
 Cada diff de producción se te muestra antes de aplicarlo. `git add` siempre por ruta. Nada directo a `main`.
 
-0. **(Tú, tras aprobar)** Consulta del nombre del CHECK y migración de la sección 3 en Supabase.
 1. `fix(montecarlo): #127 computed_at en el upsert de persist_result`
-2. `feat(montecarlo): horizonte two_day (2 sesiones) y base_close_date; lectura desc del historial; pruebas; schema.sql; lista admin`
-3. **(Tras tu confirmación de D2)** `workflow_dispatch` en la rama con `only_montecarlo = true` (sección 6.2).
+2. `feat(montecarlo): horizonte two_day (2 sesiones) y base_close_date; lectura desc del historial; pruebas; schema.sql (CHECK l. 470 + columna); lista admin`
+3. **(Lunes 5-oct, cuando el usuario avise)**
+   - a) El usuario verifica la corrida de `main` (6.2.A).
+   - b) El usuario ejecuta [fase-2-migracion.sql](fase-2-migracion.sql) y sus verificaciones.
+   - c) `workflow_dispatch` en la rama con `only_montecarlo = true` (6.2.B).
+
+   Los commits 4-7 pueden programarse antes, porque no dependen de la base.
 4. `feat(api): /api/escenarios público de solo lectura con Cache-Control`
 5. `feat(ui): tarjetas #8/#9 con Monte Carlo v2, tasa histórica y fecha de datos`
 6. `feat(ui): abanico Monte Carlo v2 en la gráfica y estado "No disponible"`
@@ -428,14 +456,11 @@ order by symbol, horizon;
 
 ## 8. Decisiones pendientes
 
-- **D1-SQL.** Aprobar la migración de la sección 3 (columna + CHECK con `two_day`) y ejecutarla tú.
-- **D2.** Confirmar la corrida del lunes 5-oct (6.2.A) antes de la corrida de la rama.
-- **D4.** ¿Dejar #3/#4 como están (ya ocultas) o cambiar a la clase literal `f1-oculto`? Recomiendo dejarlas.
-- **D5-bis.** Textos que faltaban:
-  - título de la tarjeta #9, "Dentro de 2 sesiones (mar 6-oct)";
-  - subtítulo de la tabla #47, "Escenarios simulados a partir del historial del activo.";
-  - si se corrige ya, el aviso de "Recalcular": "Evento registrado. El rango estimado se recalcula cada noche con el último cierre." (recomiendo diferirlo a la Fase 3).
-- **D6.** Puntos del abanico por selector: Día 1-2; Semana 1-2-5; Mes 1-2-5-21 (2.6).
+Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario** el lunes 5-oct:
+
+- verificar la corrida de `main` (6.2.A);
+- ejecutar [fase-2-migracion.sql](fase-2-migracion.sql) con sus verificaciones;
+- avisar para la corrida de la rama (6.2.B).
 
 ---
 
@@ -443,6 +468,6 @@ order by symbol, horizon;
 
 - **Fase 5 — tabla de feriados NYSE:** `NYSE_HOLIDAYS` en `index.html` cubre 2026-2027 y **caduca el 31-dic-2027**. Renovarla o moverla a un dato del servidor.
 - **Fase 3 — `functions/api/patterns.js:19`:** lee `asset_signals` en orden `asc` y **sin `limit`**. Si un símbolo supera el `max_rows` de Supabase (1 000), recibiría solo las señales más antiguas (mismo tipo de error que #131). Corregir con `order=date.desc` + `limit` e invertir el orden.
-- **Fase 3 — botón "Recalcular"** (0.4): valores fijos (`+0.65`, "Fuertemente alcista") y el aviso "Abanico Markov recalculado.". Revisar cuando vuelva "Estado de mercado".
-- **Fase 3 — columnas #3/#4:** si vuelven, con un endpoint por lotes de Monte Carlo.
+- **Fase 3 — ELIMINAR el botón "Recalcular"** (0.4; decisión de la ronda 3): no se corrige. Tiene valores fijos (`+0.65`, "Fuertemente alcista", "Proyección recalculada") y el aviso "Abanico Markov recalculado.".
+- **Columnas #3/#4:** se quedan ocultas como están (D4, ronda 3). Si algún día vuelven, sería con un endpoint por lotes de Monte Carlo.
 - **Fase 3 — cripto:** un paso es un día natural (1.b).
