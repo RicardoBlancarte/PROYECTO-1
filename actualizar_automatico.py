@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import sys
@@ -105,8 +106,11 @@ backfill_asset_signals()
 # para el backfill manual desde workflow_dispatch). Por activo:
 #   - Control de consistencia: si algún día de la ventana (anterior al más reciente) ya existe
 #     en la base, se compara su close guardado con el descargado (el más reciente de esos días).
-#     Si difieren más de CONSISTENCY_TOLERANCE_PCT, no se escribe nada de ese activo y se
-#     registra. El día más reciente no sirve de referencia porque se puede corregir con upsert.
+#     Si difieren más de la tolerancia, no se escribe nada de ese activo y se registra. La
+#     tolerancia es CONSISTENCY_TOLERANCE_PCT para acciones e índices y FUTURES_TOLERANCE_PCT
+#     para futuros (=F): su serie continua cambia de contrato al vencimiento, así que entre ambas
+#     tolerancias se registra un "Aviso de cambio de contrato" y se continúa. El día más reciente
+#     no sirve de referencia porque se puede corregir con upsert.
 #   - La fecha más reciente de la ventana se guarda con upsert (se puede corregir cada noche).
 #   - Las fechas anteriores que falten se insertan sin reescribir las existentes.
 # Si un día llega sin cierre (Close NaN) se omite y se registra; la siguiente corrida lo vuelve
@@ -115,7 +119,8 @@ PRICE_PERIOD = os.environ.get("PRICE_PERIOD") or "5d"
 if PRICE_PERIOD not in ("5d", "1mo"):
     print(f"PRICE_PERIOD '{PRICE_PERIOD}' no permitido; se usa '5d'.")
     PRICE_PERIOD = "5d"
-CONSISTENCY_TOLERANCE_PCT = 0.5
+CONSISTENCY_TOLERANCE_PCT = 0.5   # acciones e índices
+FUTURES_TOLERANCE_PCT = 10.0      # futuros (=F): cambio de contrato al vencimiento
 print(f"Descarga de precios con ventana {PRICE_PERIOD}.")
 
 
@@ -175,11 +180,16 @@ for symbol, asset_type in assets:
             ref = overlap[-1]
             saved = stored_close[ref["date"]]
             diff_pct = abs(ref["close"] - saved) / saved * 100 if saved else float("inf")
-            if diff_pct > CONSISTENCY_TOLERANCE_PCT:
-                print(f"Inconsistencia: {symbol} {ref['date']} guardado {saved} vs descargado {ref['close']} ({diff_pct:.2f} %); no se escribe nada de {symbol}.")
+            is_future = symbol.endswith("=F")
+            tolerance = FUTURES_TOLERANCE_PCT if is_future else CONSISTENCY_TOLERANCE_PCT
+            if diff_pct > tolerance:
+                print(f"Inconsistencia: {symbol} {ref['date']} guardado {saved} vs descargado {ref['close']} ({diff_pct:.2f} %, tolerancia {tolerance} %); no se escribe nada de {symbol}.")
                 inconsistent_symbols.append(symbol)
                 continue
-            print(f"Consistencia OK: {symbol} {ref['date']} {saved} vs {ref['close']} ({diff_pct:.2f} %).")
+            if is_future and diff_pct > CONSISTENCY_TOLERANCE_PCT:
+                print(f"Aviso de cambio de contrato: {symbol} {ref['date']} guardado {saved} vs descargado {ref['close']} ({diff_pct:.2f} %); se continúa (tolerancia de futuros {FUTURES_TOLERANCE_PCT} %).")
+            else:
+                print(f"Consistencia OK: {symbol} {ref['date']} {saved} vs {ref['close']} ({diff_pct:.2f} %).")
 
         older_missing = [row for row in candidates if row["date"] != latest["date"] and row["date"] not in stored_close]
         if older_missing:
@@ -274,6 +284,13 @@ def send_push_alerts():
         print("VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY no configuradas; se omiten las notificaciones push.")
         return
 
+    # TTL de 24 h: con el valor por defecto de pywebpush (0), el servicio de push descarta el
+    # mensaje si el dispositivo no está conectado en ese instante (Android en reposo).
+    push_options = {"ttl": 86400}
+    if "headers" in inspect.signature(webpush).parameters:
+        push_options["headers"] = {"Urgency": "high"}
+    print(f"Web Push: ttl={push_options['ttl']} s; Urgency: {'high' if 'headers' in push_options else 'no soportado por esta versión de pywebpush'}.")
+
     try:
         subscriptions = supabase.table("push_subscriptions").select("*").execute().data or []
     except Exception as e:
@@ -321,7 +338,7 @@ def send_push_alerts():
 
             if valid_transition:
                 try:
-                    webpush(
+                    response = webpush(
                         subscription_info={
                             "endpoint": sub["endpoint"],
                             "keys": {"p256dh": sub["keys_p256dh"], "auth": sub["keys_auth"]},
@@ -333,15 +350,17 @@ def send_push_alerts():
                         }),
                         vapid_private_key=VAPID_PRIVATE_KEY,
                         vapid_claims={"sub": VAPID_CLAIM_EMAIL},
+                        **push_options,
                     )
-                    print(f"Push enviado para {symbol}: {last_phase} -> {phase}")
+                    print(f"Push aceptado para {symbol}: {last_phase} -> {phase} (HTTP {response.status_code}, …{sub['endpoint'][-10:]})")
                 except WebPushException as e:
                     status = getattr(e.response, "status_code", None)
                     if status in (404, 410):
                         supabase.table("push_subscriptions").delete().eq("id", sub["id"]).execute()
-                        print(f"Suscripción expirada/revocada eliminada ({symbol}).")
+                        print(f"Suscripción expirada/revocada eliminada ({symbol}, HTTP {status}, …{sub['endpoint'][-10:]}).")
                         continue
-                    print(f"Error enviando push ({symbol}): {e}")
+                    body = (getattr(e.response, "text", "") or "")[:200].replace("\n", " ")
+                    print(f"Error enviando push ({symbol}): HTTP {status} {body}".rstrip())
 
             if phase != last_phase:
                 supabase.table("push_subscriptions").update({
