@@ -510,6 +510,11 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
 - **Fase 5 — caché en el borde o límite de frecuencia para `/api/escenarios`** (ronda 5): hoy, cada solicitud que no esté en la caché del navegador consulta Supabase con `service_role`. El `Cache-Control: public` permite que el CDN guarde la respuesta, pero en Pages Functions no está garantizado sin la Cache API. Opciones:
   - Cache API de Cloudflare (`caches.default`), con clave por símbolo y TTL hasta la próxima corrida;
   - o un límite de frecuencia por IP.
+- **Fase 5 — `asset_prediction_audit` crece sin límite** (ronda 11, junto con el pendiente de `/api/escenarios`): `logPredictionAudit` (`functions/api/patterns.js`) inserta **una fila nueva por cada consulta de patrones**, es decir, cada vez que cualquier visitante cambia de activo o pulsa "Agregar" (`selectAsset` → `loadPatterns`). No hay deduplicación, límite ni retención. Evaluar:
+  - límite de frecuencia;
+  - deduplicación (p. ej. una fila por símbolo, horizonte y día);
+  - una política de retención.
+  Las filas no identifican al visitante; solo se filtran por `created_at`.
 - **Fase 5 — tabla de feriados NYSE:** `NYSE_HOLIDAYS` en `index.html` cubre 2026-2027 y **caduca el 31-dic-2027**. Renovarla o moverla a un dato del servidor.
 - **Fase 3 — `functions/api/patterns.js:19`:** lee `asset_signals` en orden `asc` y **sin `limit`**. Si un símbolo supera el `max_rows` de Supabase (1 000), recibiría solo las señales más antiguas (mismo tipo de error que #131). Corregir con `order=date.desc` + `limit` e invertir el orden.
 - **Fase 3 — ELIMINAR el botón "Recalcular"** (0.4; decisión de la ronda 3): no se corrige. Tiene valores fijos (`+0.65`, "Fuertemente alcista", "Proyección recalculada") y el aviso "Abanico Markov recalculado.".
@@ -579,6 +584,12 @@ Los commits de documentación (plan, migración y pendientes) van aparte: `db1eb
 **Decisión (ronda 9): no se cambian en la Fase 2.**
 
 - **Fase 3, junto con la decisión de Top Picks:** cambiar "para mañana" por "para la próxima sesión" en `index.html:676` (tour), `homepage/index.html:258`, `homepage/locales/es.json:43`, `homepage/locales/en.json:43` (p. ej. "for the next session") y `homepage/locales/zh.json:43` (p. ej. "下一交易日").
+- **Fase 3, también con la decisión de Top Picks (ronda 10):**
+
+  | Archivo:línea | Texto actual | Nota |
+  |---|---|---|
+  | `index.html:96` (subtítulo del radar) | "Ordenados por cuánto podrían moverse mañana (volatilidad estimada). No es una recomendación de compra ni de venta." | "mañana" → "en la próxima sesión", con el mismo criterio que las líneas de arriba. |
+  | `index.html:94` (aviso de "Rango de escenarios") | "Rango de escenarios: 'Amplio' muestra movimientos 35 % mayores que 'Estándar'." | Sale de `RISK_MULTIPLIER = { conservative: 1, open: 1.35 }` (`index.html:517`, usado en `effectiveSigma`, l. 519). **Desde la Fase 2, ese multiplicador ya no cambia las tarjetas, el abanico ni la tabla #47** (salen de Monte Carlo). Solo afecta la etiqueta SIGMA, el radar (Top Picks) y el camino de correlación apagado, así que el aviso hoy es inexacto para las proyecciones. Decidir en la Fase 3 si se retira el control "Amplio/Estándar" o se redefine. **Debe quedar resuelto antes de la beta (Fase 9).** |
 - **Fase 8, con las capturas #92/#93 de la Fase 1 (sección J):** regenerar `homepage/assets/prob tomorrow.png` y su `alt` (`homepage/index.html:292`, hoy "Escenario de referencia para mañana") a partir de la terminal ya con Monte Carlo v2. La captura actual muestra la tarjeta vieja con "Probabilidad 23.3%" (#93).
 
 ### 10.5 CI y despliegue al hacer push
