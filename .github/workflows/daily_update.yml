@@ -10,6 +10,11 @@ on:
         required: false
         type: boolean
         default: false
+      only_winrate:
+        description: 'Correr SOLO la lectura del Win Rate (legacy y shadow_v2) en modo solo lectura: llama a PAGES_BASE_URL con X-Admin-Secret e imprime el resultado, sin escribir en win_rate_history ni tocar precios/senales/alertas push/Monte Carlo.'
+        required: false
+        type: boolean
+        default: false
       backfill_1mo:
         description: 'Backfill de precios: descargar 1 mes y SOLO insertar las fechas que falten en asset_historical_prices (nunca reescribe filas existentes, salvo el upsert del día más reciente).'
         required: false
@@ -37,9 +42,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PAGES_BASE_URL: ${{ secrets.PAGES_BASE_URL }}
+          ADMIN_API_SECRET: ${{ secrets.ADMIN_API_SECRET }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           ONLY_MONTECARLO: ${{ (github.event.inputs.only_montecarlo == 'true') && '1' || '' }}
+          ONLY_WINRATE: ${{ (github.event.inputs.only_winrate == 'true') && '1' || '' }}
           PRICE_PERIOD: ${{ (github.event.inputs.backfill_1mo == 'true') && '1mo' || '5d' }}
         run: |
           python actualizar_automatico.py
