@@ -601,3 +601,28 @@ Los commits de documentación (plan, migración y pendientes) van aparte: `db1eb
 
 - **GitHub Actions:** el único workflow es `.github/workflows/daily_update.yml`. Se dispara con `schedule` (`0 22 * * 1-5`) y `workflow_dispatch`, y **no** con `push` ni `pull_request`. El `schedule` solo corre en la rama por defecto (`main`), así que un push de esta rama no ejecuta ningún workflow.
 - **Cloudflare Pages:** con la integración de Git, un push de la rama genera un **despliegue Preview**, que usa la base de **producción**. El endpoint nuevo solo lee, pero las acciones de 6.3 marcadas como "en el Preview no" siguen aplicando. Antes de la migración, `/api/escenarios` responde 502 en el Preview (columna `base_close_date` inexistente) y la página muestra "No disponible": es el comportamiento esperado.
+
+### 10.6 Verificación con datos reales (2026-10-06, la realizó el usuario en Supabase y en el Preview)
+
+**Corrida de la rama:** `workflow_dispatch` con `only_montecarlo`, commit `71eaf2a`, 2026-10-06 03:32 UTC, success. La migración ya estaba aplicada.
+
+| Verificación (6.2.B) | Resultado |
+|---|---|
+| Filas por horizonte | **4 horizontes × 30 = 120** |
+| `base_close_date` | **2026-10-05 en las 120 filas** |
+| Diferencias contra el último cierre real de cada activo | **0** |
+| `computed_at` | de 2026-10-06 03:32:50 a 03:33:13 UTC: se actualiza en cada corrida (**#127 resuelto**) |
+| `asset_historical_prices` | **23,151 filas, sin cambios** (no se tocaron precios) |
+| `push_subscriptions` | **2, sin cambios** (no hubo push) |
+| Duración del tramo de Monte Carlo | **~23 s** |
+
+**Preview con datos reales:** criterio de salida (sección 7) **cumplido**.
+- **El abanico baja:** en NG=F la mediana pasa de 3.08 a 3.06.
+- **Se ensancha en activos volátiles:** el rango es de ±2.5 % en NG=F contra ±1.1 % en GOOGL.
+- Tooltips, tabla #47 y fechas correctos.
+
+Durante la revisión del Preview se corrigieron además el activo sin historial, "Último precio", la lista del portafolio y los decimales por magnitud (`17b2b01`).
+
+**Ventana entre la corrida de la rama y el merge.** Mientras `main` siga con el motor viejo, cada corrida nocturna (22:00 UTC, lunes a viernes) agrega un cierre nuevo y actualiza `daily`, `weekly` y `monthly` sin `base_close_date`, y no toca `two_day`. A partir de ese momento `base_close_date` (2026-10-05) deja de coincidir con el último cierre, así que el Preview, y Producción si se hace merge después, muestran "No disponible" hasta la siguiente corrida con el motor nuevo. Es el comportamiento seguro, no una falla.
+- **Merge antes de las 22:00 UTC de un día hábil:** la corrida nocturna de esa noche ya usa el motor nuevo y no hay ventana.
+- **Merge después:** para no esperar a la noche siguiente, correr `workflow_dispatch` sobre `main` con `only_montecarlo` (requiere autorización del usuario).
