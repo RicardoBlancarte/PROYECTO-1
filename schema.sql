@@ -467,7 +467,7 @@ alter table public.asset_markov_matrix enable row level security;
 -- no log — las versiones en log quedan en model_notes.log_units para quien las necesite.
 create table if not exists public.asset_montecarlo_simulation (
   symbol text not null,
-  horizon text not null check (horizon in ('daily', 'weekly', 'monthly')),
+  horizon text not null check (horizon in ('daily', 'two_day', 'weekly', 'monthly')),
   n_paths integer not null,
   seed bigint not null,
   garch_omega numeric not null,
@@ -491,6 +491,7 @@ create table if not exists public.asset_montecarlo_simulation (
   sample_skewness_robust numeric not null,   -- Bowley, cuantiles
   realized_skewness_simulated numeric not null,
   news_uncertainty_variance numeric not null default 0,
+  base_close_date date,                      -- cierre sobre el que se simulo (dates[-1])
   b1_crosscheck jsonb,                       -- snapshot de asset_sensitivity_factor al momento del calculo
   b2_crosscheck jsonb,                       -- snapshot de asset_markov_matrix al momento del calculo
   model_notes jsonb not null default '{}'::jsonb,  -- incluye lambda_pool_mode, garch_persistence_at_boundary, pool_e_z2_before_rescale, log_units
@@ -499,3 +500,12 @@ create table if not exists public.asset_montecarlo_simulation (
 );
 
 alter table public.asset_montecarlo_simulation enable row level security;
+
+-- FASE 2 de lanzamiento (Monte Carlo v2 en la grafica; ver docs/lanzamiento/fase-2-migracion.sql):
+-- horizonte 'two_day' (2 sesiones, "pasado mañana") y base_close_date (fecha del cierre sobre el
+-- que se simulo; la interfaz muestra "No disponible" si no coincide con el ultimo cierre mostrado).
+-- Idempotente, para bases creadas antes de este cambio.
+alter table public.asset_montecarlo_simulation add column if not exists base_close_date date;
+alter table public.asset_montecarlo_simulation drop constraint if exists asset_montecarlo_simulation_horizon_check;
+alter table public.asset_montecarlo_simulation add constraint asset_montecarlo_simulation_horizon_check
+  check (horizon in ('daily', 'two_day', 'weekly', 'monthly'));
