@@ -7,6 +7,21 @@
 
 ---
 
+## 0. Decisiones del usuario (2026-10-05)
+
+| # | Decisión |
+|---|---|
+| D1 | **Sí:** `limit=400` con `order=date.desc` e inversión local del arreglo. |
+| D2 | **No se rellena** `win_rate_history`. Las 4 filas existentes por motor (hasta el 29-sep) se calcularon con las 400 filas más antiguas (`asOf` de abril de 2025) y no son comparables con las nuevas. Del 30-sep al día del merge **quedan huecos**, sin filas. |
+| D3 | **Sí:** input `only_winrate` de solo lectura. Esa corrida llama a `PAGES_BASE_URL`, que probablemente apunta a **Producción**, con el código viejo hasta el merge. Por tanto **solo prueba el secreto** (401 → 200), **no el arreglo de #131**, que se prueba con `curl` en el Preview. |
+| D4 | **Sí:** clave de caché `all-v2` en ambos endpoints. |
+| D5 | **Sí:** `correlation.js` pasa a la Fase 3; el usuario verifica el `max_rows` del proyecto. |
+| Previos | El secreto `ADMIN_API_SECRET` ya existe en GitHub. El entorno Preview de Cloudflare tiene `ADMIN_API_SECRET` y las variables de Supabase. |
+
+**`GET ?all=1` no escribe en la base.** Ambos endpoints solo hacen `GET` a `asset_historical_prices` (una petición por símbolo) y guardan la respuesta en `caches.default` (caché de Cloudflare, no Supabase). No hay `POST`, `PATCH`, `upsert` ni RPC. La única escritura en `win_rate_history` la hace `actualizar_automatico.py`, y en modo `only_winrate` se omite.
+
+---
+
 ## 1. Hallazgos
 
 ### a) #131: cómo leen el historial `/api/winrate` y `/api/winrate-shadow`
@@ -128,7 +143,7 @@ Requisito previo del usuario, antes de la prueba 1.e.3: crear el secreto `ADMIN_
   ```
 - Los huecos del 30-sep al día del merge y la falta de comparabilidad con las 4 filas previas quedan anotados en #130/#131.
 
-## 6. Decisiones pendientes del usuario
+## 6. Decisiones (resueltas en la sección 0)
 
 | # | Pregunta | Recomendación |
 |---|---|---|
