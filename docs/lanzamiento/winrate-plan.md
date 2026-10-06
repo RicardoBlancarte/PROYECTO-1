@@ -133,8 +133,8 @@ Requisito previo del usuario, antes de la prueba 1.e.3: crear el secreto `ADMIN_
 
 ## 5. Criterio de salida
 
-- `/api/winrate` y `/api/winrate-shadow` devuelven `asOf` igual a la última fecha de `asset_historical_prices` para cada símbolo con datos (comprobado al menos en AAPL y GC=F).
-- La primera corrida programada desde `main` tras el merge registra en el log `Win Rate (legacy) registrado: …` y `Win Rate (shadow_v2) registrado: …`, sin 401/503 y sin el valor del secreto.
+- `/api/winrate` y `/api/winrate-shadow` devuelven `asOf` igual a la última fecha de `asset_historical_prices` para cada símbolo con datos. Como T2/T4 no se pudieron correr en el Preview (5.1), se comprueba con el log de la primera corrida tras el merge.
+- La primera corrida programada desde `main` tras el merge registra en el log `Win Rate (legacy) registrado: … (asOf más reciente <último cierre>)` y lo mismo para `shadow_v2`, sin 401/503 y sin el valor del secreto.
 - `win_rate_history` tiene una fila nueva por motor con la fecha de esa corrida, y el `asOf` dentro de `details` es reciente:
   ```sql
   select date, engine, global_win_rate,
@@ -171,9 +171,25 @@ Comprobaciones adicionales en la rama:
 - Sin secreto o sin URL: aviso y ninguna llamada.
 - El valor del secreto no aparece en el log ni en la fila guardada.
 
-**Nota sobre la corrida `only_winrate` (T5).** Llama a `PAGES_BASE_URL`, que probablemente apunta a **Producción**, con el código viejo hasta el merge. Por eso **solo prueba el secreto** (401 → 200), no el arreglo de #131. Hasta el merge, el `asOf` que imprima será la fecha de la fila 400 en orden ascendente de los datos reales. La auditoría la registró como abril de 2025; con ~504 sesiones continuas hasta fines de septiembre de 2026 caería hacia abril-mayo de 2026. El log lo dirá; en cualquier caso **no** será el último cierre. El arreglo de #131 se prueba con `curl` en el Preview (T2-T4).
+**Nota sobre la corrida `only_winrate` (T5).** Llama a `PAGES_BASE_URL`, que apunta a **Producción**, con el código viejo hasta el merge. Por eso **solo prueba el secreto** (401 → 200), no el arreglo de #131.
 
-**Pendiente:** T2-T4 en el Preview (los corre el usuario: el secreto no pasa por la sesión), T5 (`only_winrate`, cuando el usuario decida), PR y merge, y la primera corrida programada desde `main` (criterio de salida, sección 5).
+**T5: corrida `only_winrate` #30 desde `lanzamiento-winrate` (`e3937c4`), resultado del usuario: OK.**
+
+| Motor | Status | Global | Muestras | `asOf` más reciente |
+|---|---|---|---|---|
+| legacy | HTTP 200 | 28.7 | 11 820 (30 × 394) | 2025-04-11 |
+| shadow_v2 | HTTP 200 | 51.4 | 11 490 (30 × 383) | 2025-04-11 |
+
+- **#130 verificado:** el secreto de GitHub llega al script y Producción responde 200 en lugar de 401.
+- El log no tiene ninguna otra línea: el valor del secreto no aparece, y no corrieron precios, señales, push ni Monte Carlo. Tampoco hubo escritura en `win_rate_history`.
+- **El `asOf` 2025-04-11 confirma #131 con datos reales.** Es la fila 400 en orden ascendente. Con ~771 filas por símbolo (23 151 en `asset_historical_prices` según la verificación de la Fase 2), corresponde a abril de 2025, como registró la auditoría. Las "504 filas" de la auditoría eran un dato anterior, y la estimación de "abril-mayo de 2026" de la versión previa de este plan era incorrecta.
+- Con ~771 filas, `limit=400` sigue por debajo del `max_rows` de 1 000, y las 400 más recientes cubren aproximadamente desde mayo de 2025 hasta hoy.
+
+**T2-T4 en el Preview: no se pudieron correr con el script.** El comando de PowerShell devolvió "sin respuesta" en todas las llamadas. Causa probable: Windows PowerShell 5.1 no negocia TLS 1.2 por defecto, y el script no fijaba `[Net.ServicePointManager]::SecurityProtocol = 'Tls12'`. Una llamada manual con TLS 1.2 sí conecta y responde 401. Se reemplazaron así:
+- **T3: verificado a mano.** 401 sin header, en el navegador y en PowerShell.
+- **T2/T4 (#131 contra datos reales):** cubiertos por T1 (datos simulados) y por el log de la primera corrida nocturna tras el merge, que imprime `asOf más reciente` (criterio de salida, sección 5).
+
+**Pendiente:** PR y merge, y la primera corrida programada desde `main` (criterio de salida, sección 5).
 
 ## 6. Decisiones (resueltas en la sección 0)
 
