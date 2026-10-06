@@ -189,7 +189,25 @@ Comprobaciones adicionales en la rama:
 - **T3: verificado a mano.** 401 sin header, en el navegador y en PowerShell.
 - **T2/T4 (#131 contra datos reales):** cubiertos por T1 (datos simulados) y por el log de la primera corrida nocturna tras el merge, que imprime `asOf más reciente` (criterio de salida, sección 5).
 
-**Pendiente:** PR y merge, y la primera corrida programada desde `main` (criterio de salida, sección 5).
+**Merge:** PR #4 (`lanzamiento-winrate` → `main`), `main` en `8b7794d`.
+
+**Verificación en Producción: corrida `only_winrate` #31 desde `main` (`8b7794d`), resultado del usuario: OK.**
+
+| Motor | Status | Global | Muestras | `asOf` más reciente |
+|---|---|---|---|---|
+| legacy | HTTP 200 | 32.1 | 11 820 (30 × 394) | **2026-10-05** |
+| shadow_v2 | HTTP 200 | 49.7 | 11 490 (30 × 383) | **2026-10-05** |
+
+- **#131 verificado en Producción:** `asOf` pasa de 2025-04-11 (corrida #30, código viejo) al último cierre guardado, 2026-10-05, en ambos motores. Las muestras no cambian, como se esperaba.
+- **#130:** sigue en 200 desde `main`, sin el secreto en el log. Como en la #30, no hubo escritura en `win_rate_history`.
+- **#130 y #131 resueltos tras el merge.** Solo falta la **primera escritura nocturna** en `win_rate_history`: las líneas `Win Rate (…) registrado: … (asOf más reciente <último cierre>)` y una fila nueva por motor (consulta de la sección 5).
+
+**Nota: qué dicen los valores con datos recientes.** Los dos números no están en la misma escala:
+- **shadow_v2 (49.7 %)** es una tasa de acierto direccional (¿sube o baja la próxima sesión?). Con datos recientes queda en el nivel del azar (~50 %): el motor de patrones binarios no predice la dirección mejor que una moneda.
+- **legacy (32.1)** no es un porcentaje de aciertos, sino un puntaje de 0 a 100: 70 puntos si el cierre real cae dentro de la banda P10/P90 y hasta 30 por proximidad al precio central. Esa banda parte de una fórmula que siempre supone alza (`spot × (1 + 0.21σ)`), la misma que la Fase 2 retiró de la terminal. Con 32.1, la banda contiene el cierre real como mucho en ~46 % de las sesiones (32.1 / 70), muy por debajo del 80 % que debería cubrir una banda P10/P90 bien calibrada. El desglose (`bandCoverage`, `proximity`) quedará en `details` con la primera escritura nocturna.
+- **Conclusión:** los resultados respaldan **medir riesgo (rangos de escenarios) y no predecir dirección**, que es la línea de la Fase 2 (Monte Carlo v2: "escenarios simulados… no son una predicción"). Ninguno de los dos motores justifica mostrar al usuario una predicción de alza o baja. Nota aparte: el Win Rate legacy evalúa la fórmula vieja, no los escenarios de Monte Carlo v2 que muestra hoy la terminal; medir la cobertura real de esas bandas sería otra métrica.
+
+**Pendiente:** la primera corrida nocturna desde `main` con escritura en `win_rate_history` (criterio de salida, sección 5).
 
 ## 6. Decisiones (resueltas en la sección 0)
 
