@@ -17,7 +17,7 @@ export async function onRequestGet(context) {
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
   if (wantsAll) {
     const cache = caches.default;
-    const cacheKey = new Request('https://asset-winrate-cache.internal/all');
+    const cacheKey = new Request('https://asset-winrate-cache.internal/all-v2');
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
     const items = (await Promise.all(CATALOG.map(symbol => computeWinRate(context.env, headers, symbol)))).filter(Boolean).sort((a, b) => b.winRate - a.winRate);
@@ -34,11 +34,14 @@ export async function onRequestGet(context) {
 }
 
 async function computeWinRate(env, headers, symbol) {
+  // Orden DESC + inversion local (#131): con ASC y limit=400 se leian las 400 filas MAS
+  // ANTIGUAS y el backtest quedaba congelado sin ningun error. Asi se usan las 400 sesiones
+  // mas recientes y asOf/lastClose son el ultimo cierre guardado.
   const endpoint = new URL(`${env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date', limit: '400' }).toString();
+  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'close,date', limit: '400' }).toString();
   const response = await fetch(endpoint, { headers });
   if (!response.ok) return null;
-  const rows = await response.json();
+  const rows = (await response.json()).reverse();
   const MIN_WINDOW = 5; // sesiones previas mínimas para estimar sigma realizada
   if (rows.length < MIN_WINDOW + 2) return null;
   const closes = rows.map(row => Number(row.close));
