@@ -90,7 +90,7 @@
 
 Las tres pruebas solo **leen** de Supabase. Ninguna escribe en `win_rate_history` ni en `asset_historical_prices`.
 
-1. **Local, sin red:** un script de Node, `test_winrate_synthetic.mjs` (como `test_montecarlo_synthetic.py` de la Fase 2), que importa `onRequestGet` de ambos endpoints con `fetch` y `caches` simulados y 504 filas sintéticas. Comprueba: (a) que la URL pedida lleva `order=date.desc` y `limit=400`; (b) que `asOf` es la última fecha sintética y `lastClose` su cierre; (c) que `sampleSize` es 394 en legacy (400 − 5 − 1) y que shadow_v2 sigue devolviendo resultado; (d) 401 sin header y 503 sin `ADMIN_API_SECRET`.
+1. **Local, sin red:** un script de Node en el scratchpad (no se agrega al repo, decisión del usuario), que importa `onRequestGet` de ambos endpoints con `fetch` y `caches` simulados y 504 filas sintéticas. Comprueba: (a) que la URL pedida lleva `order=date.desc` y `limit=400`; (b) que `asOf` es la última fecha sintética y `lastClose` su cierre; (c) que `sampleSize` es 394 en legacy (400 − 5 − 1) y que shadow_v2 sigue devolviendo resultado; (d) 401 sin header y 503 sin `ADMIN_API_SECRET`.
 2. **Preview de Cloudflare Pages:** al subir la rama, Pages crea un despliegue de preview con el código nuevo. Se llama con `curl` a `/api/winrate?symbol=AAPL` y `/api/winrate-shadow?symbol=AAPL`, **sin `all=1`** para no pasar por el caché compartido, con el header leído de una variable de entorno local, sin escribirlo en el comando ni en el chat. Requisito: que el entorno **Preview** de Pages tenga `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `ADMIN_API_SECRET` (por verificar en el panel). Se comprueba que `asOf` = `max(date)` de AAPL en `asset_historical_prices`.
 3. **Corrida de GitHub Actions desde la rama, sin escribir:** nuevo input `only_winrate` en `workflow_dispatch` (como `only_montecarlo`). Ejecuta solo el bloque del Win Rate y en modo **solo lectura**: imprime motor, status HTTP, `globalWinRate`, `totalSamples` y el `asOf` más reciente, y **no hace upsert**. Como la corrida apunta a `PAGES_BASE_URL` (producción, que hasta el merge tiene el código viejo), esta prueba valida **#130** (200 en lugar de 401, y el secreto enmascarado); el `asOf` seguirá siendo viejo hasta el merge, como es de esperar. Si se prefiere no tocar el workflow para pruebas, la alternativa es validar #130 solo con `curl` y esperar a la primera corrida programada después del merge (ver D3).
 
@@ -104,7 +104,7 @@ Las tres pruebas solo **leen** de Supabase. Ninguna escribe en `win_rate_history
 | `functions/api/winrate-shadow.js` | l. 44: `order: 'date.desc'`; `rows.reverse()` tras l. 47; clave de caché `all-v2` (l. 23). |
 | `actualizar_automatico.py` | Leer `ADMIN_API_SECRET` (l. 13-23); header `X-Admin-Secret` en l. 261; omitir con aviso si falta; status HTTP en el mensaje de error; modo `ONLY_WINRATE` solo lectura (si se aprueba D3), que sale antes de precios, señales, push y Monte Carlo, igual que `ONLY_MONTECARLO`. |
 | `.github/workflows/daily_update.yml` | `ADMIN_API_SECRET: ${{ secrets.ADMIN_API_SECRET }}` en el `env` del paso; input `only_winrate` y `ONLY_WINRATE` (si se aprueba D3). |
-| `test_winrate_synthetic.mjs` (nuevo) | Prueba local sin red (sección 1.e.1). |
+| ~~`test_winrate_synthetic.mjs`~~ | No se agrega al repo: T1 se ejecutó desde el scratchpad (sección 5.1). |
 | `docs/lanzamiento/fase-1-auditoria.md` | Estado de #130 y #131 al cerrar. |
 | `docs/lanzamiento/winrate-plan.md` | Resultados de las pruebas y criterio de salida. |
 
@@ -114,7 +114,7 @@ Las tres pruebas solo **leen** de Supabase. Ninguna escribe en `win_rate_history
 
 Cada cambio de producción se muestra como diff antes de aplicarlo. `git add` siempre por ruta.
 
-1. `fix(winrate): leer las 400 sesiones más recientes en legacy y shadow_v2 (#131)`: `winrate.js`, `winrate-shadow.js`, `test_winrate_synthetic.mjs`.
+1. `fix(winrate): leer las 400 sesiones más recientes en legacy y shadow_v2 (#131)`: `winrate.js`, `winrate-shadow.js`.
 2. `fix(cascada): enviar X-Admin-Secret al registrar el Win Rate (#130)`: `actualizar_automatico.py`, `daily_update.yml`.
 3. `docs(lanzamiento): resultados de las pruebas del Win Rate`: este archivo y `fase-1-auditoria.md`.
 
@@ -124,7 +124,7 @@ Requisito previo del usuario, antes de la prueba 1.e.3: crear el secreto `ADMIN_
 
 | # | Prueba | Resultado esperado |
 |---|---|---|
-| T1 | `node test_winrate_synthetic.mjs` | Todas las comprobaciones de 1.e.1 en verde. |
+| T1 | Script de Node en el scratchpad (VS Code, `ELECTRON_RUN_AS_NODE=1`) | Todas las comprobaciones de 1.e.1 en verde. |
 | T2 | Preview: `?symbol=AAPL` en ambos endpoints, con header | 200; `asOf` = último cierre guardado de AAPL; `sampleSize` 394 (legacy). |
 | T3 | Preview: sin header | 401. |
 | T4 | Preview: `?symbol=GC=F` (futuro) y un símbolo con poco historial | 200 o 422 (`Historial insuficiente…`), nunca 500. |
@@ -142,6 +142,38 @@ Requisito previo del usuario, antes de la prueba 1.e.3: crear el secreto `ADMIN_
   from public.win_rate_history order by date desc, engine limit 4;
   ```
 - Los huecos del 30-sep al día del merge y la falta de comparabilidad con las 4 filas previas quedan anotados en #130/#131.
+
+## 5.1 Estado y resultados (2026-10-05)
+
+| Commit | Contenido |
+|---|---|
+| `659e0da` | `fix(winrate)`: leer las 400 sesiones más recientes en legacy y shadow_v2 (#131); clave de caché `all-v2`. |
+| `405c038` | `fix(cascada)`: enviar `X-Admin-Secret` al registrar el Win Rate (#130). El bloque pasa a `record_win_rate(write=True)`, que avisa si falta `PAGES_BASE_URL` o `ADMIN_API_SECRET`, registra solo `HTTP <status>` si la respuesta no es 2xx y añade el `asOf` más reciente al log. Input `only_winrate` (`ONLY_WINRATE=1`): llama con `write=False` y sale antes de precios, señales, push y Monte Carlo. En el workflow solo se añadieron `only_winrate`, `ADMIN_API_SECRET` y `ONLY_WINRATE`; cron, runner y pasos sin cambios. |
+
+**T1, local sin red (31/31 OK).** Se ejecutó con el Node de VS Code (`ELECTRON_RUN_AS_NODE=1`) desde el scratchpad, sin agregar la prueba al repo. Usa 504 sesiones simuladas por símbolo, hasta 2026-10-02, y un `fetch` simulado que respeta `order` y `limit`:
+
+| | `main` 9905289 | rama |
+|---|---|---|
+| Petición | `order=date.asc&limit=400` | `order=date.desc&limit=400` |
+| `asOf` (AAPL) | 2026-05-11 (fila 400 de los datos simulados: reproduce #131) | 2026-10-02 (última fila) |
+| `sampleSize` legacy / shadow_v2 | 394 / 383 | 394 / 383 |
+
+Comprobaciones adicionales en la rama:
+- `history` de legacy = 30 días más recientes, en orden ascendente.
+- `?all=1`: 30 símbolos, todos con `asOf` = última fecha. Hace solo 30 `GET` a `asset_historical_prices` (ninguna escritura) y un `cache.put` con la clave `all-v2`.
+- 401 sin header o con un header incorrecto; 503 sin `ADMIN_API_SECRET`; 400 sin `symbol` ni `all`.
+- 12 filas: legacy responde 200 con `sampleSize` 6 y shadow_v2 responde 422. `gc=f` → 200, `GC=F`.
+
+**Prueba del script, local sin red (OK).** Se ejecutó `actualizar_automatico.py` con `requests`, `supabase`, `yfinance`, `pandas` y `pywebpush` simulados:
+- `only_winrate`: 2 llamadas con el header y ninguna escritura.
+- Escritura normal: upsert de `legacy` y `shadow_v2` con `on_conflict=date,engine`.
+- 401: solo `HTTP 401` en el log, sin escritura.
+- Sin secreto o sin URL: aviso y ninguna llamada.
+- El valor del secreto no aparece en el log ni en la fila guardada.
+
+**Nota sobre la corrida `only_winrate` (T5).** Llama a `PAGES_BASE_URL`, que probablemente apunta a **Producción**, con el código viejo hasta el merge. Por eso **solo prueba el secreto** (401 → 200), no el arreglo de #131. Hasta el merge, el `asOf` que imprima será la fecha de la fila 400 en orden ascendente de los datos reales. La auditoría la registró como abril de 2025; con ~504 sesiones continuas hasta fines de septiembre de 2026 caería hacia abril-mayo de 2026. El log lo dirá; en cualquier caso **no** será el último cierre. El arreglo de #131 se prueba con `curl` en el Preview (T2-T4).
+
+**Pendiente:** T2-T4 en el Preview (los corre el usuario: el secreto no pasa por la sesión), T5 (`only_winrate`, cuando el usuario decida), PR y merge, y la primera corrida programada desde `main` (criterio de salida, sección 5).
 
 ## 6. Decisiones (resueltas en la sección 0)
 
