@@ -20,7 +20,7 @@ export async function onRequestGet(context) {
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
   if (wantsAll) {
     const cache = caches.default;
-    const cacheKey = new Request('https://asset-winrate-shadow-cache.internal/all');
+    const cacheKey = new Request('https://asset-winrate-shadow-cache.internal/all-v2');
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
     const items = (await Promise.all(CATALOG.map(symbol => computeShadowWinRate(context.env, headers, symbol)))).filter(Boolean).sort((a, b) => b.winRate - a.winRate);
@@ -40,11 +40,12 @@ export async function onRequestGet(context) {
 // Markov/Monte Carlo sigma-based, predice la direccion (alza/baja) con la misma logica de
 // patrones binarios que functions/api/patterns.js y mide la tasa de aciertos direccionales.
 async function computeShadowWinRate(env, headers, symbol) {
+  // Orden DESC + inversion local, igual que winrate.js (#131): las 400 sesiones mas recientes.
   const endpoint = new URL(`${env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date', limit: '400' }).toString();
+  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'close,date', limit: '400' }).toString();
   const response = await fetch(endpoint, { headers });
   if (!response.ok) return null;
-  const rows = await response.json();
+  const rows = (await response.json()).reverse();
   if (rows.length < MIN_HISTORY + 1) return null;
   const closes = rows.map(row => Number(row.close));
   const dates = rows.map(row => row.date);

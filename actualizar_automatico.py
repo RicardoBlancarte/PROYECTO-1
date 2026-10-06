@@ -16,6 +16,9 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 # URL publica del deploy de Cloudflare Pages, solo para leer /api/winrate* al cierre del dia.
 # No es secreta, pero se configura como secret/variable del repo igual que las demas.
 PAGES_BASE_URL = os.environ.get("PAGES_BASE_URL")
+# Mismo valor que ADMIN_API_SECRET en Cloudflare Pages: /api/winrate* exigen el header
+# X-Admin-Secret (functions/_shared/admin-auth.js). Nunca se imprime.
+ADMIN_API_SECRET = os.environ.get("ADMIN_API_SECRET")
 # Par de llaves VAPID (punto 12, Web Push). La privada solo vive aqui (GitHub Actions); la
 # publica tambien se configura en Cloudflare Pages para que /api/public-config la exponga.
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
@@ -39,6 +42,55 @@ if os.environ.get("ONLY_MONTECARLO") == "1":
     import montecarlo_engine
     montecarlo_engine.run_for_all_assets(supabase, assets)
     sys.exit(0)
+
+
+# FASE 4 — paso 2 de la cascada: recálculo diario del Win Rate (punto 9.8) de ambos motores,
+# leyendo los endpoints ya desplegados en Cloudflare Pages (que hacen el backtest real) y
+# guardando el resumen en win_rate_history para poder comparar legacy vs shadow_v2 con el
+# tiempo. No es un cron independiente: corre como parte de esta misma cascada diaria.
+# Con write=False (input only_winrate del workflow) solo lee los endpoints e imprime el
+# resultado, sin escribir en win_rate_history.
+def record_win_rate(write=True):
+    if not PAGES_BASE_URL:
+        print("PAGES_BASE_URL no configurado; se omite el registro diario de Win Rate.")
+        return
+    if not ADMIN_API_SECRET:
+        print("ADMIN_API_SECRET no configurado; se omite el registro diario de Win Rate.")
+        return
+    today = date.today().isoformat()
+    for engine, path in (("legacy", "/api/winrate?all=1"), ("shadow_v2", "/api/winrate-shadow?all=1")):
+        try:
+            response = requests.get(
+                f"{PAGES_BASE_URL.rstrip('/')}{path}",
+                headers={"X-Admin-Secret": ADMIN_API_SECRET},
+                timeout=30,
+            )
+            # Solo el status: nunca el header ni el valor del secreto.
+            if not response.ok:
+                print(f"Error registrando Win Rate ({engine}): HTTP {response.status_code}")
+                continue
+            payload = response.json()
+            as_of = max((item.get("asOf") or "" for item in payload.get("items") or []), default="") or "n/d"
+            if not write:
+                print(f"Win Rate ({engine}) solo lectura: HTTP {response.status_code}, "
+                      f"global {payload.get('globalWinRate')}, muestras {payload.get('totalSamples')}, "
+                      f"asOf más reciente {as_of}. No se escribe en win_rate_history.")
+                continue
+            supabase.table("win_rate_history").upsert({
+                "date": today,
+                "engine": engine,
+                "global_win_rate": payload.get("globalWinRate"),
+                "details": payload,
+            }, on_conflict="date,engine").execute()
+            print(f"Win Rate ({engine}) registrado: {payload.get('globalWinRate')} (asOf más reciente {as_of})")
+        except Exception as e:
+            print(f"Error registrando Win Rate ({engine}): {e}")
+
+
+if os.environ.get("ONLY_WINRATE") == "1":
+    record_win_rate(write=False)
+    sys.exit(0)
+
 
 def backfill_asset_signals():
     """Backfill retroactivo de asset_signals (punto 9.2): recorre TODO el historial ya
@@ -250,28 +302,9 @@ if signal_rows:
     except Exception as e:
         print(f"Error guardando señales binarias (asset_signals): {e}")
 
-# FASE 4 — paso 2 de la cascada: recálculo diario del Win Rate (punto 9.8) de ambos motores,
-# leyendo los endpoints ya desplegados en Cloudflare Pages (que hacen el backtest real) y
-# guardando el resumen en win_rate_history para poder comparar legacy vs shadow_v2 con el
-# tiempo. No es un cron independiente: corre como parte de esta misma cascada diaria.
-if PAGES_BASE_URL:
-    today = date.today().isoformat()
-    for engine, path in (("legacy", "/api/winrate?all=1"), ("shadow_v2", "/api/winrate-shadow?all=1")):
-        try:
-            response = requests.get(f"{PAGES_BASE_URL.rstrip('/')}{path}", timeout=30)
-            response.raise_for_status()
-            payload = response.json()
-            supabase.table("win_rate_history").upsert({
-                "date": today,
-                "engine": engine,
-                "global_win_rate": payload.get("globalWinRate"),
-                "details": payload,
-            }, on_conflict="date,engine").execute()
-            print(f"Win Rate ({engine}) registrado: {payload.get('globalWinRate')}")
-        except Exception as e:
-            print(f"Error registrando Win Rate ({engine}): {e}")
-else:
-    print("PAGES_BASE_URL no configurado; se omite el registro diario de Win Rate.")
+# FASE 4 — paso 2 de la cascada: Win Rate (ver record_win_rate, definida arriba para que
+# el modo only_winrate pueda salir antes de tocar precios, señales, push o Monte Carlo).
+record_win_rate()
 
 
 # FASE 5 — paso final de la cascada: alertas por Web Push (punto 12, reemplaza WhatsApp).
