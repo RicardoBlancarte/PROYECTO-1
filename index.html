@@ -91,7 +91,7 @@
     <header class="topbar"><div class="brand"><button id="sidebar-toggle" class="btn btn-ghost" title="Mostrar u ocultar menú" aria-label="Mostrar u ocultar menú"><i class="fa-solid fa-bars"></i></button><div class="brand-mark"><img src="logo_algorithm.svg" alt="The Algorithm"></div><div><strong>THE ALGORITHM</strong><small>IN THE NAME OF MANKIND</small></div></div><div class="top-actions"><span id="cache-status" class="status"><i class="fa-solid fa-circle"></i>ESTADO DE DATOS</span><a href="/homepage/" class="chart-control-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none" title="Ir a la página de The Algorithm" aria-label="Ir a la página de The Algorithm"><i class="fa-solid fa-house"></i><span class="btn-label">Acerca de</span></a><button id="fullscreen-toggle" class="btn btn-ghost" title="Extender pantalla" aria-label="Extender pantalla"><i class="fa-solid fa-expand"></i></button><button id="logout" class="btn btn-ghost"><i class="fa-solid fa-arrow-right-from-bracket"></i> Salir</button></div></header>
     <nav id="global-sidebar" class="hidden" aria-label="Navegación global" style="position:fixed;left:16px;top:84px;z-index:7;width:220px;padding:12px;background:#121b23;border:1px solid var(--line);box-shadow:0 16px 40px #0008"><button type="button" class="btn btn-ghost" data-app-view="main" style="width:100%;text-align:left;margin-bottom:8px"><i class="fa-solid fa-house"></i> Página principal</button><button type="button" class="btn btn-ghost" data-app-view="settings" style="width:100%;text-align:left;margin-bottom:8px"><i class="fa-solid fa-gear"></i> Ajustes</button><button type="button" id="sidebar-history-btn" class="btn btn-ghost hidden" data-app-view="history" style="width:100%;text-align:left"><i class="fa-solid fa-clock-rotate-left"></i> Historial de cotizaciones</button></nav>
     <nav id="superadmin-bar" class="superadmin-bar" aria-label="Auditoría de niveles"><div><strong>Modo superadmin</strong> · auditoría de niveles en vivo</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="dev-tier-btn" data-tier="normal" onclick="setDevTier('normal')">Free</button><button type="button" class="dev-tier-btn" data-tier="premium" onclick="setDevTier('premium')">Premium</button><button type="button" class="dev-tier-btn active" data-tier="elite" onclick="setDevTier('elite')">Elite</button><button type="button" class="btn btn-ghost" id="admin-dashboard-entry" onclick="toggleAdminDashboard()"><i class="fa-solid fa-chart-line"></i> Rendimiento</button><button type="button" class="btn btn-ghost" id="users-dashboard-entry" onclick="toggleUsersDashboard()"><i class="fa-solid fa-users"></i> Usuarios</button></div></nav>
-    <main><div class="welcome"><div><div class="eyebrow">Tu espacio</div><h1>Terminal de análisis</h1></div><div id="today" class="date"></div></div><div id="trial-banner" class="trial-banner"><span id="trial-banner-msg"></span><button type="button" class="btn-trial" onclick="openPlansModal()">Ver planes</button></div><div class="trial-banner" style="display:flex"><span>Rango de escenarios: 'Amplio' muestra movimientos 35 % mayores que 'Estándar'.</span><div style="display:flex;gap:8px"><button type="button" class="dev-tier-btn active" data-risk="conservative" onclick="setRiskPosture('conservative')">Estándar</button><button type="button" class="dev-tier-btn" data-risk="open" onclick="setRiskPosture('open')">Amplio</button></div></div>
+    <main><div class="welcome"><div><div class="eyebrow">Tu espacio</div><h1>Terminal de análisis</h1></div><div id="today" class="date"></div></div><div id="trial-banner" class="trial-banner"><span id="trial-banner-msg"></span><button type="button" class="btn-trial" onclick="openPlansModal()">Ver planes</button></div><div id="privacy-pending-banner" class="trial-banner"><span>Tu consentimiento de privacidad está guardado en este dispositivo, pero aún no quedó registrado en el servidor.</span><button type="button" class="btn-trial" id="privacy-pending-retry">Reintentar</button></div><div class="trial-banner" style="display:flex"><span>Rango de escenarios: 'Amplio' muestra movimientos 35 % mayores que 'Estándar'.</span><div style="display:flex;gap:8px"><button type="button" class="dev-tier-btn active" data-risk="conservative" onclick="setRiskPosture('conservative')">Estándar</button><button type="button" class="dev-tier-btn" data-risk="open" onclick="setRiskPosture('open')">Amplio</button></div></div>
       <section class="panel analysis-start"><div><div class="eyebrow">Resumen del día</div><h2>Hola, <span id="welcome-name">analista</span>.<br>¿Qué deseas analizar hoy?</h2><p class="subtle">Selecciona un activo o una situación financiera para abrir el informe de mercado.</p><div class="selector-row"><select id="asset-select" aria-label="Seleccionar activo"><optgroup label="Acciones"><option value="apple">AAPL (Apple Inc.)</option><option value="MSFT">MSFT (Microsoft Corporation)</option><option value="GOOGL">GOOGL (Alphabet Inc.)</option><option value="AMZN">AMZN (Amazon.com, Inc.)</option><option value="NVDA">NVDA (NVIDIA Corporation)</option><option value="META">META (Meta Platforms, Inc.)</option><option value="tesla">TSLA (Tesla, Inc.)</option><option value="NFLX">NFLX (Netflix, Inc.)</option><option value="AMD">AMD (Advanced Micro Devices, Inc.)</option><option value="INTC">INTC (Intel Corporation)</option><option value="JPM">JPM (JPMorgan Chase &amp; Co.)</option><option value="V">V (Visa Inc.)</option><option value="MA">MA (Mastercard Incorporated)</option><option value="JNJ">JNJ (Johnson &amp; Johnson)</option><option value="WMT">WMT (Walmart Inc.)</option><option value="PG">PG (The Procter &amp; Gamble Company)</option><option value="DIS">DIS (The Walt Disney Company)</option><option value="ASML">ASML (ASML Holding N.V.)</option><option value="TSM">TSM (Taiwan Semiconductor Manufacturing Company)</option><option value="KO">KO (The Coca-Cola Company)</option></optgroup><optgroup label="Commodities / Futuros"><option value="gold">GC=F (Oro)</option><option value="SI=F">SI=F (Plata)</option><option value="oil">CL=F (Petróleo WTI)</option><option value="BZ=F">BZ=F (Petróleo Brent)</option><option value="NG=F">NG=F (Gas Natural)</option><option value="copper">HG=F (Cobre)</option><option value="ZC=F">ZC=F (Maíz)</option><option value="ZW=F">ZW=F (Trigo)</option><option value="ZS=F">ZS=F (Soya)</option><option value="KC=F">KC=F (Café)</option></optgroup><optgroup label="Otros"><option value="btc">BTC-USD (Bitcoin)</option><option value="sp500">^GSPC (S&amp;P 500)</option><option value="bovespa">EWZ (Bovespa / Brasil)</option><option value="nikkei">EWJ (Nikkei 225 / Japón)</option><option value="country">Situación financiera de un país</option></optgroup></select><select id="country-select" aria-label="Seleccionar país"><option value="global">Mapa global</option><option value="us">Estados Unidos</option><option value="cn">China</option><option value="sa">Arabia Saudita</option><option value="eu">Unión Europea</option><option value="br">Brasil</option><option value="jp">Japón</option></select></div></div><div class="panel globe-panel"><div id="geopoliticalMap" aria-label="Mapa mundial de relevancia geopolítica"></div><div id="country-insight" class="micro-card"><strong>FOCO PRINCIPAL</strong><span>El mapa se centra automáticamente en la región más relevante.</span></div><div class="globe-caption">ROJO = ALTA RELEVANCIA · AMARILLO = MEDIA · AZUL = BASE</div></div><div class="relevance-legend"><span><i class="relevance-dot" style="background:#f47e78"></i>Alta relevancia geopolítica</span><span><i class="relevance-dot" style="background:#f5bd65"></i>Relevancia media</span><span><i class="relevance-dot" style="background:#0284c7"></i>Resto del mapa</span></div></section>
       <section id="top-picks" class="panel"><div class="panel-head"><div><div class="eyebrow">Radar de volatilidad</div><h2 style="margin:8px 0 4px">Activos con mayor rango de movimiento estimado</h2><p class="subtle" style="margin:0">Ordenados por cuánto podrían moverse mañana (volatilidad estimada). No es una recomendación de compra ni de venta.</p></div></div><div class="table-scroll"><table class="top-picks-table"><thead><tr><th>Activo</th><th>Movimiento estimado (1 día)</th><th>Proyección óptima</th><th>Acción</th></tr></thead><tbody id="top-picks-body"></tbody></table></div></section>
       <section id="portfolio" class="panel"><div class="panel-head"><div><div class="eyebrow">Mi portafolio</div><h2 style="margin:8px 0 4px">Monitoreo y proyección: <span id="asset-title">Oro / XAUUSD</span></h2><p class="subtle" style="margin:0">Precio histórico y rango estimado para los próximos días. Toca dos veces (o haz doble clic) en la gráfica para fijar una meta de precio.</p></div><div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end"><span id="portfolio-weight-total" class="tag">Activos activos</span><span class="tag">SIGMA <span id="sigma-value">4.78%</span></span><button type="button" id="live-quote-btn" class="btn btn-ghost f1-oculto" title="Consultar el precio de hoy vía API externa (usa caché de 60 min)" onclick="void obtenerHistoricoActivo(currentAssetKey, true)"><i class="fa-solid fa-bolt"></i> Actualizar en vivo</button></div></div><div class="bubbles"><div class="bubble"><small>ÚLTIMO PRECIO</small><strong id="last-price">$2,345.80</strong><small id="last-price-live-tag" class="hidden" style="display:block;color:var(--amber);margin-top:2px">Vista en vivo · temporal, no oficial</small></div><div class="bubble"><small id="tomorrow-label">Próxima sesión</small><small id="tomorrow-central" class="mc-line hidden">Precio central de los escenarios:</small><strong id="tomorrow-price">—</strong><small id="tomorrow-range" class="mc-line"></small><small id="tomorrow-prob" class="mc-line"></small></div><div class="bubble"><small id="next-label">Dentro de 2 sesiones</small><small id="next-central" class="mc-line hidden">Precio central de los escenarios:</small><strong id="next-price">—</strong><small id="next-range" class="mc-line"></small><small id="next-prob" class="mc-line"></small></div></div><p id="mc-context" class="mc-context hidden"><span id="mc-uprate"></span><span id="mc-asof"></span></p><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:14px"><div style="min-width:240px;flex:1"><label for="portfolio-asset">Agregar activo al monitoreo</label><select id="portfolio-asset" aria-label="Activo de portafolio"></select></div><button type="button" id="portfolio-add" class="btn btn-ghost"><i class="fa-solid fa-plus"></i> Agregar</button><button type="button" id="portfolio-optimize" class="btn btn-ghost" title="Calcula un reparto con la teoría de Markowitz"><i class="fa-solid fa-scale-balanced"></i> Optimizar (Markowitz)</button></div><div class="portfolio-layout"><div><div id="portfolio-items" style="display:grid;gap:8px;align-content:start"></div><div id="markowitz-results" class="markowitz-results hidden"></div></div><div style="min-width:0"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px"><div id="portfolio-focus" class="subtle">Selecciona un activo del portafolio.</div><div style="display:flex;gap:6px;flex:none"><button type="button" id="portfolio-zoom-in" class="btn btn-ghost" title="Acercar gráfica" aria-label="Acercar gráfica"><i class="fa-solid fa-magnifying-glass-plus"></i></button><button type="button" id="portfolio-zoom-out" class="btn btn-ghost" title="Alejar gráfica" aria-label="Alejar gráfica"><i class="fa-solid fa-magnifying-glass-minus"></i></button><button type="button" id="portfolio-zoom-reset" class="btn btn-ghost" title="Restablecer escala" aria-label="Restablecer escala"><i class="fa-solid fa-arrows-rotate"></i></button></div></div><div class="chart-wrap" style="height:340px;min-height:340px;position:relative"><canvas id="portfolio-chart"></canvas><div id="portfolio-alert-banner" class="hidden" style="position:absolute;right:12px;bottom:12px;z-index:12;max-width:min(360px,calc(100% - 24px));padding:16px;background:#18242d;border:1px solid var(--amber);box-shadow:0 16px 40px #0009"><strong>Crear alerta de portafolio</strong><p id="portfolio-alert-text" class="subtle" style="margin:8px 0 12px"></p><div style="display:flex;gap:8px"><button type="button" id="portfolio-alert-yes" class="btn btn-primary">Sí, establecer</button><button type="button" id="portfolio-alert-no" class="btn btn-ghost">No</button></div></div></div><div id="portfolio-chart-legend" class="chart-legend"></div></div></div></section>
@@ -214,7 +214,7 @@
     <label class="privacy-consent-line" for="privacy-modal-check"><input id="privacy-modal-check" type="checkbox" style="width:auto;margin-top:2px">He leído y acepto el aviso de privacidad y el tratamiento descrito. / I have read and accept the privacy notice. / 我已阅读并接受本隐私政策。</label>
     <label class="privacy-consent-line" for="privacy-ccpa-optout" style="margin-top:8px"><input id="privacy-ccpa-optout" type="checkbox" style="width:auto;margin-top:2px">(CCPA, opcional) No vender ni compartir mi información personal. / Do not sell or share my personal information. / 请勿出售或共享我的个人信息。</label>
     <div id="privacy-modal-error" class="error-text"></div>
-    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button type="button" id="privacy-modal-accept" class="btn btn-primary" style="flex:1;min-width:180px">Aceptar y continuar</button><button type="button" id="privacy-modal-decline" class="btn btn-ghost" style="flex:1;min-width:140px">No acepto</button></div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button type="button" id="privacy-modal-accept" class="btn btn-primary" style="flex:1;min-width:180px">Aceptar y continuar</button><button type="button" id="privacy-modal-continue" class="btn btn-ghost hidden" style="flex:1;min-width:180px">Continuar de todos modos</button><button type="button" id="privacy-modal-decline" class="btn btn-ghost" style="flex:1;min-width:140px">No acepto</button></div>
   </div></section>
   <div id="onboarding-tour"><div id="tour-backdrop-top" class="tour-backdrop-piece hidden"></div><div id="tour-backdrop-bottom" class="tour-backdrop-piece hidden"></div><div id="tour-backdrop-left" class="tour-backdrop-piece hidden"></div><div id="tour-backdrop-right" class="tour-backdrop-piece hidden"></div><div id="tour-hole-glass" class="hidden"></div><div id="tour-bubble" class="tour-bubble hidden"><div id="tour-bubble-text" style="color:var(--paper);font-size:12px;line-height:1.65"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px"><button type="button" id="tour-skip" class="link" style="font-size:11px;white-space:nowrap">Saltar recorrido</button><button type="button" id="tour-next" class="btn btn-primary tour-pulse" style="width:auto;padding:9px 20px">Siguiente</button></div></div></div>
   <div id="tour-final-overlay" class="tour-final-overlay"><div class="privacy-card" style="text-align:center;max-width:340px"><h2 style="margin:0 0 18px">Ya estás listo</h2><button type="button" id="tour-go" class="btn btn-primary tour-pulse" style="width:auto;padding:11px 32px">GO</button></div></div>
@@ -429,7 +429,7 @@
       if (isDoubleTap) proposePortfolioGoal(portfolioChart.scales.y.getValueForPixel(y));
     }
     function proposePortfolioGoal(value) { if(!currentAssetKey||!Number.isFinite(value))return;if(!readPortfolio().some(item=>item.key===currentAssetKey))return showToast('Agrega este activo al portafolio antes de crear una alerta.',true);proposedPortfolioGoal=value;$('portfolio-alert-text').textContent=`¿Quisieras establecer una alerta en este punto con valor ${value.toLocaleString('es-MX',{style:'currency',currency:'USD',maximumFractionDigits:2})}?`;$('portfolio-alert-banner').classList.remove('hidden'); }
-    $('portfolio-alert-yes').onclick=()=>{writePortfolio(readPortfolio().map(item=>item.key===currentAssetKey?{...item,goal:proposedPortfolioGoal,lastPhase:'blue'}:item));$('portfolio-alert-banner').classList.add('hidden');renderPortfolio();void subscribeAssetPush(currentAssetKey,proposedPortfolioGoal);showToast('Meta establecida. Si aceptas el permiso del navegador, te avisamos cuando tu activo se acerque a la meta o la alcance. Revisamos una vez al día, después del cierre.');}; $('portfolio-alert-no').onclick=()=>$('portfolio-alert-banner').classList.add('hidden'); $('portfolio-zoom-in').onclick=()=>{portfolioZoom=Math.min(3,portfolioZoom*1.35);renderPortfolioChart();}; $('portfolio-zoom-out').onclick=()=>{portfolioZoom=Math.max(.5,portfolioZoom/1.35);renderPortfolioChart();}; $('portfolio-zoom-reset').onclick=()=>{portfolioZoom=1;renderPortfolioChart();};
+    $('portfolio-alert-yes').onclick=()=>{writePortfolio(readPortfolio().map(item=>item.key===currentAssetKey?{...item,goal:proposedPortfolioGoal,lastPhase:'blue'}:item));$('portfolio-alert-banner').classList.add('hidden');renderPortfolio();void setGoalWithPush(currentAssetKey,proposedPortfolioGoal);}; $('portfolio-alert-no').onclick=()=>$('portfolio-alert-banner').classList.add('hidden'); $('portfolio-zoom-in').onclick=()=>{portfolioZoom=Math.min(3,portfolioZoom*1.35);renderPortfolioChart();}; $('portfolio-zoom-out').onclick=()=>{portfolioZoom=Math.max(.5,portfolioZoom/1.35);renderPortfolioChart();}; $('portfolio-zoom-reset').onclick=()=>{portfolioZoom=1;renderPortfolioChart();};
     function refreshMarkowitzForPortfolio() { const list=readPortfolio(); if(list.length>=2)void optimizePortfolioMarkowitz(); else { $('markowitz-results').classList.add('hidden'); $('markowitz-results').innerHTML=''; } }
     const FREE_TIER_ASSET_LIMIT = 5;
     function addPortfolioAsset() { const key=$('portfolio-asset').value; if(!key)return; const current=readPortfolio(); const alreadyTracked=current.some(item=>item.key===key); if(!alreadyTracked && effectiveTier()==='normal' && current.length>=FREE_TIER_ASSET_LIMIT) return showToast(`El plan Free permite monitorear hasta ${FREE_TIER_ASSET_LIMIT} activos. Elimina uno o mejora tu plan para agregar más.`,true); const list=current.filter(item=>item.key!==key); list.push({key,weight:0,goal:'',lastPhase:'blue'}); writePortfolio(list); $('asset-select').value=key; selectAsset(); refreshMarkowitzForPortfolio(); showToast('Activo agregado al monitoreo.'); }
@@ -447,42 +447,82 @@
     function restoreAlertPrefs() { try { const prefs = JSON.parse(getGuestItem('algo_alert_prefs_v1') || 'null'); if (prefs) { $('toggle-goals').checked = prefs.goals !== false; $('toggle-risk').checked = prefs.risk !== false; $('toggle-gdelt').checked = !!prefs.gdelt; } } catch (error) { /* ignore malformed local prefs */ } }
     ['toggle-goals', 'toggle-risk', 'toggle-gdelt'].forEach(id => $(id).addEventListener('change', saveAlertPrefs));
 
+    // Punto 1.5c: el Centro de Control y los toasts dependen del resultado real del registro en
+    // /api/push/subscribe, no solo del permiso del navegador. El último resultado de este
+    // dispositivo se guarda en algo_push_status_v1 como { status, symbol, at }.
+    const PUSH_FAILED_STATUSES = ['not-configured', 'subscribe-failed', 'server-error'];
+    const PUSH_FAILED_TOAST = ['Meta guardada, pero no pudimos activar la alerta. Reintenta desde el Centro de Control.', true];
+    const PUSH_STATUS_TOASTS = {
+      saved: ['Meta y alerta activas. Te avisamos cuando tu activo se acerque a la meta o la alcance. Revisamos una vez al día, después del cierre.', false],
+      denied: ['Meta guardada, pero sin alertas: bloqueaste las notificaciones en este navegador.', true],
+      dismissed: ['Meta guardada. Para recibir alertas, acepta el permiso de notificaciones.', false],
+      unsupported: ['Meta guardada. Este navegador no admite notificaciones push.', false],
+      'not-configured': PUSH_FAILED_TOAST, 'subscribe-failed': PUSH_FAILED_TOAST, 'server-error': PUSH_FAILED_TOAST
+    };
+    function readPushStatus() { try { return JSON.parse(getGuestItem('algo_push_status_v1') || 'null'); } catch (error) { return null; } }
+    function writePushStatus(status, symbol) { setGuestItem('algo_push_status_v1', JSON.stringify({ status, symbol: symbol || null, at: new Date().toISOString() })); }
+    function showPushStatusToast(status) { const [message, isError] = PUSH_STATUS_TOASTS[status] || PUSH_FAILED_TOAST; showToast(message, isError); }
+    function pushSupported() { return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window; }
     function updatePushPermissionStatus() {
       const el = $('push-permission-status'); const btn = $('push-enable-btn');
-      if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (!pushSupported()) {
         el.textContent = 'Este navegador no soporta notificaciones push.'; btn.disabled = true; btn.textContent = 'No disponible'; return;
       }
-      if (Notification.permission === 'granted') { el.textContent = 'Notificaciones push activas en este dispositivo.'; btn.textContent = 'Notificaciones activas'; btn.disabled = true; }
+      if (Notification.permission === 'granted') {
+        const last = readPushStatus();
+        const hasGoal = readPortfolio().some(item => Number(item.goal) > 0);
+        if (last && PUSH_FAILED_STATUSES.includes(last.status)) { el.textContent = 'Permiso concedido, pero la alerta no quedó registrada en el servidor.'; btn.textContent = 'Reintentar registro'; btn.disabled = false; }
+        else if (!hasGoal) { el.textContent = 'Permiso concedido. Fija una meta para activar una alerta.'; btn.textContent = 'Permiso concedido'; btn.disabled = true; }
+        else if (last?.status === 'saved') { el.textContent = 'Notificaciones push activas en este dispositivo.'; btn.textContent = 'Notificaciones activas'; btn.disabled = true; }
+        else { el.textContent = 'Permiso concedido. Pulsa "Registrar alerta" para confirmar tu meta en el servidor.'; btn.textContent = 'Registrar alerta'; btn.disabled = false; }
+      }
       else if (Notification.permission === 'denied') { el.textContent = 'Bloqueaste las notificaciones en este navegador; actívalas desde su configuración de sitio para recibir alertas.'; btn.textContent = 'Bloqueado por el navegador'; btn.disabled = true; }
       else { el.textContent = 'Sin permiso concedido todavía: no se asume que una alerta está activa hasta que aceptes.'; btn.textContent = 'Activar notificaciones push'; btn.disabled = false; }
     }
     async function registerServiceWorker() { if (!('serviceWorker' in navigator)) return null; try { return await navigator.serviceWorker.register('/sw.js'); } catch (error) { return null; } }
     function urlBase64ToUint8Array(base64String) { const padding = '='.repeat((4 - base64String.length % 4) % 4); const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(base64); return Uint8Array.from([...raw].map(char => char.charCodeAt(0))); }
     async function getVapidPublicKey() { await initializeSupabaseConfig(); return config.vapidPublicKey || null; }
+    // Devuelve { status, subscription }. requestPermission debe seguir siendo el PRIMER await
+    // desde el clic del usuario (Safari/iOS rechaza el permiso fuera del gesto).
     async function ensurePushSubscription() {
-      if (Notification.permission !== 'granted') { const permission = await Notification.requestPermission(); if (permission !== 'granted') { updatePushPermissionStatus(); return null; } }
+      if (!pushSupported()) return { status: 'unsupported' };
+      if (Notification.permission !== 'granted') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') { updatePushPermissionStatus(); return { status: permission === 'denied' ? 'denied' : 'dismissed' }; }
+      }
       const registration = await registerServiceWorker();
-      if (!registration) return null;
-      let subscription = await registration.pushManager.getSubscription();
+      if (!registration) return { status: 'subscribe-failed' };
+      let subscription = await registration.pushManager.getSubscription().catch(() => null);
       if (!subscription) {
         const vapidPublicKey = await getVapidPublicKey();
-        if (!vapidPublicKey) { showToast('Las notificaciones push todavía no están configuradas en el servidor.', true); return null; }
+        if (!vapidPublicKey) { reportActionError('Notificaciones push', 'Falta la llave pública VAPID en la configuración.'); return { status: 'not-configured' }; }
         try { subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) }); }
-        catch (error) { showToast('No se pudo activar la suscripción push.', true); return null; }
+        catch (error) { reportActionError('Notificaciones push', error.message); return { status: 'subscribe-failed' }; }
       }
-      updatePushPermissionStatus();
-      return subscription;
+      return { status: 'granted', subscription };
     }
+    // Devuelve saved | denied | dismissed | unsupported | not-configured | subscribe-failed | server-error.
     async function subscribeAssetPush(assetKey, goal) {
-      const subscription = await ensurePushSubscription();
+      const { status, subscription } = await ensurePushSubscription();
       const symbol = fmpSymbols[assetKey];
-      if (!subscription || !symbol) return;
-      const json = subscription.toJSON();
-      const guest = JSON.parse(localStorage.getItem('horizon_guest') || '{}');
-      try {
-        await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, assetSymbol: symbol, goal, email: currentUser?.email || guest.email || '' }) });
-      } catch (error) { /* best-effort, no bloquea la UI */ }
+      let result = status;
+      if (status === 'granted') {
+        if (!symbol) result = 'subscribe-failed';
+        else {
+          const json = subscription.toJSON();
+          const guest = JSON.parse(localStorage.getItem('horizon_guest') || '{}');
+          try {
+            const response = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, assetSymbol: symbol, goal, email: currentUser?.email || guest.email || '' }) });
+            result = response.ok ? 'saved' : 'server-error';
+            if (!response.ok) reportActionError('Notificaciones push', `El servidor respondió ${response.status}.`);
+          } catch (error) { result = 'server-error'; reportActionError('Notificaciones push', error.message); }
+        }
+      }
+      writePushStatus(result, symbol);
+      updatePushPermissionStatus();
+      return result;
     }
+    async function setGoalWithPush(assetKey, goal) { showPushStatusToast(await subscribeAssetPush(assetKey, goal)); }
     async function unsubscribeAssetPush(assetKey) {
       if (!('serviceWorker' in navigator)) return;
       const symbol = fmpSymbols[assetKey];
@@ -491,7 +531,17 @@
       if (!subscription || !symbol) return;
       try { await fetch('/api/push/subscribe', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: subscription.endpoint, assetSymbol: symbol }) }); } catch (error) { /* best-effort */ }
     }
-    $('push-enable-btn').onclick = async () => { await ensurePushSubscription(); const item = readPortfolio().find(entry => entry.key === currentAssetKey); if (item?.goal) void subscribeAssetPush(currentAssetKey, Number(item.goal)); };
+    // Mismo estado que al fijar la meta: si el último registro falló, se reintenta el activo de esa
+    // falla (si sigue con meta); si no, el activo actual con meta. Sin meta solo se pide el permiso.
+    $('push-enable-btn').onclick = async () => {
+      const portfolio = readPortfolio(); const last = readPushStatus();
+      const failedItem = last && PUSH_FAILED_STATUSES.includes(last.status) ? portfolio.find(entry => fmpSymbols[entry.key] === last.symbol && Number(entry.goal) > 0) : null;
+      const item = failedItem || portfolio.find(entry => entry.key === currentAssetKey && Number(entry.goal) > 0);
+      if (item) return setGoalWithPush(item.key, Number(item.goal));
+      const { status } = await ensurePushSubscription();
+      if (status === 'granted') { if (last && PUSH_FAILED_STATUSES.includes(last.status)) removeGuestItem('algo_push_status_v1'); updatePushPermissionStatus(); return showToast('Permiso concedido. Fija una meta para activar una alerta.'); }
+      if (PUSH_FAILED_STATUSES.includes(status)) showToast('No pudimos activar las notificaciones push en este navegador.', true);
+    };
     let adminTierOverride = null;
     // Parche interino: el mismo password que se teclea para entrar como superadmin se reenvía
     // como header X-Admin-Secret en las lecturas admin-only (winrate, metrics, track-view GET).
@@ -630,39 +680,94 @@
     const PRIVACY_VERSION = '2026-10-01';
     let privacyLang = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : (navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'es';
     function setPrivacyLang(lang) { privacyLang = ['es','en','zh'].includes(lang) ? lang : 'es'; document.querySelectorAll('[data-privacy-lang]').forEach(node => { node.hidden = node.dataset.privacyLang !== privacyLang; }); ['es','en','zh'].forEach(code => $(`privacy-lang-${code}`).classList.toggle('active', code === privacyLang)); }
+    // Punto 1.5c: el consentimiento solo se anuncia como "registrado" si el servidor lo confirmó.
+    // Si falla, el usuario puede reintentar o continuar; la aceptación queda en este dispositivo con
+    // una marca pendiente (algo_privacy_pending_v1) que se reenvía al volver a entrar.
+    // stage 'audit' = falta la fila de privacy_consents; 'profile' = la fila ya existe y solo falta
+    // profiles.privacy_accepted_at (cuenta registrada), para no duplicar filas de auditoría.
+    let privacyRetryInFlight = false;
+    function privacyPendingKey() { return currentUser ? `algo_privacy_pending_v1::uid:${currentUser.id}` : guestScopedKey('algo_privacy_pending_v1'); }
+    function readPrivacyPending() { try { return JSON.parse(localStorage.getItem(privacyPendingKey()) || 'null'); } catch (error) { return null; } }
+    function writePrivacyPending(pending) { if (pending) localStorage.setItem(privacyPendingKey(), JSON.stringify(pending)); else localStorage.removeItem(privacyPendingKey()); }
+    function buildPrivacyConsentBody() {
+      const body = { version: PRIVACY_VERSION, language: privacyLang, ccpaOptOut: $('privacy-ccpa-optout').checked };
+      if (!currentUser) { const guest = JSON.parse(localStorage.getItem('horizon_guest') || '{}'); body.name = guest.name || $('profile-name').value || ''; body.email = guest.email || $('profile-email').value || ''; }
+      return body;
+    }
+    // Devuelve 'ok', 'audit-failed' (no quedó fila de auditoría) o 'profile-failed' (hay fila, falta el perfil).
+    async function sendPrivacyConsent(attempt) {
+      if (attempt.stage !== 'profile') {
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (currentUser) { const { data: { session } } = await supabaseClient.auth.getSession(); headers.Authorization = `Bearer ${session?.access_token || ''}`; }
+          const response = await fetch('/api/privacy-consent', { method: 'POST', headers, body: JSON.stringify(attempt.body) });
+          if (!response.ok) { reportActionError('Consentimiento de privacidad', `El servidor respondió ${response.status}.`); return 'audit-failed'; }
+        } catch (error) { reportActionError('Consentimiento de privacidad', error.message); return 'audit-failed'; }
+      }
+      if (currentUser) {
+        try { const { error } = await supabaseClient.from('profiles').update({ privacy_accepted_at: attempt.acceptedAt }).eq('id', currentUser.id); if (error) throw error; }
+        catch (error) { reportActionError('Consentimiento de privacidad', `profiles.update: ${error.message}`); return 'profile-failed'; }
+      }
+      return 'ok';
+    }
+    function resetPrivacyModalActions() { $('privacy-modal-error').textContent = ''; $('privacy-modal-accept').textContent = 'Aceptar y continuar'; $('privacy-modal-accept').disabled = false; $('privacy-modal-continue').classList.add('hidden'); }
+    function completePrivacyConsent(acceptedAt, registered) {
+      if (currentUser) privacyAcceptedAt = acceptedAt; else setGuestItem('algo_privacy_accepted_v1', acceptedAt);
+      resetPrivacyModalActions();
+      $('privacy-modal').classList.remove('active');
+      showToast(registered ? 'Consentimiento de privacidad registrado.' : 'Consentimiento guardado en este dispositivo; pendiente de registro.', !registered);
+      maybeStartOnboarding();
+    }
+    async function retryPendingPrivacyConsent(manual = false) {
+      const pending = readPrivacyPending();
+      if (!pending || privacyRetryInFlight) return;
+      privacyRetryInFlight = true; $('privacy-pending-retry').disabled = true;
+      const result = await sendPrivacyConsent(pending);
+      privacyRetryInFlight = false; $('privacy-pending-retry').disabled = false;
+      if (result === 'ok') writePrivacyPending(null);
+      else if (result === 'profile-failed') writePrivacyPending({ ...pending, stage: 'profile' });
+      // El banner solo aplica mientras falte la fila de auditoría; si solo falta el perfil se reintenta en silencio.
+      $('privacy-pending-banner').classList.toggle('active', result === 'audit-failed');
+      if (manual) showToast(result === 'audit-failed' ? 'No pudimos registrar tu consentimiento en el servidor. Inténtalo más tarde.' : 'Consentimiento de privacidad registrado.', result === 'audit-failed');
+    }
     function ensurePrivacyConsent() {
+      const pending = readPrivacyPending();
+      if (currentUser && !privacyAcceptedAt && pending?.acceptedAt) privacyAcceptedAt = pending.acceptedAt;
       const accepted = currentUser ? privacyAcceptedAt : getGuestItem('algo_privacy_accepted_v1');
       setPrivacyLang(privacyLang);
+      $('privacy-pending-banner').classList.remove('active');
+      if (!accepted) resetPrivacyModalActions();
       $('privacy-modal').classList.toggle('active', !accepted);
-      if (accepted) maybeStartOnboarding();
+      if (accepted) { maybeStartOnboarding(); if (pending) void retryPendingPrivacyConsent(); }
     }
     $('privacy-modal-accept').onclick = async () => {
       if (!$('privacy-modal-check').checked) return $('privacy-modal-error').textContent = 'Marca la casilla para otorgar tu consentimiento.';
       $('privacy-modal-error').textContent = '';
-      const timestamp = new Date().toISOString();
-      const ccpaOptOut = $('privacy-ccpa-optout').checked;
-      if (currentUser) {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        const response = await fetch('/api/privacy-consent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ version: PRIVACY_VERSION, language: privacyLang, ccpaOptOut }) });
-        if (!response.ok) return $('privacy-modal-error').textContent = 'No fue posible registrar el consentimiento. Intenta de nuevo.';
-        privacyAcceptedAt = timestamp;
-        await supabaseClient.from('profiles').update({ privacy_accepted_at: timestamp }).eq('id', currentUser.id);
-      } else {
-        const guest = JSON.parse(localStorage.getItem('horizon_guest') || '{}');
-        try {
-          const response = await fetch('/api/privacy-consent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: PRIVACY_VERSION, language: privacyLang, ccpaOptOut, name: guest.name || $('profile-name').value || '', email: guest.email || $('profile-email').value || '' }) });
-          if (!response.ok) reportActionError('Consentimiento de privacidad', 'El servidor rechazó el registro; se conservó únicamente en este dispositivo.');
-        } catch (error) { reportActionError('Consentimiento de privacidad', error.message); }
-        setGuestItem('algo_privacy_accepted_v1', timestamp);
+      $('privacy-modal-accept').disabled = true;
+      const attempt = { acceptedAt: new Date().toISOString(), stage: 'audit', body: buildPrivacyConsentBody() };
+      const result = await sendPrivacyConsent(attempt);
+      $('privacy-modal-accept').disabled = false;
+      if (result !== 'audit-failed') {
+        // La fila de auditoría existe; si solo falló profiles.update, queda pendiente ese paso.
+        writePrivacyPending(result === 'profile-failed' ? { ...attempt, stage: 'profile' } : null);
+        return completePrivacyConsent(attempt.acceptedAt, true);
       }
-      $('privacy-modal').classList.remove('active');
-      showToast('Consentimiento de privacidad registrado.');
-      maybeStartOnboarding();
+      $('privacy-modal-error').textContent = 'No pudimos registrar tu consentimiento en el servidor. Puedes reintentar o continuar; lo volveremos a intentar automáticamente.';
+      $('privacy-modal-accept').textContent = 'Reintentar';
+      $('privacy-modal-continue').classList.remove('hidden');
     };
+    $('privacy-modal-continue').onclick = () => {
+      if (!$('privacy-modal-check').checked) return $('privacy-modal-error').textContent = 'Marca la casilla para otorgar tu consentimiento.';
+      const attempt = { acceptedAt: new Date().toISOString(), stage: 'audit', body: buildPrivacyConsentBody() };
+      writePrivacyPending(attempt);
+      completePrivacyConsent(attempt.acceptedAt, false);
+      $('privacy-pending-banner').classList.add('active');
+    };
+    $('privacy-pending-retry').onclick = () => void retryPendingPrivacyConsent(true);
     // "No acepto": el aviso es obligatorio para usar la plataforma, así que se deniega el
     // acceso y se regresa a la pantalla de login en vez de dejar entrar sin consentimiento.
     $('privacy-modal-decline').onclick = async () => {
-      $('privacy-modal').classList.remove('active');
+      $('privacy-modal').classList.remove('active'); $('privacy-pending-banner').classList.remove('active');
       if (supabaseClient && currentUser) { try { await supabaseClient.auth.signOut(); } catch (error) { /* best-effort */ } }
       currentUser = null; adminSession = false; adminTierOverride = null;
       document.body.classList.remove('superadmin-active'); $('floating-tools').classList.add('hidden'); $('superadmin-bar').classList.remove('active'); closeAdminDashboard(); closeUsersDashboard();
