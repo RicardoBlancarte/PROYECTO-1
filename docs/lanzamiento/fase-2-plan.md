@@ -1,6 +1,7 @@
 # Fase 2 — Monte Carlo v2 en la gráfica: hallazgos y plan
 
 - **Fecha:** 2026-10-03 (revisión 3, con las decisiones de las rondas 2 y 3 del usuario)
+- **Estado (2026-10-09): FASE 2 CERRADA.** PR #3 fusionado. Verificada en la corrida programada #32 desde `main` (`8b7794d`) (sección 10.7). #127 resuelto y verificado.
 - **Rama:** `lanzamiento-f2-montecarlo` (desde `main` en `77f0b69`)
 - **Alcance de hoy:** solo investigación y plan. No se editó código de producción ni se ejecutó SQL.
 - **Referencias:** [fase-1-auditoria.md](fase-1-auditoria.md) (#3, #4, #8, #9, #47, #120, #127, #128, #131) y [fase-1-persistencia.md](fase-1-persistencia.md).
@@ -500,6 +501,8 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
 - ejecutar [fase-2-migracion.sql](fase-2-migracion.sql) con sus verificaciones;
 - avisar para la corrida de la rama (6.2.B).
 
+**Hecho (2026-10-06):** las tres acciones se completaron (10.6), y el merge se hizo con el PR #3.
+
 ---
 
 ## 9. Pendientes para fases posteriores
@@ -516,6 +519,9 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
   - una política de retención.
   Las filas no identifican al visitante; solo se filtran por `created_at`.
 - **Fase 5 — tabla de feriados NYSE:** `NYSE_HOLIDAYS` en `index.html` cubre 2026-2027 y **caduca el 31-dic-2027**. Renovarla o moverla a un dato del servidor.
+- **Fase 5 — fecha de `win_rate_history`** (cierre, 2026-10-09): `record_win_rate()` guarda la fila con `date.today()` del runner, en UTC. La corrida programada #32 terminó después de medianoche UTC, así que guardó el cierre del 6-oct con fecha 2026-10-07. Debe usar la fecha del último cierre (el `asOf` más reciente), no `date.today()`.
+- **Fase 5 — cron en un minuto no redondo** (cierre, 2026-10-09): mover `0 22 * * 1-5` a un minuto no redondo, p. ej. `17 22 * * 1-5`. GitHub retrasa 3-4 h las corridas programadas en hora en punto, que es lo que llevó a la #32 después de medianoche UTC.
+- **Fase 5 — `/api/health`** (cierre, 2026-10-09): un endpoint que pruebe la conexión de cada entorno (Producción y Preview) con Supabase y responda solo bien o mal, sin revelar nombres de variables, tablas ni errores internos (ver #115). El 5-oct la llave de Supabase de Producción estaba mal y nadie lo notó hasta el merge.
 - **Fase 3 — `functions/api/patterns.js:19`:** lee `asset_signals` en orden `asc` y **sin `limit`**. Si un símbolo supera el `max_rows` de Supabase (1 000), recibiría solo las señales más antiguas (mismo tipo de error que #131). Corregir con `order=date.desc` + `limit` e invertir el orden.
 - **Fase 3 — ELIMINAR el botón "Recalcular"** (0.4; decisión de la ronda 3): no se corrige. Tiene valores fijos (`+0.65`, "Fuertemente alcista", "Proyección recalculada") y el aviso "Abanico Markov recalculado.".
 - **Columnas #3/#4:** se quedan ocultas como están (D4, ronda 3). Si algún día vuelven, sería con un endpoint por lotes de Monte Carlo.
@@ -527,6 +533,7 @@ Todas resueltas en la ronda 3 (sección 0). Solo quedan **acciones del usuario**
 - **Lista del portafolio — resuelto en la Fase 2** (ronda 13): `syncPortfolioItemPrice` y `renderPortfolio` muestran el último cierre real (`asset.lastClose`) con `formatPrice`, "Sin historial" si no lo hay y "Cargando…" mientras llegan los precios. Ya no muestran el precio fijo del catálogo.
 - **Fase 3 — meta en activos sin historial** (ronda 13): el aviso de meta (`proposePortfolioGoal`) y el semáforo de la meta (`portfolioState`) siguen usando `asset.price`, que para un activo sin historial es el precio fijo del catálogo. **No debe permitirse fijar una meta en un activo sin historial** (ni suscribir push para él); el aviso debe usar el último cierre real con `formatPrice`.
 - **Fase 1, punto 1.5c — posible fila de `privacy_consents` creada en el Preview con el correo real del usuario el 5-oct** (ronda 12): el Preview escribe en la base de producción. Revisarla con una consulta de solo lectura y decidir si se conserva o se borra (decisión del usuario; el agente no ejecuta SQL).
+- **Fase 1, punto 1.5c — repetir la prueba de push en Producción** (cierre, 2026-10-09): la falla de push en el celular (#129) pudo deberse a la llave de Supabase de Producción, que estaba mal el 5-oct. Repetir la prueba en Producción antes de atribuirla solo al TTL.
 - **Fase 3 — `functions/api/market/[symbol].js` (ronda 6):** `readDailyRows` lee `asset_historical_prices` con `order=date.asc&limit=1826`. Si el `max_rows` de Supabase (1 000 por defecto) recorta la respuesta, la gráfica recibiría los cierres **más antiguos**: mismo tipo de error que #131 y que `patterns.js`. Hoy no ocurre (~504-760 filas). Si ocurriera, el último cierre mostrado no coincidiría con `baseCloseDate` y las tarjetas y el abanico mostrarían "No disponible", que es el comportamiento seguro, pero la gráfica de historial quedaría vieja. Corregir con `order=date.desc` + `limit` e invertir el orden.
 
 ---
@@ -574,6 +581,8 @@ Los commits de documentación (plan, migración y pendientes) van aparte: `db1eb
    - celular.
 3. **Criterio de salida (sección 7) con datos reales:** `p50 < 0` en algún activo, y ancho TSLA/NG=F > KO/PG.
 4. **Merge** solo después de la migración (regla de la sección 3).
+
+**Hecho:** los puntos 1 a 3 se completaron el 6-oct (10.6), y el merge (punto 4) se hizo con el PR #3. El cierre con la corrida programada está en 10.7.
 
 ### 10.4 Menciones de "para mañana" fuera del alcance (sin cambiar; decisión pendiente)
 
@@ -626,3 +635,23 @@ Durante la revisión del Preview se corrigieron además el activo sin historial,
 **Ventana entre la corrida de la rama y el merge.** Mientras `main` siga con el motor viejo, cada corrida nocturna (22:00 UTC, lunes a viernes) agrega un cierre nuevo y actualiza `daily`, `weekly` y `monthly` sin `base_close_date`, y no toca `two_day`. A partir de ese momento `base_close_date` (2026-10-05) deja de coincidir con el último cierre, así que el Preview, y Producción si se hace merge después, muestran "No disponible" hasta la siguiente corrida con el motor nuevo. Es el comportamiento seguro, no una falla.
 - **Merge antes de las 22:00 UTC de un día hábil:** la corrida nocturna de esa noche ya usa el motor nuevo y no hay ventana.
 - **Merge después:** para no esperar a la noche siguiente, correr `workflow_dispatch` sobre `main` con `only_montecarlo` (requiere autorización del usuario).
+
+### 10.7 Cierre: corrida programada #32 (2026-10-06, la verificó el usuario)
+
+**Corrida:** `schedule`, `main` en `8b7794d` (PR #3 y PR #4 fusionados), cierre del 6-oct. Es la primera corrida completa del motor nuevo desde `main`.
+
+| Verificación | Resultado |
+|---|---|
+| Precios | **29 filas nuevas**; 30 de 30 activos sin error; 0 omitidos por inconsistencia |
+| META | La fila 2026-10-06 llegó con `Close` NaN y **se omitió** (arreglo de #128); su último cierre quedó en 2026-10-05 |
+| Win Rate registrado | legacy **32.3** y shadow_v2 **49.7**, `asOf` 2026-10-06 (ver [winrate-plan.md](winrate-plan.md)) |
+| Monte Carlo | **120 líneas** (log, l. 87-206) |
+| `base_close_date` | **2026-10-06 en 116 filas** y **2026-10-05 en 4** (los 4 horizontes de META) |
+| Diferencias contra el último cierre real de cada activo | **0** |
+| `win_rate_history` | Filas nuevas (legacy 32.3, shadow_v2 49.7), con `date` 2026-10-07 (ver la nota) |
+
+- **META con un día de atraso es lo esperado:** su `base_close_date` coincide con su último cierre guardado, así que la terminal muestra sus escenarios con "Datos al cierre del 5-oct" en lugar de "No disponible".
+- **Nota sobre la fecha de `win_rate_history`:** el script usa `date.today()` en UTC, y la corrida terminó después de medianoche UTC (GitHub retrasó la corrida de las 22:00). Los datos son del cierre del 6-oct. Quedan como pendientes de la Fase 5 la fecha y el minuto del cron (sección 9).
+- **Corrección sobre la #31:** la corrida `only_winrate` #31 corrió desde `lanzamiento-winrate`, con el script idéntico al de `main`, contra Producción ya en `8b7794d`.
+
+**Fase 2 cerrada.** #127, #128, #130 y #131 quedan resueltos y verificados en [fase-1-auditoria.md](fase-1-auditoria.md).
