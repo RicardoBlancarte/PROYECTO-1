@@ -3,6 +3,7 @@
 - **Fecha:** 2026-10-09
 - **Rama:** `lanzamiento-1-5c` (desde `main` en `f5ecc58`)
 - **Contexto:** en la prueba del 9-oct en Producción la suscripción push y el consentimiento **ya se guardan**. La falla anterior era la llave `SUPABASE_SERVICE_ROLE_KEY` de Production, corregida el 5-oct. Este punto mejora cómo responde la app cuando algo falla.
+- **Estado (2026-10-09):** A y B implementados en `4e11bc5` y probados en el Preview `d7209df1` (sección D). Pendientes en D.4.
 - **Alcance:** A y B con cambios de código en `index.html` y `functions/api/privacy-consent.js`. C verificado, sin bug. **No se tocan esquemas ni tablas.**
 - **Referencias:** [fase-1-persistencia.md](fase-1-persistencia.md) y [fase-2-plan.md](fase-2-plan.md) (pendientes del 1.5c).
 
@@ -147,3 +148,42 @@ En un activo con historial agregado al portafolio, fijar una meta con doble toqu
 **Decisión:** se cierra sin cambios de código. No se agrega el resumen CCPA al toast.
 
 **Pendiente para la Fase 4 (móvil):** revisar el área táctil de `.privacy-consent-line` (12 px de relleno; toda la caja responde al toque), porque es fácil marcar la casilla CCPA sin querer.
+
+---
+
+## D. Resultados de las pruebas en Preview (2026-10-09)
+
+- **Preview:** `d7209df1` (commit `4e11bc5`). Datos de prueba: "QA Prueba" / `jbrichard27+qa@gmail.com`. Escribe en la base de **producción**.
+- **Probó:** el usuario, con los pasos de A.6 y B.5.
+
+### D.1 A. Consentimiento
+
+| Prueba | Resultado |
+|---|---|
+| `/api/privacy-consent` bloqueado → Aceptar | El aviso **no se cierra**; aparecen "Reintentar" y "Continuar de todos modos". ✅ |
+| "Continuar de todos modos" | Entra a la terminal y aparece el banner de pendiente en ese momento. ✅ |
+| Quitar el bloqueo → "Reintentar" del banner | Registra el consentimiento y el banner desaparece. ✅ |
+| Payload con la casilla CCPA sin marcar | `ccpaOptOut: false`. ✅ (confirma C) |
+
+### D.2 B. Push + meta
+
+| Prueba | Resultado |
+|---|---|
+| Permiso concedido | Toast "Meta y alerta activas…"; Centro de Control "Notificaciones push activas en este dispositivo.". ✅ |
+| Permiso bloqueado (incógnito) | Toast de bloqueado y Centro de Control "Bloqueaste…". ✅ |
+| `/api/push/subscribe` simulando 502 | Toast de falla; Centro de Control "Permiso concedido, pero la alerta no quedó registrada en el servidor." con "Reintentar registro". ✅ |
+| Quitar la simulación → "Reintentar registro" | Centro de Control "activas". ✅ |
+| Cerrar el aviso de permiso con la X (`dismissed`) | **No probado.** Queda para la revisión en el celular. |
+
+### D.3 Conteo en Supabase (después de las pruebas)
+
+- `privacy_consents`: **7** filas. Es lo esperado.
+- `push_subscriptions`: **4** filas. Es lo esperado: el reintento hizo upsert sobre `endpoint,asset_symbol`, sin duplicar.
+
+### D.4 Pendientes
+
+1. **Prueba de la X en el celular:** cerrar el aviso de permiso sin elegir → toast `dismissed` y Centro de Control "Sin permiso concedido todavía…".
+2. **Push real al celular el lunes 12-oct:** confirmar que llega la notificación después de la corrida diaria.
+3. **Limpieza de filas QA:** las filas con `jbrichard27+qa@gmail.com` en `privacy_consents` y `push_subscriptions` de producción. La decisión de borrarlas es del usuario; el agente no ejecuta SQL.
+4. **Fase 4 (móvil):** área táctil de `.privacy-consent-line` (ver C).
+5. **Fase 7 (abogado):** `timestamp_aceptacion` en reintentos (ver A.5).
