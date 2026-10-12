@@ -20,14 +20,16 @@
 | H | Se quita **solo** `#recalculate` y su manejador. `#winrate-refresh` se queda. |
 | I | **`max_rows` = 1 000** (valor por defecto; no se cambia). Confirmado por el usuario. |
 | N1 | Free = 5 activos y Top 3; Premium = 12 activos y Top 10. Elite: **"por definir"** en la configuración, pero **nunca ilimitado en la interfaz**: todo nivel tiene un tope visual (1.2). Los límites de Elite se proponen después, según el diseño. |
+| L4 | **Aprobado y corrido (2026-10-12):** H1 y H2 solo con acciones, H3 con todos, umbral p < 0.017, misma prueba fuera de muestra. Resultado en la sección 5. |
+| M | **Aprobado el enfoque:** factor de calibración por horizonte (`k50`, `k90`) en `ENGINE_PARAMS`, estimado antes de la fecha de corte y validado después, con cobertura y ancho por tipo de activo. **No se implementa** hasta revisar la validación (M.5). |
+| M.4 | **Aprobados** los textos de "Estándar" y "Amplio" en es/en/zh, con las cifras tomadas de la configuración junto con la fecha de medición. |
 | N2 | **Regla (2026-10-12):** b1 no se activa en Premium hasta corregir la previa (`sensitivity-factor.js:58`) y superar a la regla 1.18 × MAD fuera de muestra. El "motor más sensible" de Premium será el **factor b1** de `sensitivity-factor.js`. En la Fase 3 solo queda como parámetro configurable por nivel, **apagado**. La comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` se hace en el laboratorio L. Ningún parámetro "más sensible" se activa en Premium hasta que L muestre que mejora el acierto fuera de muestra. |
 
 **Siguen pendientes:**
 
 | # | Pregunta | Dónde |
 |---|---|---|
-| L4 | Autorización para correr L4 (volumen y día de la semana). | Sección 5 |
-| M | Aprobación del bloque "Calibración de Monte Carlo" y del texto de "Amplio" con la cobertura medida. | Punto M |
+| M | Decidir con la validación de M.5: factor **global por horizonte** (recomendado) o por tipo de activo; luego implementar. | Punto M |
 | B2 | Aprobación para escribir en `asset_historical_prices` (backfill de los 4 activos). | Punto B |
 | C2 | Aprobación para reescribir cierres de futuros dentro de la ventana. | Punto C |
 | E1 | Límites de Elite según el diseño (propuesta del agente, más adelante). | Sección 1.2 |
@@ -302,13 +304,48 @@ Las bandas son algo **angostas**, sobre todo la exterior. El margen supone indep
 
 **Tamaño:** M. L3 ampliado: S (~5 min de cómputo). Motor, configuración y pruebas: M.
 
-**M.4 Texto del modo "Amplio" (J1) mientras no exista la calibración.** Dice la cobertura medida, no "9 de cada 10". Las cifras salen de la configuración, con la fecha de medición, y se actualizan cada vez que se vuelve a correr L3. Se usan las del horizonte diario, que son las más bajas.
+**M.4 Texto del modo "Amplio" (J1) mientras no exista la calibración (APROBADO el 2026-10-12).** Dice la cobertura medida, no "9 de cada 10". Las cifras salen de la configuración, con la fecha de medición, y se actualizan cada vez que se vuelve a correr L3. Se usan las del horizonte diario, que son las más bajas.
 
 | | es | en | zh |
 |---|---|---|---|
 | Estándar | "Estándar: banda central de los escenarios simulados. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella cerca de la mitad de las veces (47 de cada 100)." | "Standard: the central band of the simulated scenarios. In our tests on past data, the actual close fell inside it about half the time (47 out of 100)." | "标准：模拟情景的中间区间。在我们基于历史数据的测试中，实际收盘价约有一半的时间（每100次中47次）落在其中。" |
 | Amplio | "Amplio: agrega la banda exterior. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella 85 de cada 100 veces." | "Wide: adds the outer band. In our tests on past data, the actual close fell inside it 85 times out of 100." | "宽：增加外侧区间。在我们基于历史数据的测试中，实际收盘价每100次中有85次落在其中。" |
 | Aviso corto (`index.html:94`) | "Rango de escenarios: 'Estándar' muestra la banda central (el cierre real cayó dentro ~47 de cada 100 veces en nuestras pruebas); 'Amplio' agrega la exterior (~85 de cada 100)." | "Scenario range: 'Standard' shows the central band (the actual close fell inside ~47 out of 100 times in our tests); 'Wide' adds the outer band (~85 out of 100)." | "情景区间：“标准”显示中间区间（在我们的测试中，实际收盘价约每100次中47次落在其中）；“宽”增加外侧区间（约每100次中85次）。" |
+
+**M.5 Validación del factor de calibración (2026-10-12, solo lectura, motor real, 9 720 evaluaciones)**
+
+- **Datos y método:** el CSV de la sección 5. Fechas base del 2024-09-11 al 2026-10-02, cada 5 sesiones (cada 21 en `monthly`), cuatro horizontes, sin traslape dentro de cada horizonte. **Corte:** los `k` se estiman con las evaluaciones cuyo cierre real es anterior o igual al **2025-10-10** (4 920); la cobertura se mide en las evaluaciones con base posterior al corte (4 720). `k50` = mediana y `k90` = percentil 90 del factor que hace entrar el cierre real en la banda.
+- Los márgenes suponen independencia entre activos; como en las mismas fechas se mueven juntos, el margen real es mayor.
+
+**Cobertura total después del corte (factor global por horizonte):**
+
+| Horizonte | n | k50 | k90 | p25-p75 sin | p25-p75 con | p5-p95 sin | p5-p95 con | Margen 50 / 90 |
+|---|---|---|---|---|---|---|---|---|
+| Día | 1 470 | 1.042 | 1.075 | 46.9 % | **48.9 %** | 86.3 % | **88.7 %** | ±2.6 / ±1.5 |
+| 2 sesiones | 1 470 | 1.045 | 1.080 | 45.2 % | **46.8 %** | 86.9 % | **89.5 %** | ±2.6 / ±1.5 |
+| Semana | 1 450 | 1.050 | 1.076 | 47.4 % | **49.3 %** | 86.3 % | **89.0 %** | ±2.6 / ±1.5 |
+| Mes | 330 | 0.996 | 1.073 | 49.1 % | **48.8 %** | 87.6 % | **89.4 %** | ±5.4 / ±3.2 |
+
+Con el factor, 7 de 8 coberturas quedan dentro del margen. La única fuera es p25-p75 a 2 sesiones (46.8 % contra un mínimo de 47.4 %). Las bandas se ensanchan solo **4-8 %**: la mediana y `probUp` no cambian.
+
+**Por tipo de activo (después del corte):**
+
+| Horizonte | Tipo | n | p5-p95 sin | Factor global (p25-p75 / p5-p95) | k por tipo (k50 / k90) | Factor por tipo (p25-p75 / p5-p95) | Ancho p5-p95 sin → con global |
+|---|---|---|---|---|---|---|---|
+| Día | Acciones | 980 | 86.5 % | 47.4 % / 88.6 % | 1.122 / 1.145 | **50.5 % / 89.7 %** | 6.2 % → 6.7 % |
+| Día | Futuros | 490 | 85.7 % | **51.8 % / 89.0 %** | 0.992 / 1.011 | 49.4 % / 86.3 % | 7.7 % → 8.2 % |
+| 2 sesiones | Acciones | 980 | 84.9 % | 44.7 % / 87.7 % | 1.072 / 1.092 | 45.4 % / 87.9 % | 9.0 % → 9.7 % |
+| 2 sesiones | Futuros | 490 | 91.0 % | 51.0 % / 93.3 % | 1.027 / 1.054 | 51.0 % / 92.7 % | 10.9 % → 11.8 % |
+| Semana | Acciones | 960 | 87.0 % | 49.1 % / 88.9 % | 1.107 / 1.077 | 51.6 % / 88.9 % | 14.6 % → 15.7 % |
+| Semana | Futuros | 490 | 85.1 % | 49.8 % / 89.2 % | 0.963 / 1.067 | 46.5 % / 88.8 % | 17.4 % → 18.8 % |
+| Mes | Acciones | 220 | 90.0 % | 51.4 % / 92.3 % | 1.031 / 1.117 | 52.7 % / 93.2 % | 30.7 % → 32.9 % |
+| Mes | Futuros | 110 | 82.7 % | 43.6 % / 83.6 % | 0.941 / 0.901 | 41.8 % / 80.0 % | 35.6 % → 38.2 % |
+
+**Lectura:**
+- Las acciones necesitan algo más de ensanche que los futuros, pero la diferencia es **moderada**. El factor por tipo **no mejora de forma consistente fuera de muestra**: ayuda a las acciones (día: 89.7 % contra 88.6 %) y empeora a los futuros (día: 86.3 % contra 89.0 %; mes: 80.0 % contra 83.6 %). Con la mitad de los datos por tipo, el factor se ajusta al ruido del periodo de estimación.
+- Los futuros a 1 mes quedan bajos con cualquier factor (n = 110, margen ±5.6). Puede influir la serie de futuros guardada (punto C: velas provisionales y cambios de contrato).
+- **Recomendación:** factor **global por horizonte** (tabla de arriba). **No** un factor por tipo por ahora; volver a evaluarlo cuando haya más datos y después del punto C (futuros). Al implementarlo, las cifras del texto (M.4) se vuelven a medir con L3 sobre los cuantiles ya calibrados.
+- **Pendiente:** la decisión del usuario y la implementación (motor, `ENGINE_PARAMS.mcCalibration` con fecha de medición, `model_notes.raw_quantiles` y pruebas sintéticas).
 
 ## 4. Decisiones de producto (J): opciones
 
@@ -461,7 +498,7 @@ Los retornos son altos porque el periodo fue alcista; no son una expectativa.
 4. **b1 no se activa en Premium** hasta corregir la previa y superar a la regla 1.18 × MAD fuera de muestra.
 5. Las bandas de Monte Carlo son algo angostas (punto M).
 
-### L4. Volumen y día de la semana (siguiente ronda; solo lectura; NO se ha corrido)
+### L4. Volumen y día de la semana (ronda 2; solo lectura; corrido el 2026-10-12)
 
 **Datos (verificado el 2026-10-12):** el CSV trae `volume` en las 30 series, sin vacíos. En las **20 acciones** es utilizable: ningún cero y medianas de millones. En los **10 futuros no**: 121 días con volumen 0, y medianas imposibles para el contrato activo (GC=F 443, SI=F 89, HG=F 724). Parece el volumen de un solo vencimiento de la serie continua de Yahoo, no el del contrato activo. Por eso H1 y H2 se evalúan **solo en las 20 acciones**; H3 en los 30 activos.
 
@@ -474,7 +511,24 @@ Los retornos son altos porque el periodo fue alcista; no son una expectativa.
 
 **Criterio:** una hipótesis solo se considera útil si mejora a "siempre sube" fuera de muestra en varios activos de forma consistente y supera el umbral corregido. Si no, se descarta.
 
-**Tamaño:** S (se agrega a `lab_l.py`; mismo CSV).
+**Tamaño:** S (se agregó a `lab_l.py`; mismo CSV). Prueba sintética: 17 de 17 autocomprobaciones (detecta un efecto de volumen y uno de lunes plantados, y no marca nada en el activo sin memoria).
+
+**Cómo leer el acierto:** si un estado solo hace *más* probable la alza, el modelo predice "sube" igual que "siempre sube" y no le puede ganar en acierto; su aporte se vería en el Brier contra la probabilidad simple. Para ganarle en acierto, algún estado tendría que predecir "baja" y acertar.
+
+**Resultados (umbral corregido p < 0.017; ~520 días de prueba por activo):**
+
+| Hipótesis | Activos | Con estados distintos (p < 0.017) | Por azar | Acierto del modelo / "siempre sube" | Le gana a "siempre sube" | Brier: mejora / empeora (\|t\| > 2.39) |
+|---|---|---|---|---|---|---|
+| H1. Volumen alto | 20 acciones | **0** | ~0.3 | 51.7 % / 52.2 % | 3 de 20 | 0 / 0 |
+| H2. Dirección × volumen | 20 acciones | **0** | ~0.3 | 51.4 % / 52.2 % | 4 de 20 | 0 / 1 |
+| H3. Día de la semana | 30 activos | **0** | ~0.5 | 51.2 % / 52.2 % | 6 de 30 | 0 / 3 |
+
+**Conjunto de activos (solo descriptivo, no es una prueba):**
+- H1: P(sube) tras volumen alto 53.2 % (n = 1 863) contra 53.1 % tras volumen normal (n = 13 197).
+- H2: tras bajar con volumen alto 54.7 %; tras subir con volumen alto 51.7 %; los dos estados normales, ~53 %.
+- H3: lunes 54.6 %; martes a viernes, entre 51.2 % y 53.0 %. La diferencia del lunes no aparece en ningún activo por separado, y los 30 activos se mueven juntos en las mismas fechas, así que no se toma como efecto.
+
+**Conclusión:** ni el volumen ni el día de la semana agregan nada a la dirección. Las tres hipótesis se **descartan**. Confirma la ronda 1: con estos datos, ninguna regla simple predice la dirección mejor que "siempre sube".
 
 ### Cómo se corre con datos reales (cuando el usuario entregue el CSV)
 
@@ -491,13 +545,13 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 | # | Bloque | Puntos | Tamaño | Depende de | Parte de "Diseño por niveles" |
 |---|---|---|---|---|---|
 | 1 | Lecturas seguras + verificación de K | I, K | M | **Hecho:** `842622b`, en la rama con push; merge tras verificar K en la corrida de hoy | Regla 4: `correlation.js` devuelve todas las correlaciones |
-| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Ronda 1 hecha** (2026-10-12, sección 5); L4 pendiente de autorización | Regla 3: decide qué parámetros por nivel se activan |
+| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12) | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
 | 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
 | 5 | Patrones binarios | G | S-M | — | Reglas 1 y 3: `patternHorizons` y `patternWindows` desde la configuración |
 | 6 | Sigma y postura de riesgo | A, F | M | — (J1 = b) | Regla 3: `newsSensitivity` |
-| M | Calibración de Monte Carlo | M | M | L3 ampliado (solo lectura); bloque 2 (`ENGINE_PARAMS`). El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
+| M | Calibración de Monte Carlo | M | M | **Validación hecha (M.5); falta la decisión global/por tipo**; bloque 2 (`ENGINE_PARAMS`). El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
 | 7 | Markowitz (mínima varianza) | D | S-M (M con endpoint) | Bloque 1 (J2 = b) | Regla 2: cálculo para N activos en el servidor |
 | 8 | Radar en el servidor (J3 = b) | J3 | M | Bloque 2; nombre de la sección | Reglas 2 y 4: `/api/radar` con ranking completo |
 | 9 | Futuros: diagnóstico y corrección | C1, luego C2 | S + M | Aprobación C2 | — |
