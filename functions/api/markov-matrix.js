@@ -40,10 +40,11 @@ export async function onRequestGet(context) {
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
 
   const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,close', limit: String(FETCH_LIMIT) }).toString();
+  // Orden desc + inversión: si el max_rows de PostgREST recorta, se pierden las filas más antiguas.
+  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'date,close', limit: String(FETCH_LIMIT) }).toString();
   const pricesResponse = await fetch(pricesUrl, { headers });
   if (!pricesResponse.ok) return json({ error: 'No se pudo leer el histórico.' }, 502);
-  const rows = await pricesResponse.json();
+  const rows = (await pricesResponse.json()).reverse();
 
   const returns = buildReturns(rows);
   if (returns.length < MIN_OBSERVATIONS) return json({ error: 'Historial insuficiente para calibrar la matriz de Markov.', minRequired: MIN_OBSERVATIONS, available: returns.length }, 422);

@@ -92,6 +92,29 @@ if os.environ.get("ONLY_WINRATE") == "1":
     sys.exit(0)
 
 
+HISTORY_PAGE_SIZE = 1000
+
+
+def read_full_history(symbol):
+    """Todo el historial (date, close) de un simbolo en orden ascendente. Una sola consulta
+    quedaria recortada por el max_rows de PostgREST (se perderian las filas mas recientes), asi
+    que se pagina con range() avanzando por las filas recibidas hasta una pagina vacia."""
+    history = []
+    while True:
+        page = (
+            supabase.table("asset_historical_prices")
+            .select("date,close")
+            .eq("symbol", symbol)
+            .order("date", desc=False)
+            .range(len(history), len(history) + HISTORY_PAGE_SIZE - 1)
+            .execute()
+            .data
+        ) or []
+        if not page:
+            return history
+        history.extend(page)
+
+
 def backfill_asset_signals():
     """Backfill retroactivo de asset_signals (punto 9.2): recorre TODO el historial ya
     existente en asset_historical_prices (no solo desde hoy) y llena asset_signals con la
@@ -122,14 +145,7 @@ def backfill_asset_signals():
             if signals_count >= prices_count - 1:
                 continue  # ya al dia, nada que recalcular para este simbolo
 
-            history = (
-                supabase.table("asset_historical_prices")
-                .select("date,close")
-                .eq("symbol", symbol)
-                .order("date", desc=False)
-                .execute()
-                .data
-            ) or []
+            history = read_full_history(symbol)
             if len(history) < 2:
                 continue
 

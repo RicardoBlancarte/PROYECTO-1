@@ -1,4 +1,7 @@
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=900' } });
+// Filas más recientes por símbolo. Se piden en orden desc y se invierten: si el max_rows de
+// PostgREST recorta la respuesta, se pierden las más antiguas, nunca las más recientes.
+const HISTORY_ROWS = 1000;
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
@@ -16,9 +19,9 @@ export async function onRequestGet(context) {
   let signalSource = 'asset_historical_prices';
   if (horizon === 'daily') {
     const signalsUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_signals`);
-    signalsUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'signal' }).toString();
+    signalsUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'signal', limit: String(HISTORY_ROWS) }).toString();
     const signalsResponse = await fetch(signalsUrl, { headers });
-    const signalRows = signalsResponse.ok ? await signalsResponse.json() : [];
+    const signalRows = signalsResponse.ok ? (await signalsResponse.json()).reverse() : [];
     if (signalRows.length >= 8) {
       bits = signalRows.map(row => String(row.signal));
       signalSource = 'asset_signals';
@@ -29,9 +32,9 @@ export async function onRequestGet(context) {
     // Respaldo: weekly/monthly siempre llegan aquí (asset_signals es solo diaria), y daily
     // también si asset_signals todavía no tiene suficiente historial para este símbolo.
     const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-    pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'close,date' }).toString();
+    pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'close,date', limit: String(HISTORY_ROWS) }).toString();
     const pricesResponse = await fetch(pricesUrl, { headers });
-    const dailyRows = pricesResponse.ok ? await pricesResponse.json() : [];
+    const dailyRows = pricesResponse.ok ? (await pricesResponse.json()).reverse() : [];
     if (dailyRows.length < 8) return json({ error: 'Not enough cached history.' }, 422);
     const rows = horizon === 'weekly' ? toWeekly(dailyRows) : horizon === 'monthly' ? toMonthly(dailyRows) : dailyRows;
     if (rows.length < 8) return json({ error: 'Not enough cached history for this horizon.' }, 422);

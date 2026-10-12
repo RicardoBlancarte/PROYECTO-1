@@ -32,9 +32,11 @@ function headers(env) { return { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authoriz
 
 async function readDailyRows(env, symbol) {
   const endpoint = new URL(`${supabaseUrl(env)}/rest/v1/asset_historical_prices`);
-  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,open,high,low,close', limit: '1826' }).toString();
+  // Orden desc + inversión: si el max_rows de PostgREST recorta la respuesta, se pierden los
+  // cierres más antiguos, nunca los más recientes (el resto del archivo espera orden asc).
+  endpoint.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'date,open,high,low,close', limit: '1826' }).toString();
   const response = await fetch(endpoint, { headers: headers(env) });
-  return response.ok ? response.json() : [];
+  return response.ok ? (await response.json()).reverse() : [];
 }
 
 // Explicit, user-triggered point-in-time quote only (never a bulk historical pull).

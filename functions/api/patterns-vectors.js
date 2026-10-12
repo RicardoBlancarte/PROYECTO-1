@@ -16,7 +16,7 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 
 const MIN_VECTORS = 15; // piso de seguridad para que Sigma/MAD no degeneren; no es el N_min de Silverman.
 const PERSIST_LIMIT = 260; // solo se audita la cola reciente; el cálculo en memoria usa todo el historial.
-const FETCH_LIMIT = 5000; // evita el límite por defecto de PostgREST (1000) truncando el historial real.
+const FETCH_LIMIT = 5000; // tope pedido; el max_rows de PostgREST puede recortarlo (por eso la lectura es desc).
 const SILVERMAN_D = 2; // dimensiones del vector: retorno, volumen.
 const SILVERMAN_C = 0.5;
 
@@ -30,10 +30,11 @@ export async function onRequestGet(context) {
   const headers = { apikey: context.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${context.env.SUPABASE_SERVICE_ROLE_KEY}` };
 
   const pricesUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.asc', select: 'date,close,volume', limit: String(FETCH_LIMIT) }).toString();
+  // Orden desc + inversión: si el max_rows de PostgREST recorta, se pierden las filas más antiguas.
+  pricesUrl.search = new URLSearchParams({ symbol: `eq.${symbol}`, order: 'date.desc', select: 'date,close,volume', limit: String(FETCH_LIMIT) }).toString();
   const pricesResponse = await fetch(pricesUrl, { headers });
   if (!pricesResponse.ok) return json({ error: 'No se pudo leer el histórico.' }, 502);
-  const rawRows = await pricesResponse.json();
+  const rawRows = (await pricesResponse.json()).reverse();
   const rows = horizon === 'weekly' ? resample(rawRows, isoWeekKey) : horizon === 'monthly' ? resample(rawRows, row => row.date.slice(0, 7)) : rawRows;
 
   const vectors = buildVectors(rows);
