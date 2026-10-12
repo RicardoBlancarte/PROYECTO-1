@@ -18,7 +18,7 @@
 | J2 | **b.** Mínima varianza para N activos, sin μ. Los activos sin historial se excluyen con aviso. El μ histórico queda para cuando el laboratorio L lo valide. |
 | J3 | **b.** Orden por el ancho p5-p95 diario de Monte Carlo. Arriba/abajo (`probUp`) se muestra como **reparto de escenarios**, nunca como criterio de orden. Nombres propuestos en la sección 4. |
 | H | Se quita **solo** `#recalculate` y su manejador. `#winrate-refresh` se queda. |
-| I | **`max_rows`: sin dato todavía** (la respuesta llegó como "[NÚMERO]"). El bloque 1 se diseñó para funcionar con cualquier valor (punto I); el usuario lo confirma antes del merge. |
+| I | **`max_rows` = 1 000** (valor por defecto; no se cambia). Confirmado por el usuario. |
 | N1 | Free = 5 activos y Top 3; Premium = 12 activos y Top 10. Elite: **"por definir"** en la configuración, pero **nunca ilimitado en la interfaz**: todo nivel tiene un tope visual (1.2). Los límites de Elite se proponen después, según el diseño. |
 | N2 | El "motor más sensible" de Premium será el **factor b1** de `sensitivity-factor.js`. En la Fase 3 solo queda como parámetro configurable por nivel, **apagado**. La comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` se hace en el laboratorio L. Ningún parámetro "más sensible" se activa en Premium hasta que L muestre que mejora el acierto fuera de muestra. |
 
@@ -26,12 +26,10 @@
 
 | # | Pregunta | Dónde |
 |---|---|---|
-| I | Valor de `max_rows` del proyecto en Supabase (API settings). | Punto I |
-| L | Confirmar el alcance del laboratorio L (propuesta en la sección 5). | Sección 5 |
+| L | CSV exportado de `asset_historical_prices` (y, si se puede, de `asset_news_scores`) para correr el laboratorio. | Sección 5 |
 | B2 | Aprobación para escribir en `asset_historical_prices` (backfill de los 4 activos). | Punto B |
 | C2 | Aprobación para reescribir cierres de futuros dentro de la ventana. | Punto C |
 | E1 | Límites de Elite según el diseño (propuesta del agente, más adelante). | Sección 1.2 |
-| J3 | Nombre de la sección del radar. | Sección 4 |
 
 ---
 
@@ -270,12 +268,15 @@ Mientras todo sea gratis no hay pérdida, pero **Premium requerirá validar el n
 
 **Decididas el 2026-10-12: J1 = b, J2 = b, J3 = b** (sección 0). Las tablas quedan como registro.
 
-**Nombres propuestos para la sección del radar (J3, pendiente de elegir):**
-1. **"Radar de amplitud"**: corto y conserva la palabra "radar" de la homepage.
-2. **"Mayor rango de escenarios"**: describe exactamente el criterio de orden.
-3. **"Rango de la próxima sesión"**: pone el horizonte en el título y evita "mañana".
+**Nombre de la sección del radar (J3, decidido):**
 
-En los tres, cada fila muestra el rango p5-p95 y el reparto "X % de los escenarios arriba / Y % abajo" como dato, no como orden.
+| Idioma | Título | Subtítulo |
+|---|---|---|
+| es | Radar | Activos con mayor rango de escenarios para la próxima sesión |
+| en (propuesta) | Radar | Assets with the widest range of scenarios for the next session |
+| zh (propuesta) | 雷达 | 下一交易日情景区间最宽的资产 |
+
+Cada fila muestra el rango p5-p95 y el reparto "X % de los escenarios arriba / Y % abajo" como dato, no como orden. En la homepage, `attributes[5]` y `block8` cambian al mismo texto (en el plan Free, "los 3 activos…").
 
 ### J1. Postura de riesgo
 
@@ -307,18 +308,73 @@ Con el diseño por niveles, a), b) y d) admiten Top 3 / Top 10 sin cambios: el s
 
 ---
 
-## 5. Laboratorio L (propuesta, pendiente de confirmar el alcance)
+## 5. Laboratorio L (alcance aprobado el 2026-10-12)
 
-El laboratorio no estaba definido en los documentos anteriores. Propuesta:
+- **Qué es:** una evaluación **de solo lectura y fuera de muestra**. Nada de lo que mida cambia la interfaz ni la cascada.
+- **Datos:** **sin credenciales.** El script solo lee un CSV exportado de `asset_historical_prices` (columnas `symbol, date, close` y, opcional, `volume`) que entrega el usuario. Para L2-noticias acepta además un CSV de `asset_news_scores` (`symbol, published_at, impact_score`).
+- **Script:** `lab_l.py` (en el scratchpad del agente; no se agrega al repo salvo que el usuario lo pida). Escribe CSV y un `informe.md` en la carpeta de salida. **Todavía no se ha corrido con datos reales.**
+- **Definición de "sube":** `close_t > close_{t-1}` (estricta), igual que `asset_signals`.
+- **Criterio general:** un parámetro solo se activa en un nivel si mejora la métrica fuera de muestra de forma consistente entre activos, no en promedio por un par de activos.
 
-- **Qué es:** una evaluación **de solo lectura y fuera de muestra** de los parámetros del motor. Nada de lo que mida cambia la interfaz ni la cascada.
-- **Preguntas:**
-  1. **μ histórico (J2):** ¿un μ estimado con la ventana previa predice el retorno de la ventana siguiente mejor que μ = 0? Si no, la mínima varianza se queda.
-  2. **b1 contra `NEWS_SENSITIVITY_FACTOR` (N2):** qué mide cada uno y si mejora el acierto. b1 escala la sigma realizada en `sensitivity-factor.js`; `NEWS_SENSITIVITY_FACTOR` desplaza una probabilidad según las noticias (`index.html:673-674`).
-  3. **Calibración de Monte Carlo v2:** ¿el cierre real cae dentro de p25-p75 ~50 % de las veces y dentro de p5-p95 ~90 %? Es la métrica que respalda J1 y J3, y el Win Rate legacy no la mide (winrate-plan, 5.1).
-- **Método:** ventanas móviles sin mirar el futuro (*walk-forward*): calibrar con los datos hasta el día t y evaluar en t+1…t+h. Métricas: cobertura de bandas, error de pronóstico de la varianza y puntaje de Brier para direcciones.
-- **Cómo corre:** un script de Python en el scratchpad que **solo lee** `asset_historical_prices` (y `asset_news_scores` para la pregunta 2), como `diagnose_volatility_feedback.py`. No hay credenciales locales con lectura (RLS), así que lo ejecuta el usuario con `SUPABASE_URL`/`SUPABASE_KEY` en su entorno y comparte la salida, que no incluye secretos. Primero se prueba con datos sintéticos.
-- **Criterio:** un parámetro solo se activa en un nivel si mejora la métrica fuera de muestra de forma consistente entre activos, no en promedio por un par de activos.
+### L0 (pregunta principal)
+
+**L0a. Inventario (solo lectura del código, 2026-10-12, líneas en `842622b`)**
+
+| Pieza | Qué calcula | Archivo:línea |
+|---|---|---|
+| `markov-matrix.js` | 3 estados (bajista / neutral / alcista) definidos por **terciles** del retorno log del propio activo. **Orden 1:** cuenta parejas de días seguidos `(estado_t, estado_t+1)`. Ventana: todo el historial que llega (pide 5 000; con `max_rows` = 1 000, las 1 000 sesiones más recientes desde el bloque 1). Semana y mes: `P^5` y `P^21`, sin reajustar. Guarda en `asset_markov_matrix`. Ninguna pantalla lo usa. | l. 28-31 (constantes), 54-57 (terciles), 123-127 (conteo de transiciones), 63-66 (potencia), 167-183 (guardado) |
+| `patterns-vectors.js` | Un vector por día: retorno log y volumen, ambos normalizados por MAD. Patrón = 3 vectores seguidos. Distancia de Mahalanobis entre el patrón actual y cada patrón histórico; peso `e^-D`; `P(sube)` = proporción ponderada de días siguientes al alza. Etiqueta de confianza con N mínimo de Silverman. Ventana: todo el historial. Guarda en `asset_pattern_vectors` (últimos 260) y `asset_pattern_vectors_snapshots`. Ninguna pantalla lo usa. | l. 124-145 (vectores), 62-76 (kernel y `P(sube)`), 203-211 (distancia), 81-89 (Silverman) |
+| `sensitivity-factor.js` (b1) | Factor de **magnitud**, no de dirección: ajusta `abs(r_t) = S · MAD(20 días previos)` con verosimilitud Student-t y previa en 0.21 (el `step` legacy). Guarda en `asset_sensitivity_factor`. | l. 20-23 (constantes), 55-88 (ajuste), 131-140 (pares) |
+| **Hallazgo en b1** | La previa pesa unas **250 veces** más que los datos: `lambda0 = K_PRIOR / mean(x²)` no se escala por τ², así que b1 **nunca se aleja de 0.21**. En datos sintéticos GARCH: b1 = 0.2116 (idéntico en el JS real y en la réplica de Python), contra 1.22 por mínimos cuadrados sin previa. Hoy b1 es, en la práctica, la constante legacy. No se corrige en el laboratorio; se documenta para N2. | l. 58 |
+| ¿Cómo combina shadow_v2? | **No hay una fórmula que combine** Markov, patrones, Monte Carlo y noticias. Son piezas independientes (filas siguientes). | — |
+| · Panel "Patrones binarios" | Patrón binario de 3 y 5 días; frecuencia empírica más `promedio impact_score / 100` de las últimas 20 noticias, acotado a [5 %, 95 %]. | `patterns.js`: l. 44-49 (noticias), 61-83 (estimación) |
+| · Win Rate shadow_v2 | Solo el patrón binario de 5 días, **sin noticias** ni otras piezas. | `winrate-shadow.js`: l. 6, 55-66 |
+| · Monte Carlo v2 | GARCH(1,1) con Student-t y simulación histórica filtrada: el pool de shocks se pondera con `e^-Mahalanobis` de patrones de 3 días (la misma idea de `patterns-vectors.js`) y `lambda_pool` = 1 fijo. **Noticias: no** (`news_uncertainty_variance = 0`). **b1 y Markov: no**; solo se guardan como `b1_crosscheck` y `b2_crosscheck`. | `montecarlo_engine.py`: l. 541-544 (pool), 55 y 519-523 (`lambda_pool`), 572 y 621 (noticias = 0), 626-627 (crosscheck) |
+| · `NEWS_SENSITIVITY_FACTOR` (0.35) | Solo lo usa `applyNewsWeighting`; su resultado (`adjusted`) se calcula y **no se usa**. Hoy no tiene efecto visible. El `.35` que escala la píldora SIGMA con `newsDebateScore` es otra constante escrita a mano. | `index.html`: l. 676-677, 679, 371 |
+| ¿Guardamos historial de noticias? | **Sí, pero no sistemático.** `asset_news_scores` guarda cada titular puntuado (`published_at`, `impact_score` de −10 a 10, resúmenes; único por `content_hash`). Solo se escribe cuando alguien abre el Newsbox de un activo, y GDELT responde 429 con frecuencia (#118), así que muchos puntajes son heurísticos y la cobertura depende del tráfico. | `schema.sql:133-145, 222-223`; `news.js:26-57` |
+
+**Hallazgos de L0a:**
+1. **No existe una fórmula que combine las piezas.** Markov, patrones binarios, vectores, Monte Carlo y noticias se calculan por separado; Monte Carlo solo guarda b1 y Markov como verificación, sin usarlos.
+2. **El Win Rate de 49.7 % solo mide el patrón binario de 5 días** (`winrate-shadow.js`), sin noticias, Markov, vectores ni Monte Carlo. No es una medida del "motor sombra" completo.
+3. **b1 está atorado en 0.21 por la previa** (`sensitivity-factor.js:58`): la previa pesa ~250 veces más que los datos.
+4. **`applyNewsWeighting` se calcula y no se usa** (`index.html:679`): hoy `NEWS_SENSITIVITY_FACTOR` no tiene efecto visible.
+
+**L0b. Matrices de transición de orden 1, 2 y 3.** Por activo, `P(sube | últimos k días)` con el número de casos por fila. En orden 1, la separación `P(sube|subió) − P(sube|bajó)` con su margen de error al 95 %. En órdenes 2 y 3, cada fila contra la tasa base (margen al 95 %) y una prueba chi² de "todas las filas iguales". El informe indica cuántos positivos se esperan por azar (5 %), porque con 30 activos y muchas filas habrá falsos positivos.
+- **Markov de 2 estados (sube/baja) contra Markov de 3 estados (terciles).** El de 2 estados es el diseño original del usuario: es el orden 1 binario de arriba, `P(sube | subió)` y `P(sube | bajó)`. El de 3 estados es el que calcula hoy `markov-matrix.js` (bajista / neutral / alcista por terciles del propio activo). Para compararlos con la misma medida, de cada uno se reporta `P(sube | estado del día anterior)` con casos por fila; para el de 3 estados, además, la matriz 3×3 completa, la separación `P(sube|alcista) − P(sube|bajista)` con su margen al 95 % y una chi² de "las 3 filas iguales". En L0b los terciles salen de todo el historial, como en el endpoint (descriptivo).
+
+**L0c. Acierto fuera de muestra.** Ventana que avanza (se expande): desde la sesión 252, en cada día se predice con los conteos de los días anteriores y luego se agrega el dato observado. Órdenes 1, 2 y 3 (2 estados) y Markov de 3 estados contra "siempre sube" y contra la probabilidad simple de alza. En el de 3 estados, los terciles se recalculan cada 21 sesiones **solo con datos anteriores** (sin mirar el futuro). Métricas: acierto (umbral 0.5), Brier y una prueba *t* pareada del Brier contra la probabilidad simple. Tabla por activo y resumen.
+- **Potencia:** con ~520 días de prueba por activo, un acierto solo se distingue del azar si supera 50 % ± ~4 puntos, y el *t* del Brier necesita efectos aún mayores. En datos sintéticos, un efecto real de ±14 puntos dio t ≈ 1.4.
+
+### L1. μ histórico contra μ = 0 (J2)
+- Por activo: R² fuera de muestra (μ de las 252 sesiones previas contra 0, para predecir el retorno medio de las 21 siguientes, sin traslape).
+- Portafolio: mínima varianza, μ histórico y peso igual, con el mismo esquema que la interfaz (encogimiento de 0.35, recorte de negativos y tope por activo), rebalanceo cada 21 sesiones. Volatilidad, retorno y Sharpe realizados.
+
+### L2. b1 contra `NEWS_SENSITIVITY_FACTOR` (N2)
+- **No miden lo mismo:** b1 es un factor de magnitud; `NEWS_SENSITIVITY_FACTOR` desplaza una probabilidad de dirección. Se evalúan por separado.
+- **b1:** pronóstico de `abs(r_{t+1})` con b1 (reajustado cada 21 sesiones con el mismo algoritmo del JS) contra la constante legacy 0.21 y la constante normal `√(2/π) × 1.4826 ≈ 1.183`. Métrica: error absoluto medio.
+- **Noticias (solo con el CSV de noticias):** Brier de la dirección del día siguiente con `applyNewsWeighting` para sensibilidades 0, 0.1, 0.2, 0.35 y 0.5, y con el ajuste de `patterns.js`, solo en los días con noticias publicadas.
+
+### L3. Cobertura de Monte Carlo v2 (J1, J3)
+- Se ejecuta el motor real (`montecarlo_engine.run_montecarlo_for_symbol`, importado con `--repo`) en fechas pasadas, cada 10 sesiones dentro de las últimas 252, sin traslape, para `daily` y `weekly`.
+- Se mide qué fracción de los cierres reales cae dentro de p25-p75 (esperado 0.50) y de p5-p95 (esperado 0.90), con su margen de error.
+
+### Prueba con datos sintéticos (2026-10-12): 12 de 12 autocomprobaciones OK
+
+Seis activos sintéticos con propiedades conocidas: sin memoria; memoria de orden 1; memoria solo de orden 2; tendencia del 60 %; volatilidad GARCH; y reversión tras días grandes (la dirección depende del tamaño del movimiento previo).
+- L0b detecta la memoria de orden 1 (separación 0.169, margen 0.065) y no la marca en el activo sin memoria (−0.003). La memoria de orden 2 aparece en la chi² de orden 2 (p = 5·10⁻¹⁰).
+- L0c: el orden correcto acierta más que la probabilidad simple (59.7 % contra 50.5 %; 59.4 % contra 50.2 %). En el activo con tendencia, "siempre sube" acierta 0.598.
+- 2 contra 3 estados: en el activo con reversión tras días grandes, el de 3 estados ve la separación (−0.31, margen 0.08; chi² p = 10⁻¹³) que el de 2 estados solo ve diluida, y acierta más fuera de muestra (60.4 % contra 58.3 %). En el activo sin memoria, ninguno marca separación.
+- L2: b1 replica exactamente al JS (0.211623) y confirma el hallazgo de la previa.
+- L3: la cobertura p5-p95 del activo GARCH queda dentro del margen de 0.90.
+- Tiempo: ~7 s sin L3 y del orden de minutos con L3 (depende de `--mc-step`).
+
+### Cómo se corre con datos reales (cuando el usuario entregue el CSV)
+
+```
+py lab_l.py --prices precios.csv [--news noticias.csv] --repo "<ruta del repo>" --out salida_real
+```
+
+El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 
 ---
 
@@ -326,8 +382,8 @@ El laboratorio no estaba definido en los documentos anteriores. Propuesta:
 
 | # | Bloque | Puntos | Tamaño | Depende de | Parte de "Diseño por niveles" |
 |---|---|---|---|---|---|
-| 1 | Lecturas seguras + verificación de K | I, K | M | `max_rows` (confirmar antes del merge) | Regla 4: `correlation.js` devuelve todas las correlaciones |
-| L | Laboratorio (solo lectura) | J2, N2, calibración | M | Confirmar alcance (sección 5) | Regla 3: decide qué parámetros por nivel se activan |
+| 1 | Lecturas seguras + verificación de K | I, K | M | **Hecho:** `842622b`, en la rama con push; merge tras verificar K en la corrida de hoy | Regla 4: `correlation.js` devuelve todas las correlaciones |
+| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | Script listo y probado con datos sintéticos; falta el CSV real (sección 5) | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
 | 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
@@ -345,6 +401,10 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 ## 7. Pendientes para fases posteriores
 
 - **Fase 5 — validar el nivel en el servidor** (1.5): hoy todo límite por nivel se controla solo en el navegador; Premium lo requerirá en el servidor.
+- **Fase 5 — Supabase: "Automatically expose new tables" está activado.** Supabase recomienda desactivarlo: con esa opción, toda tabla nueva queda expuesta por la API desde que se crea. Revisarlo junto con las RLS de las 20 tablas.
+- **Bloque 2 — correlaciones por nivel:** hoy la interfaz muestra como máximo **una** correlación (la primera confirmada por volumen, `renderShadowEngine`), igual para todos los niveles, y solo dentro del motor sombra oculto. No hay regla por nivel. Si vuelve en la Fase 5, el número debe salir de `TIER_LIMITS` (p. ej. `correlationSuggestions`).
+- **Fase 5 — b1 (`sensitivity-factor.js:58`):** la previa domina el ajuste (sección 5, L0a). Corregir antes de usar b1 en cualquier nivel, y solo si L lo justifica.
+- **Fase 5 — `NEWS_SENSITIVITY_FACTOR`:** el resultado de `applyNewsWeighting` (`index.html:679`) no se usa; decidir si se borra o se conecta según L2.
 - **Límites de Elite (E1):** el agente los propone según el diseño de las pantallas; mientras tanto, la interfaz usa el tope visual `UI_CAPS`.
 - **Laboratorio L:** comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` y validación del μ histórico antes de activar cualquier parámetro "más sensible" en Premium.
 - **Fase 5 — `asset_prediction_audit`** crece en cada consulta de patrones (ya anotado en fase-2-plan, sección 9); se agrava mientras `loadShadowCorrelation` siga activo (punto I).
