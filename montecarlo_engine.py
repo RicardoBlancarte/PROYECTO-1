@@ -31,8 +31,10 @@ parametrica (esa es simetrica por construccion y no captura asimetria sin un par
 """
 
 import hashlib
+import json
 from datetime import datetime, timezone
 from math import lgamma, log, pi
+from pathlib import Path
 
 import numpy as np
 from scipy.optimize import minimize
@@ -58,6 +60,31 @@ LAMBDA_POOL_MODE = "fixed_low_power_n760"
 # (el sigma GARCH del paso 2 depende del shock del paso 1).
 STEPS_BY_HORIZON = {"daily": 1, "two_day": 2, "weekly": 5, "monthly": 21}
 MIN_RETURNS = 90  # piso de seguridad: ventana + MLE + ESS estables necesitan margen.
+
+# Calibracion de las bandas (Fase 3 de lanzamiento, punto M): factores k50/k90 por horizonte en
+# functions/_shared/engine-params.json (mcCalibration). Sin archivo o con un horizonte ausente,
+# k = 1 (cuantiles sin calibrar) y model_notes lo registra; nunca tumba la cascada.
+ENGINE_PARAMS_PATH = Path(__file__).resolve().parent / "functions" / "_shared" / "engine-params.json"
+IDENTITY_CALIBRATION = {"k50": 1.0, "k90": 1.0}
+
+
+def load_mc_calibration(path=ENGINE_PARAMS_PATH):
+    """Devuelve {"measured_at": ..., "horizons": {horizonte: {"k50", "k80" (o None), "k90"}}} o None
+    si no hay configuracion valida. k80 es opcional: si falta, calibrate_quantiles lo interpola."""
+    try:
+        config = json.loads(Path(path).read_text(encoding="utf-8"))["mcCalibration"]
+        horizons = {
+            name: {"k50": float(values["k50"]), "k80": float(values["k80"]) if values.get("k80") else None,
+                   "k90": float(values["k90"])}
+            for name, values in config["horizons"].items()
+            if float(values["k50"]) > 0 and float(values["k90"]) > 0
+        }
+        return {"measured_at": str(config.get("measuredAt", "")), "horizons": horizons}
+    except Exception:  # noqa: BLE001 -- sin configuracion se simula sin calibrar
+        return None
+
+
+MC_CALIBRATION = load_mc_calibration()
 
 
 # ---------------------------------------------------------------------------
@@ -484,12 +511,55 @@ def summarize_simulation(cumulative_log_returns):
     }
 
 
+QUANTILE_ORDER = ("p5", "p10", "p25", "p50", "p75", "p90", "p95")
+
+
+def interpolated_k80(k50, k90):
+    """k80 a la banda del 80 % por interpolacion lineal entre la del 50 % y la del 90 %."""
+    return k50 + 0.75 * (k90 - k50)
+
+
+def calibrate_quantiles(quantiles, k50, k90, k80=None):
+    """Ensancha (k > 1) o angosta (k < 1) la distancia de cada cuantil a la mediana:
+    q' = p50 + k * (q - p50). k50 para p25/p75, k80 para p10/p90 (si no se da, se interpola) y
+    k90 para p5/p95. La mediana no cambia. Se garantiza el orden p5 <= ... <= p95 y que ningun
+    cuantil implique un precio <= 0 (retorno simple > -1)."""
+    if k80 is None:
+        k80 = interpolated_k80(k50, k90)
+    factors = {"p5": k90, "p10": k80, "p25": k50, "p50": 1.0, "p75": k50, "p90": k80, "p95": k90}
+    p50 = quantiles["p50"]
+    # Forma equivalente a p50 + k * (q - p50) que con k = 1 devuelve q exacto (sin redondeo).
+    values = [max(quantiles[name] + (factors[name] - 1.0) * (quantiles[name] - p50), -0.9999) for name in QUANTILE_ORDER]
+    values = np.maximum.accumulate(values)
+    return {name: float(value) for name, value in zip(QUANTILE_ORDER, values)}
+
+
+def resolve_calibration(horizon, calibration=None):
+    """calibration=None -> la de engine-params.json para ese horizonte (o k = 1 si no hay);
+    un dict {"k50", "k90"[, "k80"]} explicito (pruebas y laboratorio) tiene prioridad. Siempre
+    devuelve un k80 numerico y de donde salio ("explicito" o "interpolado")."""
+    if calibration is not None:
+        factors = {"k50": float(calibration["k50"]), "k90": float(calibration["k90"]),
+                   "k80": float(calibration["k80"]) if calibration.get("k80") else None}
+        meta = {"measured_at": None, "source": "override"}
+    elif MC_CALIBRATION and horizon in MC_CALIBRATION["horizons"]:
+        factors = dict(MC_CALIBRATION["horizons"][horizon])
+        meta = {"measured_at": MC_CALIBRATION["measured_at"], "source": "engine-params.json"}
+    else:
+        factors = {**IDENTITY_CALIBRATION, "k80": None}
+        meta = {"measured_at": None, "source": "sin_configuracion"}
+    k80_source = "explicito" if factors["k80"] is not None else "interpolado"
+    if factors["k80"] is None:
+        factors["k80"] = interpolated_k80(factors["k50"], factors["k90"])
+    return {**factors, **meta, "k80_source": k80_source}
+
+
 # ---------------------------------------------------------------------------
 # Orquestacion por simbolo.
 # ---------------------------------------------------------------------------
 
 def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
-                               b1_row=None, b2_row=None, n_paths=10000, window=WINDOW):
+                               b1_row=None, b2_row=None, n_paths=10000, window=WINDOW, calibration=None):
     if horizon not in STEPS_BY_HORIZON:
         raise ValueError(f"Horizonte invalido: {horizon}")
     steps = STEPS_BY_HORIZON[horizon]
@@ -575,6 +645,13 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
     log_units = summary.pop("log_units")
     realized_skewness_simulated_simple = summary.pop("realized_skewness_simulated_simple")
 
+    # Punto M (Fase 3 de lanzamiento): bandas calibradas con un factor global por horizonte.
+    # Solo cambian los cuantiles publicados; la mediana, probability_up, VaR, CVaR y la
+    # semi-desviacion quedan sin calibrar. Los cuantiles originales van a model_notes.
+    raw_quantiles = summary["quantiles"]
+    applied = resolve_calibration(horizon, calibration)
+    summary["quantiles"] = calibrate_quantiles(raw_quantiles, applied["k50"], applied["k90"], applied["k80"])
+
     model_notes = {
         "engine": "shadow_v2_montecarlo",
         "low_effective_sample": bool(ess < n_min),
@@ -600,6 +677,16 @@ def run_montecarlo_for_symbol(symbol, horizon, closes, volumes, dates,
         "pool_skewness_bowley_weighted": pool_skewness_bowley_weighted,
         "realized_skewness_simulated_simple": realized_skewness_simulated_simple,
         "log_units": log_units,
+        "raw_quantiles": raw_quantiles,
+        "calibration": {
+            "k50": applied["k50"],
+            "k80": applied["k80"],
+            "k80_source": applied["k80_source"],
+            "k90": applied["k90"],
+            "measured_at": applied["measured_at"],
+            "source": applied["source"],
+            "note": "solo quantiles esta calibrado; VaR, CVaR, semi_deviation y probability_up no.",
+        },
     }
 
     result = {
@@ -718,7 +805,8 @@ def run_for_all_assets(supabase, assets, n_paths=10000):
                     )
                     persist_result(supabase, result)
                     print(f"Monte Carlo ({symbol}, {horizon}): P(sube)={result['probability_up']:.3f} "
-                          f"VaR95={result['var_95']:.4f} lambda_pool_mode={result['model_notes']['lambda_pool_mode']}")
+                          f"VaR95={result['var_95']:.4f} lambda_pool_mode={result['model_notes']['lambda_pool_mode']} "
+                          f"calibracion={result['model_notes']['calibration']['source']}")
                 except Exception as e:
                     print(f"Error en Monte Carlo ({symbol}, {horizon}): {e}")
         except Exception as e:

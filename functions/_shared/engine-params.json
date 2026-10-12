@@ -1,0 +1,20 @@
+{
+  "_nota": "Parametros del motor (ENGINE_PARAMS, docs/lanzamiento/fase-3-plan.md 1.3 y punto M). Publicos, sin secretos. Los lee montecarlo_engine.py; el bloque 2 los expondra a tier-config.js.",
+  "mcCalibration": {
+    "measuredAt": "2026-10-12",
+    "method": "Factor global por horizonte: q' = p50 + k * (q - p50). k50 para p25/p75, k80 para p10/p90 y k90 para p5/p95 (si falta k80 se interpola: k50 + 0.75 * (k90 - k50)). k50 = mediana, k80 = percentil 80 y k90 = percentil 90 del factor que hace entrar el cierre real en la banda, con 9 720 evaluaciones del motor real (30 activos, fechas base 2024-09-11 a 2026-10-02). Sin factor por tipo de activo: se reevalua despues del punto C (futuros) y con mas datos.",
+    "horizons": {
+      "daily":   { "k50": 1.054, "k80": 1.128, "k90": 1.123 },
+      "two_day": { "k50": 1.089, "k80": 1.110, "k90": 1.088 },
+      "weekly":  { "k50": 1.056, "k80": 1.091, "k90": 1.102 },
+      "monthly": { "k50": 1.008, "k80": 1.074, "k90": 1.091 }
+    }
+  },
+  "coverageText": {
+    "measuredAt": "2026-10-12",
+    "horizon": "daily",
+    "standardPer100": 49,
+    "widePer100": 89,
+    "method": "Cobertura FUERA DE MUESTRA con bandas calibradas: factores estimados con cierres hasta 2025-10-10 y medidos en 1 470 evaluaciones diarias posteriores (motor real con la calibracion aplicada). Es la cifra que muestran los textos de Estandar y Amplio (punto M.4)."
+  }
+}

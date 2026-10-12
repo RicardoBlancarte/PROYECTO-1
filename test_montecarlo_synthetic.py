@@ -19,6 +19,9 @@ en produccion para INTC/META que llevo a reemplazar la recursion EWMA por GARCH(
   5. Fase 2 de lanzamiento: horizonte two_day (determinista, ancho ~sqrt(2) x daily),
      base_close_date, y el criterio de salida del abanico (puede bajar con deriva negativa; se
      ensancha con mayor volatilidad).
+  6. Fase 3 de lanzamiento (punto M): calibracion de bandas con k50/k90 por horizonte desde
+     functions/_shared/engine-params.json; k = 1 deja los cuantiles crudos; p50, probability_up y
+     VaR/CVaR no cambian; sin configuracion no falla.
 
 Corre: py test_montecarlo_synthetic.py
 """
@@ -273,6 +276,82 @@ def run():
         "5e. Con sigma 3x, el ancho p90-p10 diario es claramente mayor (ratio > 2)",
         ratio_vol > 2.0,
         f"ratio={ratio_vol:.3f}",
+    ))
+
+    # --- 6. Fase 3 de lanzamiento, punto M: calibracion de las bandas por horizonte ---
+    print("\n--- 6. Fase 3: calibracion de bandas (k50, k90) ---")
+    cfg = mc.load_mc_calibration()
+    results.append(check(
+        "6a. engine-params.json se carga con los 4 horizontes y fecha de medicion",
+        cfg is not None and set(cfg["horizons"]) == set(mc.STEPS_BY_HORIZON) and cfg["measured_at"] == "2026-10-12",
+        f"horizontes={sorted(cfg['horizons']) if cfg else None}  medido={cfg['measured_at'] if cfg else None}",
+    ))
+    identity = mc.run_montecarlo_for_symbol("SINTETICO_A", "daily", closes_a, volumes_a, dates_a, n_paths=10000,
+                                            calibration={"k50": 1.0, "k90": 1.0})
+    results.append(check(
+        "6b. Con k = 1 los cuantiles publicados son identicos a los crudos, y los crudos no dependen de la calibracion",
+        identity["quantiles"] == identity["model_notes"]["raw_quantiles"]
+        and identity["model_notes"]["raw_quantiles"] == result["model_notes"]["raw_quantiles"],
+    ))
+    wide = mc.run_montecarlo_for_symbol("SINTETICO_A", "daily", closes_a, volumes_a, dates_a, n_paths=10000,
+                                        calibration={"k50": 1.2, "k90": 1.5})
+    raw, cal = wide["model_notes"]["raw_quantiles"], wide["quantiles"]
+    ratio = lambda name: (cal[name] - cal["p50"]) / (raw[name] - raw["p50"])  # noqa: E731
+    results.append(check(
+        "6c. Con k50 = 1.2 y k90 = 1.5: p50 identico; p25/p75 x1.2, p10/p90 x1.425, p5/p95 x1.5 exactos",
+        cal["p50"] == raw["p50"]
+        and all(abs(ratio(n) - 1.2) < 1e-9 for n in ("p25", "p75"))
+        and all(abs(ratio(n) - 1.425) < 1e-9 for n in ("p10", "p90"))
+        and all(abs(ratio(n) - 1.5) < 1e-9 for n in ("p5", "p95")),
+        f"p25={ratio('p25'):.6f}  p90={ratio('p90'):.6f}  p95={ratio('p95'):.6f}",
+    ))
+    results.append(check(
+        "6d. La calibracion no toca probability_up, VaR, CVaR ni la semi-desviacion",
+        all(wide[key] == identity[key] for key in ("probability_up", "var_95", "cvar_95", "var_99", "cvar_99", "semi_deviation")),
+    ))
+    expected = cfg["horizons"]["daily"] if cfg else {"k50": None, "k80": None, "k90": None}
+    notes = result["model_notes"]["calibration"]
+    results.append(check(
+        "6e. Sin override, el motor usa los factores de engine-params.json (con k80 explicito) y lo registra en model_notes",
+        notes["source"] == "engine-params.json" and notes["k50"] == expected["k50"] and notes["k90"] == expected["k90"]
+        and notes["k80"] == expected["k80"] and notes["k80_source"] == "explicito"
+        and notes["measured_at"] == "2026-10-12"
+        and result["quantiles"] == mc.calibrate_quantiles(result["model_notes"]["raw_quantiles"],
+                                                          expected["k50"], expected["k90"], expected["k80"]),
+        f"k50={notes['k50']}  k80={notes['k80']} ({notes['k80_source']})  k90={notes['k90']}  fuente={notes['source']}",
+    ))
+    saved = mc.MC_CALIBRATION
+    try:
+        mc.MC_CALIBRATION = mc.load_mc_calibration("no-existe.json")
+        missing = mc.run_montecarlo_for_symbol("SINTETICO_A", "daily", closes_a, volumes_a, dates_a, n_paths=10000)
+    finally:
+        mc.MC_CALIBRATION = saved
+    results.append(check(
+        "6f. Sin configuracion: k = 1, cuantiles crudos y fuente 'sin_configuracion' (no falla)",
+        mc.load_mc_calibration("no-existe.json") is None
+        and missing["model_notes"]["calibration"]["source"] == "sin_configuracion"
+        and missing["quantiles"] == missing["model_notes"]["raw_quantiles"],
+    ))
+    odd = mc.calibrate_quantiles({"p5": -0.6, "p10": -0.3, "p25": -0.05, "p50": 0.0, "p75": 0.05, "p90": 0.3, "p95": 0.6}, 4.0, 1.0)
+    values = [odd[name] for name in mc.QUANTILE_ORDER]
+    results.append(check(
+        "6g. Con factores extremos (k50 > k90) se conserva el orden p5 <= ... <= p95 y ningun precio <= 0",
+        all(a <= b for a, b in zip(values, values[1:])) and min(values) > -1,
+        f"{[round(v, 4) for v in values]}",
+    ))
+
+    explicit = mc.run_montecarlo_for_symbol("SINTETICO_A", "daily", closes_a, volumes_a, dates_a, n_paths=10000,
+                                            calibration={"k50": 1.2, "k80": 1.3, "k90": 1.5})
+    raw_e, cal_e = explicit["model_notes"]["raw_quantiles"], explicit["quantiles"]
+    ratio_e = lambda name: (cal_e[name] - cal_e["p50"]) / (raw_e[name] - raw_e["p50"])  # noqa: E731
+    results.append(check(
+        "6h. Con k80 explicito (1.3), p10/p90 usan ese factor y no el interpolado (1.425); p25/p75 y p5/p95 sin cambio",
+        all(abs(ratio_e(n) - 1.3) < 1e-9 for n in ("p10", "p90"))
+        and all(abs(ratio_e(n) - 1.2) < 1e-9 for n in ("p25", "p75"))
+        and all(abs(ratio_e(n) - 1.5) < 1e-9 for n in ("p5", "p95"))
+        and explicit["model_notes"]["calibration"]["k80_source"] == "explicito"
+        and wide["model_notes"]["calibration"]["k80_source"] == "interpolado",
+        f"p10={ratio_e('p10'):.6f}  p90={ratio_e('p90'):.6f}",
     ))
 
     total, passed = len(results), sum(results)

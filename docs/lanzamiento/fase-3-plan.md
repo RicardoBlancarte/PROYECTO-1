@@ -21,7 +21,7 @@
 | I | **`max_rows` = 1 000** (valor por defecto; no se cambia). Confirmado por el usuario. |
 | N1 | Free = 5 activos y Top 3; Premium = 12 activos y Top 10. Elite: **"por definir"** en la configuración, pero **nunca ilimitado en la interfaz**: todo nivel tiene un tope visual (1.2). Los límites de Elite se proponen después, según el diseño. |
 | L4 | **Aprobado y corrido (2026-10-12):** H1 y H2 solo con acciones, H3 con todos, umbral p < 0.017, misma prueba fuera de muestra. Resultado en la sección 5. |
-| M | **Aprobado el enfoque:** factor de calibración por horizonte (`k50`, `k90`) en `ENGINE_PARAMS`, estimado antes de la fecha de corte y validado después, con cobertura y ancho por tipo de activo. **No se implementa** hasta revisar la validación (M.5). |
+| M | **Decidido (2026-10-12): factor global por horizonte** (`k50`, `k90`), **sin factor por tipo de activo**. Se reevalúa después de corregir los futuros (punto C) y con más datos. Implementado en la rama, sin commit (M.6). |
 | M.4 | **Aprobados** los textos de "Estándar" y "Amplio" en es/en/zh, con las cifras tomadas de la configuración junto con la fecha de medición. |
 | N2 | **Regla (2026-10-12):** b1 no se activa en Premium hasta corregir la previa (`sensitivity-factor.js:58`) y superar a la regla 1.18 × MAD fuera de muestra. El "motor más sensible" de Premium será el **factor b1** de `sensitivity-factor.js`. En la Fase 3 solo queda como parámetro configurable por nivel, **apagado**. La comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` se hace en el laboratorio L. Ningún parámetro "más sensible" se activa en Premium hasta que L muestre que mejora el acierto fuera de muestra. |
 
@@ -29,10 +29,130 @@
 
 | # | Pregunta | Dónde |
 |---|---|---|
-| M | Decidir con la validación de M.5: factor **global por horizonte** (recomendado) o por tipo de activo; luego implementar. | Punto M |
+| S | **Prioritario:** rotación del secreto y GitHub Pages **hechos** (2026-10-12). Falta aprobar el PR "S" (middleware, `_routes.json` y quitar literales) y decidir si el repo pasa a privado. | Sección S |
 | B2 | Aprobación para escribir en `asset_historical_prices` (backfill de los 4 activos). | Punto B |
 | C2 | Aprobación para reescribir cierres de futuros dentro de la ventana. | Punto C |
 | E1 | Límites de Elite según el diseño (propuesta del agente, más adelante). | Sección 1.2 |
+
+---
+
+## S. Bloque de seguridad PRIORITARIO (adelantado de la Fase 5 el 2026-10-12)
+
+> Verificaciones de solo lectura. Ningún valor de credenciales se imprimió ni se escribe aquí. Nada se ha cambiado todavía: todo lo de esta sección es propuesta y requiere el visto bueno del usuario.
+
+### S1. Credenciales en archivos públicos — **SÍ**
+
+**Contraseña del superadmin (la que valida `admin-go`):** sí aparece, en texto plano, en archivos servidos al público.
+
+| Dónde | Qué |
+|---|---|
+| `index.html:262` | Manejador de `admin-go`: compara usuario y contraseña con literales y guarda la contraseña tecleada en `adminApiSecret`. |
+| `index.html:263` | Login del formulario principal en modo admin: la misma contraseña con otro usuario. |
+| `admin.html:103` (y usuario en `admin.html:44`) | Backoffice: la misma comparación. |
+| `README.md:43` | La documenta como "contraseña demo". |
+
+- **Está en `origin/main`**, es decir, en lo que sirve Producción (`/`, `/admin` y `/README.md` en thalgorithm.com) y GitHub Pages (S2).
+- **Historial de git:** la contraseña entre comillas entra en los commits `f9417aa` y `02707b0` (2026-08-27) y no ha salido. El usuario aparece además en `db0be60`.
+- Desde 2026-10-01, `winrate-plan.md:65` y el comentario de `.dev.vars.example` dicen que `ADMIN_API_SECRET` "es hoy la misma contraseña". Los dos archivos son públicos.
+
+**Valor de `ADMIN_API_SECRET`:** **no aparece** en ningún archivo del repo ni del historial con ese nombre. `.dev.vars.example` no tiene valores, y `.dev.vars` está en `.gitignore` y no existe en el repo. **No se puede confirmar** desde aquí si es igual a la contraseña demo, porque el valor vive en Cloudflare y en GitHub. Si lo es (como dicen los documentos), **el secreto que protege los endpoints de admin es público de hecho.**
+
+**Qué protege hoy `ADMIN_API_SECRET`** (`checkAdminAuth`): `winrate.js`, `winrate-shadow.js`, `montecarlo.js`, `markov-matrix.js`, `patterns-vectors.js`, `sensitivity-factor.js`, `track-view.js` y `admin/metrics.js`.
+- **Lectura:** conteos de `page_views` y `profiles` (solo `created_at`, sin datos personales), y la fila completa de Monte Carlo, que incluye VaR y CVaR.
+- **Escritura:** `markov-matrix`, `patterns-vectors` y `sensitivity-factor` hacen upsert de sus tablas de snapshots cada vez que se llaman (datos calculados, no arbitrarios).
+- **Costo:** `winrate*?all=1` recalcula el backtest de 30 activos (CPU del Worker).
+- **Riesgo:** moderado. Sin datos personales, pero permite escribir y gastar recursos.
+
+**Propuesta S1** (orden sugerido; requiere aprobación):
+1. **Rotar `ADMIN_API_SECRET`** a un valor aleatorio largo, independiente de la contraseña demo, en Cloudflare (Production y Preview) y en el secreto de GitHub. Lo hace el usuario; el valor no pasa por el chat. Es lo único que corrige el historial, porque la contraseña ya es pública.
+2. **Quitar los literales del navegador:** `admin-go` deja de comparar con una contraseña escrita en el código; el admin teclea el secreto, el panel lo envía como `X-Admin-Secret` y el servidor decide (401 si no coincide). Lo mismo en `index.html:263` y `admin.html:103`.
+3. Quitar las credenciales de `README.md:43`, del comentario de `.dev.vars.example` y de `winrate-plan.md:65` (solo el texto; el historial queda).
+4. **Verificación:** con el secreto nuevo, `curl` sin header → 401; con el valor viejo → 401; el panel de superadmin funciona tecleando el secreto nuevo.
+
+### S2. Archivos del repo publicados como estáticos
+
+**Cloudflare Pages** (`pages_build_output_dir = "."`, `_routes.json` solo manda `/api/*` a las Functions). Verificado con `curl -I` contra thalgorithm.com, solo lectura:
+
+| Público hoy (200 con el archivo real) | No publicado (devuelve la página de inicio) |
+|---|---|
+| `docs/lanzamiento/*.md` de `main` (auditoría, planes, `winrate-plan.md`), `docs/lanzamiento/fase-2-migracion.sql`, `schema.sql`, `README.md`, `AGENTS.md`, `actualizar_automatico.py`, `montecarlo_engine.py`, `test_montecarlo_synthetic.py`, `.github/workflows/daily_update.yml`, `.dev.vars.example` (sin valores), `wrangler.toml`, `package.json`, `.gitignore` | `functions/**` (código de las Functions), `.git/`, `_routes.json`, archivos que no están en `main` |
+
+- También es público `homepage/assets/shanghai-hero.jpg.png`, la imagen original con los subtítulos retirados en #91.
+- Con el merge de la Fase 3 se publicarían además `docs/lanzamiento/fase-3-plan.md` (que describe estos hallazgos) y `functions/_shared/engine-params.json` (este puede seguir público).
+
+**GitHub Pages está ACTIVO** (`has_pages: true`): `ricardoblancarte.github.io/PROYECTO-1/` sirve el mismo repositorio (200 en `README.md`, `docs/lanzamiento/winrate-plan.md`, `schema.sql`, `actualizar_automatico.py`). **El middleware de Cloudflare no lo protege**: hay que apagarlo aparte (Settings → Pages → Unpublish), o hacer el repo privado (S3).
+
+**Propuesta S2: `functions/_middleware.js` con lista de permitidos** (sin implementar). Todo lo que no esté en la lista responde 404, así un archivo nuevo queda bloqueado por defecto. Además, una lista explícita de bloqueados por si alguien amplía los permitidos.
+
+```js
+// functions/_middleware.js — solo se sirve lo que usa la página; el resto, 404.
+const ALLOWED = [
+  /^\/$/, /^\/index(\.html)?$/,                 // terminal
+  /^\/admin(\.html)?$/,                          // backoffice demo (ver S1)
+  /^\/homepage(\/.*)?$/,                         // homepage, assets/*.png y locales/*.json
+  /^\/sw\.js$/, /^\/supabase-config\.js$/,
+  /^\/favicon\.png$/, /^\/logo_algorithm\.svg$/,
+  /^\/functions\/_shared\/engine-params\.json$/, // público por decisión del usuario
+  /^\/api\//                                    // Functions
+];
+const BLOCKED = /^\/(docs|\.github|\.git|functions\/(?!_shared\/engine-params\.json$)|node_modules|scratch)(\/|$)|\.(md|sql|py|pyc|toml|ya?ml|map|log|bak|tmp|example)$|(^|\/)(\.gitignore|\.dev\.vars[^/]*|\.env[^/]*|package(-lock)?\.json|wrangler\.toml|_routes\.json|shanghai-hero\.jpg\.png)$/i;
+
+export async function onRequest(context) {
+  const path = decodeURIComponent(new URL(context.request.url).pathname);
+  if (!BLOCKED.test(path) && ALLOWED.some(rule => rule.test(path))) return context.next();
+  return new Response('No encontrado.', {
+    status: 404,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' },
+  });
+}
+```
+
+- **Requisito: cambiar `_routes.json`.** Hoy las Functions (y por tanto el middleware) solo corren en `/api/*`, así que un middleware **no vería** `/docs/...`. Propuesta: `"include": ["/*"]` y `"exclude"` con los estáticos permitidos (`/`, `/index.html`, `/admin`, `/admin.html`, `/homepage/*`, `/sw.js`, `/supabase-config.js`, `/favicon.png`, `/logo_algorithm.svg`), para no gastar invocaciones de Functions en ellos. Todo lo demás pasa por el middleware y recibe 404. Límite de Pages: 100 reglas en `_routes.json`; aquí son ~11.
+- **Efecto secundario:** las rutas inexistentes dejan de devolver la página de inicio con 200 y devuelven 404. Es lo correcto.
+- **Alternativa más limpia (más trabajo):** carpeta de salida dedicada (`public/` con `index.html`, `admin.html`, `homepage/`, `sw.js`, `supabase-config.js`, `favicon.png`, `logo_algorithm.svg`, `_routes.json`) y `pages_build_output_dir = "public"`. Las Functions siguen en `functions/` en la raíz. Cambia rutas de archivos en el repo (no las URL públicas) y hay que confirmar la configuración de Pages en el panel. Se puede hacer después del middleware.
+- **Cómo probarlo en el Preview** (después del push de la rama, con la URL del Preview en `$PREVIEW`):
+
+```
+for p in / /index.html /admin /homepage/ /homepage/locales/es.json "/homepage/assets/top%20portafolios.png" /sw.js /supabase-config.js /favicon.png /logo_algorithm.svg /functions/_shared/engine-params.json "/api/escenarios?symbol=AAPL" \
+         /schema.sql /README.md /AGENTS.md /docs/lanzamiento/winrate-plan.md /docs/lanzamiento/fase-2-migracion.sql /actualizar_automatico.py /montecarlo_engine.py \
+         /test_montecarlo_synthetic.py /.github/workflows/daily_update.yml /.dev.vars.example /wrangler.toml /package.json /.gitignore /homepage/assets/shanghai-hero.jpg.png /no-existe; do
+  printf "%-50s " "$p"; curl -s -o /dev/null -w "%{http_code} %{content_type}\n" "$PREVIEW$p"; done
+```
+
+  **Esperado:** las primeras 12 rutas → 200 (o 308 en las `.html`); las demás → **404**. Después, en el navegador: terminal, homepage en es/en/zh, imágenes, registro del service worker, `/api/*`, panel de superadmin y consola sin errores.
+
+### S3. ¿Qué pasa si el repo se hace privado? (solo explicación; no se cambió nada)
+
+- **Cloudflare Pages:** sigue funcionando. La integración usa la app de GitHub de Cloudflare, que conserva el acceso al repo privado si se instaló con acceso a este repositorio (o a todos). Los despliegues de Producción y Preview siguen igual. **Pero hacer el repo privado no cambia lo que Cloudflare publica**: sin S2, `docs/`, `schema.sql` y demás siguen servidos en thalgorithm.com.
+- **GitHub Actions:** sigue funcionando (schedule, `workflow_dispatch` y secretos). En un repo privado del plan Free los minutos son limitados (2 000 al mes); la cascada diaria usa una fracción pequeña. Conviene revisar el uso en Settings → Billing.
+- **Lo que se apaga o cambia:**
+  - **GitHub Pages:** en el plan Free no está disponible para repos privados, así que `ricardoblancarte.github.io/PROYECTO-1/` deja de publicarse. Es justo lo que conviene; se puede apagar también sin hacer el repo privado.
+  - **Estrellas y observadores:** GitHub avisa que se pierden al pasar a privado (hoy son 0).
+  - **Reglas de protección de ramas:** en el plan Free no están disponibles para repos privados (hoy no se usan, hasta donde se ve en el repo).
+  - **Enlaces públicos** al repo o a archivos `raw` dejan de funcionar.
+  - **Forks:** hoy hay 0.
+- **No borra lo ya publicado:** el historial con la contraseña pudo haberse copiado o quedar en cachés. Por eso la rotación (S1.1) es necesaria en cualquier caso.
+
+### Estado de S (2026-10-12)
+
+| Paso | Estado |
+|---|---|
+| Rotar `ADMIN_API_SECRET` | **Hecho por el usuario:** GitHub, Cloudflare Production y Preview, con redespliegue. La contraseña vieja da 401 en ambos entornos (verificado por el usuario). |
+| Apagar GitHub Pages | **Hecho por el usuario** (despublicado, Branch = None). Verificado por el agente: `github.io/PROYECTO-1/` responde 404 en `/`, `README.md`, `winrate-plan.md` y `schema.sql`; la API de GitHub devuelve `has_pages: false`. |
+| PR "S": middleware, `_routes.json` y quitar los literales (S1.2, S1.3, S2) | Pendiente de aprobación. |
+| ¿Repo privado? (S3) | Pendiente de decisión. |
+
+**Efectos de la rotación que hay que vigilar:**
+- **Panel de superadmin:** `admin-go` sigue validando la contraseña demo y la envía como `X-Admin-Secret`, así que los endpoints de admin responden **401** hasta implementar S1.2 (teclear el secreto nuevo). Afecta "MOTOR SOMBRA (v2)", "Recalcular" y las métricas del panel. Es esperado, no es una falla nueva.
+- **Cascada de esta noche:** usa el secreto nuevo de GitHub. En el log deben aparecer `Win Rate (legacy) registrado: …` y `Win Rate (shadow_v2) registrado: …` sin `HTTP 401` (#130).
+- **Sigue público en Cloudflare** (hasta el middleware): los documentos, `schema.sql` y los scripts. La contraseña demo y la mención de que era igual al secreto ya no abren nada.
+
+### Orden propuesto para S
+
+1. Rotar `ADMIN_API_SECRET` (usuario) y apagar GitHub Pages (usuario).
+2. PR "S": middleware y `_routes.json` (S2) más quitar los literales del navegador (S1.2-S1.3). Probar en el Preview con los `curl` de arriba.
+3. Decidir si el repo pasa a privado (S3).
+4. Más adelante, opcional: carpeta `public/` dedicada.
 
 ---
 
@@ -261,7 +381,7 @@ Mientras todo sea gratis no hay pérdida, pero **Premium requerirá validar el n
   - `correlation.js`: paginar con `limit`/`offset` y avanzar por las filas recibidas **hasta una página vacía** (no "hasta una página incompleta": si `max_rows` fuera menor que el tamaño de página, esa regla cortaría antes de tiempo).
   - Python (`backfill_asset_signals`): necesita **todo** el historial, así que se pagina con `.range()` hasta una página vacía, en lugar de `desc` + `limit`.
 - **Extra opcional (no incluido en el bloque 1):** `loadShadowCorrelation` (`index.html:322`) sigue llamando a `/api/correlation` y `/api/patterns` con el motor sombra oculto, y `patterns.js` escribe en `asset_prediction_audit` en cada llamada. Cortarlo con `SHOW_SHADOW_ENGINE`.
-- **`max_rows`:** sin dato aún. El arreglo no depende de su valor; el usuario lo confirma antes del merge.
+- **`max_rows` = 1 000** (valor por defecto de Supabase; confirmado por el usuario el 2026-10-12; no se cambia). El arreglo no depende de su valor.
 - **Prueba:** prueba local con `fetch` simulado de 1 200 filas (como T1 del Win Rate); en el Preview, la gráfica de AAPL termina en el último cierre.
 - **Niveles:** `correlation.js` devuelve todas las correlaciones sobre el umbral (1.4). `RETENTION` de `market/[symbol].js` pasa a la configuración en el bloque 2, donde vive `tier-config.js`.
 
@@ -304,13 +424,13 @@ Las bandas son algo **angostas**, sobre todo la exterior. El margen supone indep
 
 **Tamaño:** M. L3 ampliado: S (~5 min de cómputo). Motor, configuración y pruebas: M.
 
-**M.4 Texto del modo "Amplio" (J1) mientras no exista la calibración (APROBADO el 2026-10-12).** Dice la cobertura medida, no "9 de cada 10". Las cifras salen de la configuración, con la fecha de medición, y se actualizan cada vez que se vuelve a correr L3. Se usan las del horizonte diario, que son las más bajas.
+**M.4 Textos de "Estándar" y "Amplio" (J1) (APROBADOS el 2026-10-12).** Dicen la cobertura medida fuera de muestra, no "9 de cada 10". **Cifras actualizadas con las bandas calibradas (M.6): 49 y 89 de cada 100**; antes de calibrar eran 47 y 85. Las cifras salen de la configuración, con la fecha de medición, y se actualizan cada vez que se vuelve a correr L3. Se usan las del horizonte diario, que son las más bajas.
 
 | | es | en | zh |
 |---|---|---|---|
-| Estándar | "Estándar: banda central de los escenarios simulados. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella cerca de la mitad de las veces (47 de cada 100)." | "Standard: the central band of the simulated scenarios. In our tests on past data, the actual close fell inside it about half the time (47 out of 100)." | "标准：模拟情景的中间区间。在我们基于历史数据的测试中，实际收盘价约有一半的时间（每100次中47次）落在其中。" |
-| Amplio | "Amplio: agrega la banda exterior. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella 85 de cada 100 veces." | "Wide: adds the outer band. In our tests on past data, the actual close fell inside it 85 times out of 100." | "宽：增加外侧区间。在我们基于历史数据的测试中，实际收盘价每100次中有85次落在其中。" |
-| Aviso corto (`index.html:94`) | "Rango de escenarios: 'Estándar' muestra la banda central (el cierre real cayó dentro ~47 de cada 100 veces en nuestras pruebas); 'Amplio' agrega la exterior (~85 de cada 100)." | "Scenario range: 'Standard' shows the central band (the actual close fell inside ~47 out of 100 times in our tests); 'Wide' adds the outer band (~85 out of 100)." | "情景区间：“标准”显示中间区间（在我们的测试中，实际收盘价约每100次中47次落在其中）；“宽”增加外侧区间（约每100次中85次）。" |
+| Estándar | "Estándar: banda central de los escenarios simulados. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella cerca de la mitad de las veces (49 de cada 100)." | "Standard: the central band of the simulated scenarios. In our tests on past data, the actual close fell inside it about half the time (49 out of 100)." | "标准：模拟情景的中间区间。在我们基于历史数据的测试中，实际收盘价约有一半的时间（每100次中49次）落在其中。" |
+| Amplio | "Amplio: agrega la banda exterior. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella 89 de cada 100 veces." | "Wide: adds the outer band. In our tests on past data, the actual close fell inside it 89 times out of 100." | "宽：增加外侧区间。在我们基于历史数据的测试中，实际收盘价每100次中有89次落在其中。" |
+| Aviso corto (`index.html:94`) | "Rango de escenarios: 'Estándar' muestra la banda central (el cierre real cayó dentro ~49 de cada 100 veces en nuestras pruebas); 'Amplio' agrega la exterior (~89 de cada 100)." | "Scenario range: 'Standard' shows the central band (the actual close fell inside ~49 out of 100 times in our tests); 'Wide' adds the outer band (~89 out of 100)." | "情景区间：“标准”显示中间区间（在我们的测试中，实际收盘价约每100次中49次落在其中）；“宽”增加外侧区间（约每100次中89次）。" |
 
 **M.5 Validación del factor de calibración (2026-10-12, solo lectura, motor real, 9 720 evaluaciones)**
 
@@ -345,7 +465,78 @@ Con el factor, 7 de 8 coberturas quedan dentro del margen. La única fuera es p2
 - Las acciones necesitan algo más de ensanche que los futuros, pero la diferencia es **moderada**. El factor por tipo **no mejora de forma consistente fuera de muestra**: ayuda a las acciones (día: 89.7 % contra 88.6 %) y empeora a los futuros (día: 86.3 % contra 89.0 %; mes: 80.0 % contra 83.6 %). Con la mitad de los datos por tipo, el factor se ajusta al ruido del periodo de estimación.
 - Los futuros a 1 mes quedan bajos con cualquier factor (n = 110, margen ±5.6). Puede influir la serie de futuros guardada (punto C: velas provisionales y cambios de contrato).
 - **Recomendación:** factor **global por horizonte** (tabla de arriba). **No** un factor por tipo por ahora; volver a evaluarlo cuando haya más datos y después del punto C (futuros). Al implementarlo, las cifras del texto (M.4) se vuelven a medir con L3 sobre los cuantiles ya calibrados.
-- **Pendiente:** la decisión del usuario y la implementación (motor, `ENGINE_PARAMS.mcCalibration` con fecha de medición, `model_notes.raw_quantiles` y pruebas sintéticas).
+- **Decisión (2026-10-12):** factor **global por horizonte**, sin factor por tipo. Se reevalúa después del punto C (futuros) y con más datos.
+
+**M.6 Implementación (2026-10-12, en la rama, sin commit; no se corrió el workflow ni se escribió en Supabase)**
+
+- **Configuración:** `functions/_shared/engine-params.json` (nuevo; desde M.7 incluye `k80` explícito por horizonte). Es JSON para que lo lean el motor en Python y, en el bloque 2, `tier-config.js`. Contiene:
+  - `mcCalibration`: `measuredAt` = 2026-10-12, método y `k50`/`k90` por horizonte, estimados con **todas** las evaluaciones (9 720), para incluir el periodo más reciente.
+  - `coverageText`: las cifras de los textos de "Estándar" y "Amplio" (M.4) con su fecha y su método.
+- **Factores de producción** (todas las evaluaciones) y, para comparar, los estimados antes del corte (M.5):
+
+| Horizonte | k50 / k90 (producción) | k50 / k90 (antes del corte) |
+|---|---|---|
+| Día | 1.054 / 1.123 | 1.042 / 1.075 |
+| 2 sesiones | 1.089 / 1.088 | 1.045 / 1.080 |
+| Semana | 1.056 / 1.102 | 1.050 / 1.076 |
+| Mes | 1.008 / 1.091 | 0.996 / 1.073 |
+
+- **Motor (`montecarlo_engine.py`):**
+  - `load_mc_calibration()` lee el JSON al importar el módulo.
+  - `calibrate_quantiles()` aplica `q' = q + (k − 1)·(q − p50)` (con k = 1 devuelve `q` exacto): `k50` para p25/p75, `k90` para p5/p95 y `k80 = k50 + 0.75·(k90 − k50)` para p10/p90. Garantiza el orden de los cuantiles y que ningún precio quede ≤ 0.
+  - `run_montecarlo_for_symbol(..., calibration=None)`: usa el JSON; un dict explícito tiene prioridad (pruebas y laboratorio). Solo cambian los `quantiles` publicados; `probability_up`, VaR, CVaR y la semi-desviación siguen sin calibrar.
+  - `model_notes.raw_quantiles` guarda los cuantiles originales y `model_notes.calibration` los factores, la fecha y la fuente (`engine-params.json`, `override` o `sin_configuracion`).
+  - Sin el JSON, k = 1 y la cascada no falla. La línea del log agrega `calibracion=<fuente>`.
+  - **Sin cambio de esquema:** `quantiles` y `model_notes` ya son `jsonb`. `/api/escenarios` no cambia: publica los cuantiles calibrados a partir de la primera corrida después del merge.
+- **Pruebas (`test_montecarlo_synthetic.py`, sección 6): 29 de 29.**
+  - 6a: el JSON se carga con los 4 horizontes y la fecha.
+  - 6b: con k = 1, los cuantiles publicados son idénticos a los crudos.
+  - 6c: con k50 = 1.2 y k90 = 1.5, p50 queda idéntico y las distancias se multiplican por 1.2, 1.425 y 1.5 exactos.
+  - 6d: la calibración no toca `probability_up`, VaR, CVaR ni la semi-desviación.
+  - 6e: sin override, el motor usa los factores del JSON.
+  - 6f: sin configuración, k = 1 y no falla.
+  - 6g: con factores extremos se conserva el orden y ningún precio queda ≤ 0.
+- **Con k = 1, idéntico a `HEAD`:** 72 de 72 corridas reales (6 activos × 4 horizontes × 3 fechas) dan cuantiles, `probability_up` y VaR95 iguales bit a bit. La primera versión usaba `p50 + k·(q − p50)` y difería por redondeo en 28 de 72; se cambió a la forma equivalente exacta.
+- **Cobertura con las bandas ya calibradas por el propio motor** (factores estimados antes del corte; 4 720 evaluaciones después del corte):
+
+| Horizonte | n | Dentro de p25-p75 | Dentro de p5-p95 | Ancho medio p5-p95 |
+|---|---|---|---|---|
+| Día | 1 470 | **48.9 %** | **88.7 %** | 7.2 % |
+| 2 sesiones | 1 470 | 46.8 % | 89.5 % | 10.4 % |
+| Semana | 1 450 | 49.3 % | 89.0 % | 16.8 % |
+| Mes | 330 | 48.8 % | 89.4 % | 34.7 % |
+
+  Coincide exactamente con el cálculo de M.5. **Cifras de los textos** (`coverageText`, horizonte diario, medidas fuera de muestra): **Estándar 49 de cada 100; Amplio 89 de cada 100.** Los factores de producción (estimados con todos los datos) son algo mayores, así que la cobertura real esperada es igual o un poco más alta: las cifras publicadas son conservadoras.
+- **Textos de M.4 con las cifras nuevas:**
+  - es: "Estándar: … cerca de la mitad de las veces (49 de cada 100)." / "Amplio: … 89 de cada 100 veces."
+  - en: "… about half the time (49 out of 100)." / "… 89 times out of 100."
+  - zh: "…（每100次中49次）…" / "…每100次中有89次…"
+
+  La interfaz los leerá de `coverageText` en el bloque 6 (F).
+- **Factores de producción contra factores validados:** los de producción (estimados con todos los datos) son **mayores** que los validados (estimados antes del corte): en el día, k90 1.123 contra 1.075. Los textos usan las cifras **validadas** fuera de muestra (49 y 89 de cada 100), que por eso son **conservadoras**: con los factores de producción, la cobertura real esperada es igual o algo mayor.
+- **Merge:** después del bloque 1. El bloque 1 va primero, tras verificar K con el log de hoy.
+
+**M.7 Validación de p10-p90 (meta 80 %), pedida por el usuario, porque la tabla #47 muestra p10/p90 al público y k80 es interpolado**
+
+Mismas 9 720 evaluaciones, regeneradas para guardar p10/p90 (los demás cuantiles salieron idénticos a la corrida anterior). Corte en 2025-10-10.
+
+| Horizonte | n | Sin calibrar | k80 interpolado (antes del corte) | Con k80 interpolado | k80 estimado directo | Con k80 directo | Margen |
+|---|---|---|---|---|---|---|---|
+| Día | 1 470 | 76.3 % | 1.067 | **77.7 %** (fuera por 0.3) | 1.114 | **79.1 %** | ±2.0 |
+| 2 sesiones | 1 470 | 75.6 % | 1.071 | 78.2 % | 1.087 | 78.8 % | ±2.0 |
+| Semana | 1 450 | 75.7 % | 1.069 | 78.9 % | 1.071 | 78.9 % | ±2.1 |
+| Mes | 330 | 75.5 % | 1.054 | 78.2 % | 1.048 | 77.9 % | ±4.3 |
+
+- Con el k80 interpolado, 3 de 4 horizontes quedan dentro del margen; **el día queda 0.3 puntos por debajo**. Con k80 estimado directamente (percentil 80 del factor necesario), los 4 quedan dentro.
+- Por tipo, con k80 interpolado: acciones 76.6-78.6 %, futuros 77.3-81.4 %. Es el mismo patrón que p5-p95: las acciones necesitan algo más.
+- **Decidido e implementado (2026-10-12):** `k80` explícito por horizonte en `engine-params.json`; el motor lo usa si existe y, si no, interpola (`model_notes.calibration.k80_source` = `explicito` o `interpolado`). Prueba 6h: con `k80` explícito, p10/p90 usan ese factor; 30 de 30 pruebas sintéticas. Valores de producción (todos los datos): día 1.128 (hoy interpolado 1.106), 2 sesiones 1.110 (1.088), semana 1.091 (1.091), mes 1.074 (1.070). Cambio pequeño: motor, JSON y una prueba sintética (6h: con `k80` explícito, p10/p90 usan ese factor). `calibrate_quantiles` ya garantiza el orden aunque k80 > k90.
+
+**M.8 ¿Se muestran VaR, CVaR o la semi-desviación? — No.**
+- `functions/api/escenarios.js:26`, el único endpoint público de Monte Carlo, selecciona solo `horizon, probability_up, quantiles, base_close_date, computed_at`.
+- `functions/api/montecarlo.js:21` devuelve la fila completa (`select=*`, con VaR, CVaR y semi-desviación), pero está protegido por `checkAdminAuth` (l. 12) y **ninguna pantalla lo llama**.
+- `index.html`, `admin.html` y la homepage no muestran ninguno de los tres.
+- Por eso no hace falta calibrarlos ni quitarlos ahora. Si algún día se muestran, deben calibrarse con `k90` (VaR95 sobre p5) o etiquetarse como "sin calibrar". Nota: con S1, hoy cualquiera con la contraseña demo podría leerlos vía `/api/montecarlo` (datos de mercado, no personales).
+- **Verificación después del merge:** en el log de la corrida, 120 líneas `Monte Carlo (…)` con `calibracion=engine-params.json`. En Supabase, `model_notes->'calibration'->>'source'` = `engine-params.json` y `model_notes ? 'raw_quantiles'` en las 120 filas.
 
 ## 4. Decisiones de producto (J): opciones
 
@@ -530,6 +721,13 @@ Los retornos son altos porque el periodo fue alcista; no son una expectativa.
 
 **Conclusión:** ni el volumen ni el día de la semana agregan nada a la dirección. Las tres hipótesis se **descartan**. Confirma la ronda 1: con estos datos, ninguna regla simple predice la dirección mejor que "siempre sube".
 
+### Estado del laboratorio (2026-10-12): EN PAUSA hasta la Fase 6a
+
+- **Rondas hechas:** ronda 1 (L0-L3), ronda 2 (L4) y validación de la calibración (M.5, M.6).
+- **Resumen de L4:** ni el volumen (H1, H2; 20 acciones) ni el día de la semana (H3; 30 activos) agregan nada a la dirección. 0 activos con diferencias reales con el umbral corregido (p < 0.017), acierto del modelo (51.2-51.7 %) por debajo de "siempre sube" (52.2 %) y ningún Brier mejor. Las tres hipótesis se descartan.
+- **Por qué se pausa:** las preguntas que quedan abiertas (L2-noticias: `NEWS_SENSITIVITY_FACTOR` y el ajuste de `patterns.js`) necesitan historial de noticias, y `asset_news_scores` está vacía (0 filas). Se reanuda cuando la Fase 6a guarde historial diario.
+- **Antes de reanudar:** reevaluar el factor de calibración global contra uno por tipo después del punto C (futuros), y volver a medir HG=F con datos nuevos.
+
 ### Cómo se corre con datos reales (cuando el usuario entregue el CSV)
 
 ```
@@ -544,14 +742,15 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 
 | # | Bloque | Puntos | Tamaño | Depende de | Parte de "Diseño por niveles" |
 |---|---|---|---|---|---|
+| **S** | **Seguridad (prioritario)** | S1, S2 | S-M | Rotación y GitHub Pages hechos; falta el PR "S" | — |
 | 1 | Lecturas seguras + verificación de K | I, K | M | **Hecho:** `842622b`, en la rama con push; merge tras verificar K en la corrida de hoy | Regla 4: `correlation.js` devuelve todas las correlaciones |
-| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12) | Regla 3: decide qué parámetros por nivel se activan |
+| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12). **En pausa hasta la Fase 6a** (historial de noticias) | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
 | 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
 | 5 | Patrones binarios | G | S-M | — | Reglas 1 y 3: `patternHorizons` y `patternWindows` desde la configuración |
 | 6 | Sigma y postura de riesgo | A, F | M | — (J1 = b) | Regla 3: `newsSensitivity` |
-| M | Calibración de Monte Carlo | M | M | **Validación hecha (M.5); falta la decisión global/por tipo**; bloque 2 (`ENGINE_PARAMS`). El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
+| M | Calibración de Monte Carlo | M | M | **Implementado en la rama, sin commit (M.6)**; merge después del bloque 1. Factores en `functions/_shared/engine-params.json`. El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
 | 7 | Markowitz (mínima varianza) | D | S-M (M con endpoint) | Bloque 1 (J2 = b) | Regla 2: cálculo para N activos en el servidor |
 | 8 | Radar en el servidor (J3 = b) | J3 | M | Bloque 2; nombre de la sección | Reglas 2 y 4: `/api/radar` con ranking completo |
 | 9 | Futuros: diagnóstico y corrección | C1, luego C2 | S + M | Aprobación C2 | — |
@@ -563,6 +762,10 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 
 ## 7. Pendientes para fases posteriores
 
+- **Fase 5 — Monitoreo de cobertura de Monte Carlo:** `asset_montecarlo_simulation` sobrescribe la fila de cada activo y horizonte cada noche, así que no hay historial para medir si las bandas siguen calibradas.
+  - **Propuesta (requiere aprobación de esquema):** tabla nueva `asset_montecarlo_history`: `symbol`, `horizon`, `base_close_date`, `quantiles` (calibrados), `raw_quantiles`, `probability_up`, `calibration` (k y fecha de medición), `computed_at`. PK `(symbol, horizon, base_close_date)`; RLS activado sin políticas (solo `service_role`). La cascada agrega un upsert por fila además del actual. Son ~120 filas por día hábil, ~31 000 al año.
+  - **Chequeo mensual (solo lectura):** cruzar el historial con `asset_historical_prices` (cierre `steps` sesiones después de `base_close_date`) y medir la cobertura de p25-p75, p10-p90 y p5-p95 por horizonte en los últimos 3 meses. Si alguna se sale del margen, recalibrar con el laboratorio (L3/M) y actualizar `engine-params.json` y las cifras de los textos.
+  - **Alternativa sin esquema:** correr cada mes el laboratorio sobre un CSV exportado, como en M.5. Es más manual y depende de que el motor sea reproducible (hoy lo es: la semilla depende de símbolo, horizonte y fecha).
 - **Fase 5 — validar el nivel en el servidor** (1.5): hoy todo límite por nivel se controla solo en el navegador; Premium lo requerirá en el servidor.
 - **Fase 5 — Supabase: "Automatically expose new tables" está activado.** Supabase recomienda desactivarlo: con esa opción, toda tabla nueva queda expuesta por la API desde que se crea. Revisarlo junto con las RLS de las 20 tablas.
 - **Bloque 2 — correlaciones por nivel:** hoy la interfaz muestra como máximo **una** correlación (la primera confirmada por volumen, `renderShadowEngine`), igual para todos los niveles, y solo dentro del motor sombra oculto. No hay regla por nivel. Si vuelve en la Fase 5, el número debe salir de `TIER_LIMITS` (p. ej. `correlationSuggestions`).
