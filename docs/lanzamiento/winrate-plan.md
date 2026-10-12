@@ -62,7 +62,7 @@
   - El script nunca lo imprime. Los mensajes actuales imprimen `e` (para un `HTTPError` de `requests` el texto es `401 Client Error: Unauthorized for url: …`, sin headers) y `globalWinRate`. No hay `print(response.request.headers)` ni nada parecido, y no se agregará.
   - GitHub Actions enmascara con `***` cualquier aparición literal de un secreto en el log.
   - Para diagnosticar se registrará solo el status: `HTTP 401`/`HTTP 503`, nunca el header.
-  - Nota: el valor de `ADMIN_API_SECRET` es hoy la misma contraseña que el superadmin teclea en `admin-go` (ver `.dev.vars.example`). Guardarla como secreto de GitHub no cambia su exposición, pero es un motivo más para no imprimirla.
+  - Nota (corregida el 2026-10-12): `ADMIN_API_SECRET` es un valor aleatorio independiente de cualquier contraseña. Se rotó el 2026-10-12 en GitHub, Cloudflare Production y Preview (ver fase-3-plan.md, sección S). Nunca se imprime.
 
 ### c) Qué se escribe en `win_rate_history` y los días perdidos
 
