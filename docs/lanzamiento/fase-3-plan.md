@@ -20,13 +20,14 @@
 | H | Se quita **solo** `#recalculate` y su manejador. `#winrate-refresh` se queda. |
 | I | **`max_rows` = 1 000** (valor por defecto; no se cambia). Confirmado por el usuario. |
 | N1 | Free = 5 activos y Top 3; Premium = 12 activos y Top 10. Elite: **"por definir"** en la configuración, pero **nunca ilimitado en la interfaz**: todo nivel tiene un tope visual (1.2). Los límites de Elite se proponen después, según el diseño. |
-| N2 | El "motor más sensible" de Premium será el **factor b1** de `sensitivity-factor.js`. En la Fase 3 solo queda como parámetro configurable por nivel, **apagado**. La comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` se hace en el laboratorio L. Ningún parámetro "más sensible" se activa en Premium hasta que L muestre que mejora el acierto fuera de muestra. |
+| N2 | **Regla (2026-10-12):** b1 no se activa en Premium hasta corregir la previa (`sensitivity-factor.js:58`) y superar a la regla 1.18 × MAD fuera de muestra. El "motor más sensible" de Premium será el **factor b1** de `sensitivity-factor.js`. En la Fase 3 solo queda como parámetro configurable por nivel, **apagado**. La comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` se hace en el laboratorio L. Ningún parámetro "más sensible" se activa en Premium hasta que L muestre que mejora el acierto fuera de muestra. |
 
 **Siguen pendientes:**
 
 | # | Pregunta | Dónde |
 |---|---|---|
-| L | CSV exportado de `asset_historical_prices` (y, si se puede, de `asset_news_scores`) para correr el laboratorio. | Sección 5 |
+| L4 | Autorización para correr L4 (volumen y día de la semana). | Sección 5 |
+| M | Aprobación del bloque "Calibración de Monte Carlo" y del texto de "Amplio" con la cobertura medida. | Punto M |
 | B2 | Aprobación para escribir en `asset_historical_prices` (backfill de los 4 activos). | Punto B |
 | C2 | Aprobación para reescribir cierres de futuros dentro de la ventana. | Punto C |
 | E1 | Límites de Elite según el diseño (propuesta del agente, más adelante). | Sección 1.2 |
@@ -219,7 +220,7 @@ Mientras todo sea gratis no hay pérdida, pero **Premium requerirá validar el n
 
 - **Dónde:** aviso (`index.html:94`), `RISK_MULTIPLIER` y `setRiskPosture` (l. 574-581), paso 8 del tour (l. 790), homepage (`attributes[4]`, `block7`).
 - **Causa:** desde la Fase 2 el 1.35× solo cambia la píldora SIGMA; el orden del radar no cambia porque escala a todos por igual.
-- **Cambio (J1 = b):** se elimina `RISK_MULTIPLIER` y `effectiveSigma` deja de escalar. El control decide qué bandas dibuja el abanico: **Estándar** = p25-p75 (la mitad de los escenarios); **Amplio** = además p5-p95 (9 de cada 10). Se reescriben el aviso de l. 94, los toasts de `setRiskPosture`, el paso 8 del tour y la homepage (`attributes[4]`, `block7`). Se conservan los valores `conservative`/`open` en `user_state.risk_posture` (`schema.sql:236`), así que **no hay cambio de esquema**.
+- **Cambio (J1 = b):** se elimina `RISK_MULTIPLIER` y `effectiveSigma` deja de escalar. El control decide qué bandas dibuja el abanico: **Estándar** = p25-p75 (la mitad de los escenarios); **Amplio** = además p5-p95. **El texto no dice "9 de cada 10"** mientras no exista la calibración (punto M): dice la cobertura medida en L3 (ver M.4). Se reescriben el aviso de l. 94, los toasts de `setRiskPosture`, el paso 8 del tour y la homepage (`attributes[4]`, `block7`). Se conservan los valores `conservative`/`open` en `user_state.risk_posture` (`schema.sql:236`), así que **no hay cambio de esquema**.
 - **Niveles:** los cuantiles ya llegan completos (1.4); el nivel podría decidir qué bandas se ven sin cambiar el endpoint.
 
 ### G. P(alza) del panel "Patrones binarios" — S-M
@@ -263,6 +264,51 @@ Mientras todo sea gratis no hay pérdida, pero **Premium requerirá validar el n
 - **Niveles:** `correlation.js` devuelve todas las correlaciones sobre el umbral (1.4). `RETENTION` de `market/[symbol].js` pasa a la configuración en el bloque 2, donde vive `tier-config.js`.
 
 ---
+
+### M. Calibración de Monte Carlo — M
+
+**M.1 Medición (L3, 2026-10-12, 30 activos, 26 fechas por activo y horizonte, solo lectura):**
+
+| Horizonte | Dentro de p25-p75 (esperado 50 %) | Dentro de p5-p95 (esperado 90 %) |
+|---|---|---|
+| Día | 46.7 % (±3.5) | **85.0 %** (±2.1) |
+| Semana | 44.7 % (±3.5) | **87.3 %** (±2.1) |
+
+Las bandas son algo **angostas**, sobre todo la exterior. El margen supone independencia entre activos; como en las mismas fechas se mueven juntos, el margen real es mayor.
+
+**M.2 Causas posibles (por verificar, no confirmadas):**
+1. El pool de shocks pesa por `e^-Mahalanobis` (`montecarlo_engine.py:541-544`): concentra el peso en pocos días parecidos a hoy, baja el tamaño efectivo de muestra y adelgaza las colas.
+2. El pronóstico GARCH de un paso no incorpora la incertidumbre de sus propios parámetros ni los saltos.
+3. La renormalización `E[z²] = 1` (l. 549-550) fija la varianza, pero no la forma de las colas.
+
+**M.3 Opciones:**
+
+| Opción | Qué hace | Pros | Contras |
+|---|---|---|---|
+| **a) Factor de calibración empírico por horizonte (recomendada primero)** | Ensancha las distancias a la mediana: `q' = p50 + k · (q − p50)`, con `k50` para p25/p75 y `k90` para p5/p95 (p10/p90 interpolado), uno por horizonte. Los `k` se estiman con las coberturas pasadas de **todos** los activos juntos (por activo, 26 puntos son pocos). | Simple, explicable, no cambia el modelo; p50 y `probUp` no se mueven | Es un parche: no corrige la causa; hay que recalibrar periódicamente |
+| b) Ajuste de colas en el motor | Mezclar los pesos del pool con un peso uniforme (`w = (1−ε)·e^-D + ε`) para subir el tamaño efectivo, o sortear parte de los shocks de la Student-t del GARCH | Ataca la causa | Cambia el modelo; más difícil de validar; L |
+| c) Mapeo por PIT (cuantiles empíricos) | Usar la distribución histórica de la posición del cierre real dentro del pronóstico para reasignar los niveles | El más flexible | Necesita más cuantiles (p1, p2.5, p97.5, p99; caben en el `jsonb` sin cambio de esquema) y más datos |
+
+**Implementación propuesta (opción a):**
+- Los factores viven en `ENGINE_PARAMS.mcCalibration = { daily: { k50, k90, medidoEl }, two_day: …, weekly: …, monthly: … }` (bloque 2). Sin cambio de esquema.
+- `montecarlo_engine.py` los aplica al guardar `quantiles` y conserva los cuantiles sin calibrar en `model_notes.raw_quantiles` para auditoría. `/api/escenarios` no cambia.
+- `test_montecarlo_synthetic.py`: con `k = 1` las filas no cambian byte a byte; con `k > 1` p50 es idéntico y el ancho crece en la proporción exacta.
+
+**Validación fuera de muestra con el mismo L3 (solo lectura):**
+1. Ampliar L3: últimas ~500 sesiones, cada 5 sesiones, horizontes `daily`, `two_day`, `weekly` y `monthly` (sin traslape dentro de cada horizonte).
+2. **Partición en el tiempo:** los `k` se estiman solo con fechas anteriores a un corte; la cobertura se mide después del corte con esos `k` fijos. Variante rodante: el `k` de cada fecha usa solo evaluaciones cuyo cierre real ya ocurrió.
+3. **Criterio:** en el tramo de prueba, la cobertura conjunta queda dentro del margen de 50 % y 90 % en los cuatro horizontes, sin activos con desvío sistemático. Se reporta también el ancho medio de las bandas, para no "ganar" cobertura con bandas absurdamente anchas.
+4. Recalibrar con el laboratorio cada mes, o cuando la cobertura se salga del margen.
+
+**Tamaño:** M. L3 ampliado: S (~5 min de cómputo). Motor, configuración y pruebas: M.
+
+**M.4 Texto del modo "Amplio" (J1) mientras no exista la calibración.** Dice la cobertura medida, no "9 de cada 10". Las cifras salen de la configuración, con la fecha de medición, y se actualizan cada vez que se vuelve a correr L3. Se usan las del horizonte diario, que son las más bajas.
+
+| | es | en | zh |
+|---|---|---|---|
+| Estándar | "Estándar: banda central de los escenarios simulados. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella cerca de la mitad de las veces (47 de cada 100)." | "Standard: the central band of the simulated scenarios. In our tests on past data, the actual close fell inside it about half the time (47 out of 100)." | "标准：模拟情景的中间区间。在我们基于历史数据的测试中，实际收盘价约有一半的时间（每100次中47次）落在其中。" |
+| Amplio | "Amplio: agrega la banda exterior. En nuestras pruebas con datos pasados, el cierre real cayó dentro de ella 85 de cada 100 veces." | "Wide: adds the outer band. In our tests on past data, the actual close fell inside it 85 times out of 100." | "宽：增加外侧区间。在我们基于历史数据的测试中，实际收盘价每100次中有85次落在其中。" |
+| Aviso corto (`index.html:94`) | "Rango de escenarios: 'Estándar' muestra la banda central (el cierre real cayó dentro ~47 de cada 100 veces en nuestras pruebas); 'Amplio' agrega la exterior (~85 de cada 100)." | "Scenario range: 'Standard' shows the central band (the actual close fell inside ~47 out of 100 times in our tests); 'Wide' adds the outer band (~85 out of 100)." | "情景区间：“标准”显示中间区间（在我们的测试中，实际收盘价约每100次中47次落在其中）；“宽”增加外侧区间（约每100次中85次）。" |
 
 ## 4. Decisiones de producto (J): opciones
 
@@ -311,6 +357,7 @@ Con el diseño por niveles, a), b) y d) admiten Top 3 / Top 10 sin cambios: el s
 ## 5. Laboratorio L (alcance aprobado el 2026-10-12)
 
 - **Qué es:** una evaluación **de solo lectura y fuera de muestra**. Nada de lo que mida cambia la interfaz ni la cascada.
+- **Datos usados (2026-10-12):** `asset_historical_prices_rows (1).csv` (Descargas del usuario; no se copia al repo): 23 251 filas, 30 símbolos con 774-778 filas cada uno, del 2023-09-08 al 2026-10-08 (acciones) o 2026-10-09 (futuros), sin cierres vacíos ni duplicados. `asset_news_scores`: 0 filas, sin CSV.
 - **Datos:** **sin credenciales.** El script solo lee un CSV exportado de `asset_historical_prices` (columnas `symbol, date, close` y, opcional, `volume`) que entrega el usuario. Para L2-noticias acepta además un CSV de `asset_news_scores` (`symbol, published_at, impact_score`).
 - **Script:** `lab_l.py` (en el scratchpad del agente; no se agrega al repo salvo que el usuario lo pida). Escribe CSV y un `informe.md` en la carpeta de salida. **Todavía no se ha corrido con datos reales.**
 - **Definición de "sube":** `close_t > close_{t-1}` (estricta), igual que `asset_signals`.
@@ -331,7 +378,7 @@ Con el diseño por niveles, a), b) y d) admiten Top 3 / Top 10 sin cambios: el s
 | · Win Rate shadow_v2 | Solo el patrón binario de 5 días, **sin noticias** ni otras piezas. | `winrate-shadow.js`: l. 6, 55-66 |
 | · Monte Carlo v2 | GARCH(1,1) con Student-t y simulación histórica filtrada: el pool de shocks se pondera con `e^-Mahalanobis` de patrones de 3 días (la misma idea de `patterns-vectors.js`) y `lambda_pool` = 1 fijo. **Noticias: no** (`news_uncertainty_variance = 0`). **b1 y Markov: no**; solo se guardan como `b1_crosscheck` y `b2_crosscheck`. | `montecarlo_engine.py`: l. 541-544 (pool), 55 y 519-523 (`lambda_pool`), 572 y 621 (noticias = 0), 626-627 (crosscheck) |
 | · `NEWS_SENSITIVITY_FACTOR` (0.35) | Solo lo usa `applyNewsWeighting`; su resultado (`adjusted`) se calcula y **no se usa**. Hoy no tiene efecto visible. El `.35` que escala la píldora SIGMA con `newsDebateScore` es otra constante escrita a mano. | `index.html`: l. 676-677, 679, 371 |
-| ¿Guardamos historial de noticias? | **Sí, pero no sistemático.** `asset_news_scores` guarda cada titular puntuado (`published_at`, `impact_score` de −10 a 10, resúmenes; único por `content_hash`). Solo se escribe cuando alguien abre el Newsbox de un activo, y GDELT responde 429 con frecuencia (#118), así que muchos puntajes son heurísticos y la cobertura depende del tráfico. | `schema.sql:133-145, 222-223`; `news.js:26-57` |
+| ¿Guardamos historial de noticias? | **No, en la práctica.** El esquema lo prevé: `asset_news_scores` guardaría cada titular puntuado (`published_at`, `impact_score` de −10 a 10, resúmenes; único por `content_hash`), solo cuando alguien abre el Newsbox. Pero **la tabla está vacía en producción (0 filas al 2026-10-12, dato del usuario)**. Posible causa por revisar en la Fase 6a: el insert de `news.js` descarta cualquier error sin registrarlo (`.catch(() => {})`, sin revisar `response.ok`), y GDELT responde 429 con frecuencia (#118). Consecuencia: el "Ajuste noticia" de `patterns.js` hoy siempre vale 0. | `schema.sql:133-145, 222-223`; `news.js:26-57` |
 
 **Hallazgos de L0a:**
 1. **No existe una fórmula que combine las piezas.** Markov, patrones binarios, vectores, Monte Carlo y noticias se calculan por separado; Monte Carlo solo guarda b1 y Markov como verificación, sin usarlos.
@@ -368,6 +415,67 @@ Seis activos sintéticos con propiedades conocidas: sin memoria; memoria de orde
 - L3: la cobertura p5-p95 del activo GARCH queda dentro del margen de 0.90.
 - Tiempo: ~7 s sin L3 y del orden de minutos con L3 (depende de `--mc-step`).
 
+### Resultados con datos reales (ronda 1, 2026-10-12)
+
+- **Datos:** el CSV validado (sección 5, "Datos usados"); ~521 días de prueba por activo (oct-2024 a oct-2026). Solo lectura; 74 s. Los CSV de salida quedan fuera del repo.
+- **Potencia:** un acierto solo se distingue del azar si se aleja más de 50 % ± 4.3 puntos.
+
+**L0b. Matrices de transición (30 activos)**
+
+| Prueba | Activos o filas que superan el margen (95 %) | Esperados por azar |
+|---|---|---|
+| 2 estados, orden 1: separación P(sube \| subió) − P(sube \| bajó) | 5 de 30: ASML −0.100, GC=F −0.081, HG=F −0.132, KO −0.074 (reversión) y JNJ +0.084 (inercia); margen ±0.07 | ~1.5 |
+| 2 estados, orden 2: chi² "filas iguales" | 3 de 30 (ASML, HG=F, KC=F); por fila, 7 de 120 | ~1.5; ~6 |
+| 2 estados, orden 3: chi² "filas iguales" | 8 de 30; por fila, 16 de 240 (filas con apenas 53 casos) | ~1.5; ~12 |
+| 3 estados (terciles): separación alcista − bajista | 4 de 30 (HG=F −0.172, SI=F −0.110, ASML −0.095, JNJ +0.091); chi² 3 de 30 (HG=F p = 0.0003, SI=F, TSLA) | ~1.5 |
+
+**L0c. Acierto fuera de muestra (promedio de 30 activos)**
+
+| Modelo | Acierto | Brier | Mejora el Brier de la prob. simple | Lo empeora |
+|---|---|---|---|---|
+| "Siempre sube" | **52.2 %** | — | — | — |
+| Probabilidad simple de alza | 51.9 % | 0.2500 | — | — |
+| 2 estados, orden 1 | 51.9 % | 0.2503 | 1 (HG=F) | 3 |
+| 2 estados, orden 2 | 51.3 % | 0.2512 | 0 | 9 |
+| 2 estados, orden 3 | 51.8 % | 0.2531 | 0 | 7 |
+| 3 estados (terciles) | 51.8 % | 0.2508 | 1 (HG=F) | 2 |
+
+**L1. μ histórico contra μ = 0:** μ histórico mejora a 0 solo en 5 de 30 activos (AMD, GC=F, JNJ, JPM, TSM). Portafolio de 30 activos, rebalanceo cada 21 sesiones, 504 días:
+
+| Estrategia | Volatilidad anual | Retorno anual | Sharpe |
+|---|---|---|---|
+| Mínima varianza | **9.2 %** | 20.8 % | **2.27** |
+| μ histórico | 13.3 % | 27.1 % | 2.03 |
+| Peso igual | 14.5 % | 31.7 % | 2.18 |
+
+Los retornos son altos porque el periodo fue alcista; no son una expectativa.
+
+**L2.** b1: mediana entre 0.211 y 0.235 en los 30 activos (atorado en la previa). Su error es apenas 0.1-1.6 % menor que el de la constante legacy y **19-38 % mayor** que el de la regla 1.18 × MAD (t entre −4.8 y −8.9 en los 30). Noticias: **no evaluable** (0 filas en `asset_news_scores`).
+
+**L3.** Ver el punto M.1.
+
+**Conclusiones:**
+1. Ningún Markov, de 2 o de 3 estados y de orden 1 a 3, predice la dirección mejor que "siempre sube". Los órdenes altos empeoran (sobreajuste) y los "significativos" de L0b son poco más de lo que da el azar.
+2. Los resultados respaldan J2 = b (mínima varianza) y la línea de la Fase 2: medir rangos, no predecir dirección.
+3. **HG=F (cobre): candidato a vigilar con datos nuevos.** Es el único activo con reversión en L0b (orden 1 y 3 estados) que además mejora fuera de muestra (57.5 % contra 53.5 %). Con 30 activos, uno así puede salir por azar: **sin uso en el producto**; se vuelve a medir en cada ronda de L.
+4. **b1 no se activa en Premium** hasta corregir la previa y superar a la regla 1.18 × MAD fuera de muestra.
+5. Las bandas de Monte Carlo son algo angostas (punto M).
+
+### L4. Volumen y día de la semana (siguiente ronda; solo lectura; NO se ha corrido)
+
+**Datos (verificado el 2026-10-12):** el CSV trae `volume` en las 30 series, sin vacíos. En las **20 acciones** es utilizable: ningún cero y medianas de millones. En los **10 futuros no**: 121 días con volumen 0, y medianas imposibles para el contrato activo (GC=F 443, SI=F 89, HG=F 724). Parece el volumen de un solo vencimiento de la serie continua de Yahoo, no el del contrato activo. Por eso H1 y H2 se evalúan **solo en las 20 acciones**; H3 en los 30 activos.
+
+**Hipótesis fijadas de antemano** (no se agregan otras al ver los resultados):
+- **H1. Alza tras día de volumen alto.** "Volumen alto" = volumen del día > 1.5 × mediana de las 20 sesiones previas (sin mirar el futuro). Dos estados: alto / normal. ¿P(sube mañana | alto) ≠ P(sube mañana | normal)?
+- **H2. Dirección × volumen.** Cuatro estados: subió con volumen alto, subió normal, bajó con volumen alto, bajó normal. ¿Alguno difiere de la tasa base?
+- **H3. Día de la semana.** Cinco estados (lunes a viernes, por la fecha de la sesión que se predice). ¿P(sube | día) difiere entre días?
+
+**Método:** el mismo de L0b y L0c. Tablas por activo con casos por fila, margen de error al 95 % y chi²; acierto y Brier fuera de muestra con la ventana que avanza, contra "siempre sube" y contra la probabilidad simple. Como son 3 hipótesis, se reporta también el umbral corregido (p < 0.05 / 3 ≈ 0.017) y cuántos positivos se esperan por azar.
+
+**Criterio:** una hipótesis solo se considera útil si mejora a "siempre sube" fuera de muestra en varios activos de forma consistente y supera el umbral corregido. Si no, se descarta.
+
+**Tamaño:** S (se agrega a `lab_l.py`; mismo CSV).
+
 ### Cómo se corre con datos reales (cuando el usuario entregue el CSV)
 
 ```
@@ -383,12 +491,13 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 | # | Bloque | Puntos | Tamaño | Depende de | Parte de "Diseño por niveles" |
 |---|---|---|---|---|---|
 | 1 | Lecturas seguras + verificación de K | I, K | M | **Hecho:** `842622b`, en la rama con push; merge tras verificar K en la corrida de hoy | Regla 4: `correlation.js` devuelve todas las correlaciones |
-| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | Script listo y probado con datos sintéticos; falta el CSV real (sección 5) | Regla 3: decide qué parámetros por nivel se activan |
+| L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Ronda 1 hecha** (2026-10-12, sección 5); L4 pendiente de autorización | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
 | 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
 | 5 | Patrones binarios | G | S-M | — | Reglas 1 y 3: `patternHorizons` y `patternWindows` desde la configuración |
 | 6 | Sigma y postura de riesgo | A, F | M | — (J1 = b) | Regla 3: `newsSensitivity` |
+| M | Calibración de Monte Carlo | M | M | L3 ampliado (solo lectura); bloque 2 (`ENGINE_PARAMS`). El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
 | 7 | Markowitz (mínima varianza) | D | S-M (M con endpoint) | Bloque 1 (J2 = b) | Regla 2: cálculo para N activos en el servidor |
 | 8 | Radar en el servidor (J3 = b) | J3 | M | Bloque 2; nombre de la sección | Reglas 2 y 4: `/api/radar` con ranking completo |
 | 9 | Futuros: diagnóstico y corrección | C1, luego C2 | S + M | Aprobación C2 | — |
@@ -403,8 +512,10 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 - **Fase 5 — validar el nivel en el servidor** (1.5): hoy todo límite por nivel se controla solo en el navegador; Premium lo requerirá en el servidor.
 - **Fase 5 — Supabase: "Automatically expose new tables" está activado.** Supabase recomienda desactivarlo: con esa opción, toda tabla nueva queda expuesta por la API desde que se crea. Revisarlo junto con las RLS de las 20 tablas.
 - **Bloque 2 — correlaciones por nivel:** hoy la interfaz muestra como máximo **una** correlación (la primera confirmada por volumen, `renderShadowEngine`), igual para todos los niveles, y solo dentro del motor sombra oculto. No hay regla por nivel. Si vuelve en la Fase 5, el número debe salir de `TIER_LIMITS` (p. ej. `correlationSuggestions`).
-- **Fase 5 — b1 (`sensitivity-factor.js:58`):** la previa domina el ajuste (sección 5, L0a). Corregir antes de usar b1 en cualquier nivel, y solo si L lo justifica.
+- **b1 (`sensitivity-factor.js:58`):** la previa domina el ajuste (sección 5, L0a y resultados). **No se activa en Premium hasta corregir la previa y superar a la regla 1.18 × MAD fuera de muestra** en el laboratorio.
+- **HG=F (cobre):** candidato a vigilar con datos nuevos en cada ronda de L; sin uso en el producto.
 - **Fase 5 — `NEWS_SENSITIVITY_FACTOR`:** el resultado de `applyNewsWeighting` (`index.html:679`) no se usa; decidir si se borra o se conecta según L2.
+- **Fase 6a — historial diario de noticias (requisito):** `asset_news_scores` está vacía en producción, así que las preguntas del laboratorio que dependen de noticias (L2-noticias: `NEWS_SENSITIVITY_FACTOR` y el ajuste de `patterns.js`) **no se pueden evaluar**. La descarga nocturna de noticias debe guardar historial diario por activo, independiente de que alguien abra el Newsbox. Además, **`news.js` descarta los errores al guardar**: el insert en `asset_news_scores` termina en `.catch(() => {})` y no revisa `response.ok` (`functions/api/news.js:50-55`). Una falla de guardado no deja rastro; debe registrarse. Ningún ajuste por noticias se activa hasta tener ese historial y evaluarlo en L.
 - **Límites de Elite (E1):** el agente los propone según el diseño de las pantallas; mientras tanto, la interfaz usa el tope visual `UI_CAPS`.
 - **Laboratorio L:** comparativa b1 contra `NEWS_SENSITIVITY_FACTOR` y validación del μ histórico antes de activar cualquier parámetro "más sensible" en Premium.
 - **Fase 5 — `asset_prediction_audit`** crece en cada consulta de patrones (ya anotado en fase-2-plan, sección 9); se agrava mientras `loadShadowCorrelation` siga activo (punto I).
