@@ -14,7 +14,8 @@ VAPID_PRIVATE_KEY=
 # superadmin y del motor v2 (winrate, winrate-shadow, admin/metrics, track-view,
 # patterns-vectors, sensitivity-factor, markov-matrix, montecarlo). FAIL-CLOSED: si se deja
 # vacía, esos endpoints responden 503 (ya NO se quedan abiertos). Hay que fijarla también en
-# local para poder usarlos con `npm run dev`. El valor se captura del mismo password que ya se
-# teclea al entrar como superadmin (ver admin-go en index.html) y se envía como header
-# X-Admin-Secret; no es autenticación real, ver functions/_shared/admin-auth.js.
+# local para poder usarlos con `npm run dev`. Usa un valor aleatorio largo, distinto de cualquier
+# contraseña. El superadmin lo teclea en el modal de admin-go (index.html) o en admin.html; se
+# verifica en /api/admin/check y se envía como header X-Admin-Secret. No es autenticación real,
+# ver functions/_shared/admin-auth.js.
 ADMIN_API_SECRET=

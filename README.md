@@ -40,7 +40,7 @@ El panel de control consulta los perfiles de todos los usuarios autenticados por
 
 ## Acceso administrativo demo
 
-El backoffice está oculto. Abre el modal con `Ctrl + Shift + A` y utiliza el usuario bloqueado `gov` y la contraseña demo `mode`. Estas credenciales están escritas en el JavaScript del navegador y, por tanto, no protegen producción. Antes de usar datos reales, reemplaza este flujo por Supabase Auth con una columna de rol protegida por RLS y una Edge Function para las operaciones administrativas.
+El backoffice está oculto. Abre el modal con `Ctrl + Shift + A` (o entra a `admin.html`) y escribe la clave de administrador, que es el valor de `ADMIN_API_SECRET`. La clave se verifica en el servidor (`/api/admin/check`: 200 si coincide, 401 si no, 503 si no está configurada) y solo queda en memoria mientras la pestaña está abierta; no se guarda en `localStorage` ni en `sessionStorage`. No es autenticación real: es una clave compartida. Antes de usar datos reales, reemplaza este flujo por Supabase Auth con una columna de rol protegida por RLS y una Edge Function para las operaciones administrativas.
 
 El catálogo y las proyecciones actuales son una base visual demostrativa. Para precios y noticias en vivo se debe conectar un proveedor de datos mediante una función de servidor; no se deben colocar claves privadas de APIs en Cloudflare Pages.
 
