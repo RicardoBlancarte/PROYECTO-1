@@ -1,3 +1,5 @@
+import { engineParams, tierLimits } from '../_shared/tier-config.js';
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=900' } });
 // Filas más recientes por símbolo. Se piden en orden desc y se invierten: si el max_rows de
 // PostgREST recorta la respuesta, se pierden las más antiguas, nunca las más recientes.
@@ -46,12 +48,12 @@ export async function onRequestGet(context) {
   const newsResponse = await fetch(newsUrl, { headers });
   const scores = newsResponse.ok ? await newsResponse.json() : [];
   const newsAdjustment = scores.length ? scores.reduce((sum, row) => sum + Number(row.impact_score), 0) / scores.length : 0;
-  const result = [3, 5].map(windowSize => estimate(bits, windowSize, newsAdjustment));
+  const result = engineParams(tier).patternWindows.map(windowSize => estimate(bits, windowSize, newsAdjustment));
   await Promise.all([
     ...result.map(snapshot => upsertSnapshot(context.env, headers, symbol, horizon, snapshot, newsAdjustment)),
     logPredictionAudit(context.env, headers, symbol, tier, horizon, result, newsAdjustment)
   ]);
-  const allowed = tier === 'normal' ? ['daily'] : tier === 'premium' ? ['daily', 'weekly'] : ['daily', 'weekly', 'monthly'];
+  const allowed = tierLimits(tier).patternHorizons;
   return json({ symbol, horizon, allowedHorizons: allowed, newsAdjustment: Number(newsAdjustment.toFixed(2)), patterns: result, signalSource, computedAt: new Date().toISOString() });
 }
 
