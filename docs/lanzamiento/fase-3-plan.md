@@ -29,7 +29,7 @@
 
 | # | Pregunta | Dónde |
 |---|---|---|
-| S | **Prioritario:** rotación del secreto y GitHub Pages **hechos** (2026-10-12). Falta aprobar el PR "S" (middleware, `_routes.json` y quitar literales) y decidir si el repo pasa a privado. | Sección S |
+| S | **Prioritario:** PR S fusionado (#7, `2641a0a`) y verificado en Producción el 2026-10-13 (28/28 rutas; login de admin con la clave nueva). Falta: Cloudflare Access en los Previews y repo privado, el mismo día (sección S, "Pendiente prioritario"). | Sección S |
 | B2 | Aprobación para escribir en `asset_historical_prices` (backfill de los 4 activos). | Punto B |
 | C2 | Aprobación para reescribir cierres de futuros dentro de la ventana. | Punto C |
 | E1 | Límites de Elite según el diseño (propuesta del agente, más adelante). | Sección 1.2 |
@@ -139,8 +139,24 @@ for p in / /index.html /admin /homepage/ /homepage/locales/es.json "/homepage/as
 |---|---|
 | Rotar `ADMIN_API_SECRET` | **Hecho por el usuario:** GitHub, Cloudflare Production y Preview, con redespliegue. La contraseña vieja da 401 en ambos entornos (verificado por el usuario). |
 | Apagar GitHub Pages | **Hecho por el usuario** (despublicado, Branch = None). Verificado por el agente: `github.io/PROYECTO-1/` responde 404 en `/`, `README.md`, `winrate-plan.md` y `schema.sql`; la API de GitHub devuelve `has_pages: false`. |
-| PR "S": middleware, `_routes.json` y quitar los literales (S1.2, S1.3, S2) | Pendiente de aprobación. |
-| ¿Repo privado? (S3) | Pendiente de decisión. |
+| PR "S": middleware, `_routes.json` y quitar los literales (S1.2, S1.3, S2) | **Fusionado** (#7, `2641a0a`, 2026-10-13). Verificado en Producción por el agente (28/28 rutas con `curl`; `/api/winrate*` sin clave dan 401 de la Function, o sea que pasan el middleware) y por el usuario en el navegador (clave vieja → "Clave incorrecta."; la nueva entra; MOTOR SOMBRA (v2) 49.9 %; con F5 la vuelve a pedir; también en `/admin`). |
+| ¿Repo privado? (S3) | **Decidido:** sí, después de los merges de la Fase 3. Lo hace el usuario en GitHub; el agente confirma después que Cloudflare y Actions siguen funcionando. |
+| Cloudflare Access en los Previews | **Pendiente prioritario**, el mismo día que el repo pase a privado (ver abajo). |
+
+**Pendiente prioritario de S: los Previews viejos siguen publicando archivos (2026-10-13).** Cloudflare mantiene accesible cada despliegue de Preview, por su alias de rama y por su URL con hash, hasta que se borra. Los alias de ramas anteriores a S no tienen middleware. Verificado con `curl`: `lanzamiento-1-5c`, `lanzamiento-winrate` y `lanzamiento-f2-montecarlo` responden 200 en `/schema.sql` y `docs/` (en la última, `docs/` ya responde 200 HTML, pero `schema.sql` sigue expuesto), y sirven el `index.html` viejo con la contraseña demo, que ya no abre nada. `lanzamiento-f3-bloque1` y `lanzamiento-f3-calculos` ya traen `main` con S.
+- **Opción elegida: Cloudflare Access en "Preview deployments"**, a activar el mismo día que el repo pase a privado. Workers & Pages → proyecto → Settings → *Enable access policy*.
+- **Lo que pide Cloudflare:**
+  - una organización de Zero Trust; el plan Free incluye 50 usuarios;
+  - según el foro de Cloudflare (sin documentación oficial encontrada), **un método de pago aunque el cargo sea $0**: confirmarlo en el panel;
+  - por defecto se entra con un código de un solo uso enviado al correo.
+- **Cuidado:** *Enable access policy* crea **dos** políticas: una para el `*.pages.dev` de Producción (`algorithm-global-engine.pages.dev`) y otra para los Previews. Si `PAGES_BASE_URL` (secreto de GitHub, no legible) apuntara a `algorithm-global-engine.pages.dev`, la cascada recibiría la pantalla de Access y **dejaría de registrar el Win Rate**.
+  - **Antes de activarlo:** volver a guardar `PAGES_BASE_URL` con `https://thalgorithm.com` (es una URL pública).
+  - **Después:** decidir si se conserva o se borra la política del `*.pages.dev` de Producción.
+  - `thalgorithm.com` no queda protegido por esas políticas (necesitaría su propia aplicación de Access), así que sigue público.
+- **Evidencia sobre `PAGES_BASE_URL`:** la corrida #30 (desde `lanzamiento-winrate`) devolvió el `asOf` del código viejo, así que no apunta a un alias de Preview de rama. No descarta `algorithm-global-engine.pages.dev`.
+- **Alternativas o complementos:** borrar en Cloudflare los despliegues viejos de esas ramas, o hacer merge de `main` en las ramas que sigan vivas (esto solo cubre el alias, no las URLs con hash).
+
+**Costo del middleware (2026-10-13):** con `"include": ["/*"]`, toda ruta que no esté en `exclude` ejecuta el middleware: una invocación de Functions por petición. Hoy pasan por ahí las imágenes de `/homepage/assets/*` (~10 por visita a la homepage), `/admin` con barra final, las rutas inexistentes y `/api/*`. El plan gratis de Functions tiene un límite diario de invocaciones. **Revisar el costo si el tráfico crece** (Cloudflare → Workers & Pages → métricas). Opciones: excluir `/homepage/assets/*` en `_routes.json` y borrar del repo `shanghai-hero.jpg.png`, la única imagen bloqueada, o mover los estáticos a una carpeta de salida dedicada (S2).
 
 **Efectos de la rotación que hay que vigilar:**
 - **Panel de superadmin:** `admin-go` sigue validando la contraseña demo y la envía como `X-Admin-Secret`, así que los endpoints de admin responden **401** hasta implementar S1.2 (teclear el secreto nuevo). Afecta "MOTOR SOMBRA (v2)", "Recalcular" y las métricas del panel. Es esperado, no es una falla nueva.
@@ -562,6 +578,8 @@ Cada fila muestra el rango p5-p95 y el reparto "X % de los escenarios arriba / Y
 
 ### J2. Markowitz
 
+**Prueba del usuario en el Preview del bloque 1 (2026-10-13):** hoy Markowitz **le asigna peso a Bitcoin aunque no tiene historial**: 30 % con 2 activos y 1 % con 4. Es el hallazgo del punto D: un activo sin historial deja `minLength = 0`, la covarianza de todos queda en cero y los pesos salen de la sigma anual escrita a mano. Lo corrige el bloque 7 (mínima varianza; activos sin historial excluidos con aviso).
+
 | Opción | Pros | Contras |
 |---|---|---|
 | a) Clásico, μ = retorno histórico medio | El Markowitz "de libro" | μ muy ruidoso; pesos extremos; suena a recomendación |
@@ -742,8 +760,8 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 
 | # | Bloque | Puntos | Tamaño | Depende de | Parte de "Diseño por niveles" |
 |---|---|---|---|---|---|
-| **S** | **Seguridad (prioritario)** | S1, S2 | S-M | Rotación y GitHub Pages hechos; falta el PR "S" | — |
-| 1 | Lecturas seguras + verificación de K | I, K | M | **Hecho:** `842622b`, en la rama con push; merge tras verificar K en la corrida de hoy | Regla 4: `correlation.js` devuelve todas las correlaciones |
+| **S** | **Seguridad (prioritario)** | S1, S2 | S-M | **Fusionado** (#7) y verificado en Producción; falta Access en Previews y repo privado | — |
+| 1 | Lecturas seguras + verificación de K | I, K | M | **Listo para merge** en `lanzamiento-f3-bloque1` (`842622b` + merge de `main`, `36a3b9b`). K verificado en la corrida #36. Pruebas del usuario en el Preview OK. **Orden: S (hecho) → bloque 1 → M**, después de la prueba de push de Oro | Regla 4: `correlation.js` devuelve todas las correlaciones |
 | L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12). **En pausa hasta la Fase 6a** (historial de noticias) | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
@@ -761,6 +779,12 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 ---
 
 ## 7. Pendientes para fases posteriores
+
+- **Fase 4 — llamadas repetidas a activos sin historial** (visto en el Preview el 2026-10-13; ya ocurre en `main`, no es una regresión). Al seleccionar Bitcoin, cada selección hace 3 llamadas a `/api/market/BTC-USD` (404) y 2 a `/api/escenarios?symbol=BTC-USD` (404): `renderPortfolio` → `renderPortfolioChart`, `loadPatterns` → `loadShadowCorrelation` → `renderPortfolioChart` y `obtenerHistoricoActivo`. A eso se suman la de `syncAssetDataWithSupabase` al arrancar y las de Markowitz con BTC en el portafolio (el usuario vio 8-10). Además `/api/patterns` responde 422 en cada selección. Propuesta:
+  - guardar en caché por sesión los "sin historial" (404/422);
+  - no pedir `/api/escenarios` ni `/api/patterns` para activos sin historial;
+  - que `renderPortfolioChart` reutilice el historial ya descargado en vez de pedirlo en cada redibujado.
+- **Fase 4 — caché de `/api/patterns` por pestaña:** `sessionStorage`, 60 min. Para ver la llamada en Network hay que usar una pestaña nueva o borrar `algo_patterns_*`.
 
 - **Fase 5 — Monitoreo de cobertura de Monte Carlo:** `asset_montecarlo_simulation` sobrescribe la fila de cada activo y horizonte cada noche, así que no hay historial para medir si las bandas siguen calibradas.
   - **Propuesta (requiere aprobación de esquema):** tabla nueva `asset_montecarlo_history`: `symbol`, `horizon`, `base_close_date`, `quantiles` (calibrados), `raw_quantiles`, `probability_up`, `calibration` (k y fecha de medición), `computed_at`. PK `(symbol, horizon, base_close_date)`; RLS activado sin políticas (solo `service_role`). La cascada agrega un upsert por fila además del actual. Son ~120 filas por día hábil, ~31 000 al año.
