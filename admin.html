@@ -40,9 +40,8 @@
     <div class="login-box">
       <div class="eyebrow">Private backoffice</div>
       <h1 style="font-size:22px;margin:8px 0">Acceso administrador</h1>
-      <p class="subtle">Credenciales del System de control (demo).</p>
-      <label for="admin-user">Usuario</label><input id="admin-user" value="gov" readonly>
-      <label for="admin-password">Contraseña</label><input id="admin-password" type="password" placeholder="Contraseña">
+      <p class="subtle">Escribe la clave de administrador. Se verifica en el servidor y no se guarda en este navegador.</p>
+      <label for="admin-password">Clave de administrador</label><input id="admin-password" type="password" autocomplete="off" placeholder="Clave de administrador">
       <div id="admin-error" class="error-text"></div>
       <button id="admin-go" class="btn btn-primary" style="width:100%;margin-top:8px">GO <i class="fa-solid fa-rocket"></i></button>
       <a href="index.html" class="btn btn-ghost" style="display:block;text-align:center;text-decoration:none;margin-top:12px"><i class="fa-solid fa-house"></i> Volver al inicio</a>
@@ -89,7 +88,6 @@
     let supabaseClient = null; let configPromise;
     async function initializeSupabaseConfig() { if (supabaseClient || !config.configProxy) return supabaseClient; if (!configPromise) configPromise = fetch(config.configProxy).then(response => response.ok ? response.json() : Promise.reject(new Error('Configuración pública no disponible.'))).then(settings => { if (!settings.url || !settings.anonKey) throw new Error('Configuración pública incompleta.'); supabaseClient = window.supabase.createClient(settings.url, settings.anonKey); return supabaseClient; }).catch(() => null); return configPromise; }
     const $ = id => document.getElementById(id);
-    const SESSION_KEY = 'algorithm_admin_session';
 
     async function showAdminApp() {
       $('login-screen').classList.add('hidden');
@@ -99,14 +97,21 @@
       loadUsers();
     }
 
-    $('admin-go').onclick = () => {
-      if ($('admin-user').value !== 'gov' || $('admin-password').value !== 'mode') { $('admin-error').textContent = 'Credenciales incorrectas.'; return; }
+    // Bloque S: sin contraseña fija en el navegador. La clave se verifica en /api/admin/check
+    // (200/401) y no se guarda; al recargar la página se vuelve a pedir.
+    $('admin-go').onclick = async () => {
+      const secret = $('admin-password').value;
+      if (!secret) { $('admin-error').textContent = 'Escribe la clave de administrador.'; return; }
+      $('admin-go').disabled = true; $('admin-error').textContent = 'Verificando…';
+      let status = 0;
+      try { status = (await fetch('/api/admin/check', { headers: { 'X-Admin-Secret': secret }, cache: 'no-store' })).status; } catch (error) { status = 0; }
+      $('admin-go').disabled = false;
+      if (status !== 200) { $('admin-error').textContent = status === 401 ? 'Clave incorrecta.' : status === 503 ? 'El acceso de administrador no está configurado en este entorno.' : 'No se pudo verificar la clave. Intenta de nuevo.'; return; }
       $('admin-error').textContent = ''; $('admin-password').value = '';
-      sessionStorage.setItem(SESSION_KEY, '1');
       showAdminApp();
     };
     $('admin-password').addEventListener('keydown', event => { if (event.key === 'Enter') $('admin-go').click(); });
-    $('admin-logout').onclick = () => { sessionStorage.removeItem(SESSION_KEY); location.href = 'index.html'; };
+    $('admin-logout').onclick = () => { location.href = 'index.html'; };
 
     let adminChartsReady = false;
     function initAdminCharts() {
@@ -126,8 +131,6 @@
       $('users-body').innerHTML = data.map(user => `<tr><td class="mono">${user.folio || '-'}</td><td>${user.full_name || '-'}</td><td>${user.email}</td><td class="mono">${user.last_login ? new Date(user.last_login).toLocaleString('es-MX') : '-'}</td><td>${user.comments || '-'}</td><td><span class="level ${user.user_level}">${user.user_level}</span></td></tr>`).join('');
     }
     $('refresh-users').onclick = loadUsers;
-
-    if (sessionStorage.getItem(SESSION_KEY) === '1') showAdminApp();
   </script>
 </body>
 </html>

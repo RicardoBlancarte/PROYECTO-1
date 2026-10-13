@@ -1,5 +1,18 @@
 {
   "version": 1,
-  "include": ["/api/*"],
-  "exclude": []
+  "include": ["/*"],
+  "exclude": [
+    "/",
+    "/index.html",
+    "/admin",
+    "/admin.html",
+    "/homepage",
+    "/homepage/",
+    "/homepage/index.html",
+    "/homepage/locales/*",
+    "/sw.js",
+    "/supabase-config.js",
+    "/favicon.png",
+    "/logo_algorithm.svg"
+  ]
 }
