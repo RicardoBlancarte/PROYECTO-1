@@ -1,5 +1,5 @@
 // Parche interino de acceso para los endpoints de solo-lectura/escritura del panel de
-// superadmin y del motor v2 (winrate, winrate-shadow, admin/metrics, track-view,
+// superadmin y del motor v2 (winrate, winrate-shadow, admin/metrics, admin/check, track-view,
 // patterns-vectors, sensitivity-factor, markov-matrix, montecarlo). No es autenticación real:
 // compara un header contra una variable de entorno. La autenticación real de todo el
 // backoffice (hoy un bypass 100% client-side, ver AGENTS.md) queda como proyecto aparte.
