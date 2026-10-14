@@ -17,11 +17,8 @@ export async function onRequestGet(context) {
 
   const cutoff = new Date();
   cutoff.setUTCDate(cutoff.getUTCDate() - LOOKBACK_DAYS);
-  const bulkUrl = new URL(`${context.env.SUPABASE_URL}/rest/v1/asset_historical_prices`);
-  bulkUrl.search = new URLSearchParams({ date: `gte.${cutoff.toISOString().slice(0, 10)}`, select: 'symbol,date,close,volume', order: 'symbol.asc,date.asc' }).toString();
-  const response = await fetch(bulkUrl, { headers });
-  if (!response.ok) return json({ error: 'No se pudo leer el histórico.' }, 502);
-  const rows = await response.json();
+  const rows = await readAllRows(context.env.SUPABASE_URL, headers, cutoff.toISOString().slice(0, 10));
+  if (!rows) return json({ error: 'No se pudo leer el histórico.' }, 502);
 
   const bySymbol = new Map();
   rows.forEach(row => { if (!bySymbol.has(row.symbol)) bySymbol.set(row.symbol, []); bySymbol.get(row.symbol).push(row); });
@@ -41,7 +38,28 @@ export async function onRequestGet(context) {
     suggestions.push({ symbol: otherSymbol, correlation: Number(correlation.toFixed(3)), confirmedByVolume, lastClose: Number(otherRows.at(-1).close) });
   }
   suggestions.sort((a, b) => b.correlation - a.correlation);
-  return json({ symbol, suggestions: suggestions.slice(0, 5), computedAt: new Date().toISOString() });
+  // Todas las correlaciones sobre el umbral: el cliente decide cuántas mostrar.
+  return json({ symbol, suggestions, computedAt: new Date().toISOString() });
+}
+
+// La consulta abarca todos los símbolos (~90 sesiones × 30 ≈ 2 700 filas) y el max_rows de
+// PostgREST la recortaría sin error. Se pagina con limit/offset, avanzando por las filas
+// recibidas, hasta una página vacía (no "hasta una página incompleta": si max_rows fuera menor
+// que PAGE_SIZE, esa regla cortaría antes). El orden symbol,date es único (PK), así que es estable.
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 50;
+async function readAllRows(supabaseUrl, headers, fromDate) {
+  const rows = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const pageUrl = new URL(`${supabaseUrl}/rest/v1/asset_historical_prices`);
+    pageUrl.search = new URLSearchParams({ date: `gte.${fromDate}`, select: 'symbol,date,close,volume', order: 'symbol.asc,date.asc', limit: String(PAGE_SIZE), offset: String(rows.length) }).toString();
+    const response = await fetch(pageUrl, { headers });
+    if (!response.ok) return null;
+    const pageRows = await response.json();
+    if (!pageRows.length) return rows;
+    rows.push(...pageRows);
+  }
+  return null;
 }
 
 function toReturns(rows) { return rows.slice(1).map((row, index) => Math.log(Number(row.close) / Number(rows[index].close))); }
