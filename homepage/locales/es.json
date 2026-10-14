@@ -40,7 +40,7 @@
     { "title": "Inteligencia Geopolítica", "desc": "Cada noticia analizada en dos escenarios, de continuidad y de cambio, para entender su posible impacto." },
     { "title": "Mapa de influencia", "desc": "Las regiones del mundo que más suelen influir en cada activo." },
     { "title": "Perfil de Riesgo", "desc": "Elige un rango de escenarios estándar o amplio, según cuánto riesgo quieras ver." },
-    { "title": "Radar de volatilidad", "desc": "Los 3 activos con mayor rango de movimiento estimado para mañana." }
+    { "title": "Radar de volatilidad", "desc": "Los 3 activos con mayor rango de movimiento estimado para la próxima sesión." }
   ],
   "blocks": {
     "block2": { "line1": "Herramientas de análisis cuantitativo, gratis", "line2": "Matemáticas aplicadas al alcance de todos", "tag": "In the name of mankind" },
