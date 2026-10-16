@@ -765,7 +765,7 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 | L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12). **En pausa hasta la Fase 6a** (historial de noticias) | Regla 3: decide qué parámetros por nivel se activan |
 | 2 | Configuración por niveles | 1.2, 1.3 | S-M | **En rama `lanzamiento-f3-niveles`** (2026-10-13). Opción (b): el radar sigue en 3 para todos hasta el bloque 8; `radarSize` solo queda en la configuración. Valores idénticos a los del código; prueba de equivalencia de `patterns.js` y `/api/market` 36/36 y 16/16 | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
-| 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
+| 4 | Textos y limpieza | E, H | S | **En rama `lanzamiento-f3-textos`** (2026-10-13): "mañana" → "la próxima sesión" en el subtítulo del radar, el tour y la homepage es/en/zh; `#recalculate` y su manejador retirados. El nombre "Radar" y su subtítulo nuevo esperan al bloque 8. J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
 | 5 | Patrones binarios | G | S-M | — | Reglas 1 y 3: `patternHorizons` y `patternWindows` desde la configuración |
 | 6 | Sigma y postura de riesgo | A, F | M | — (J1 = b) | Regla 3: `newsSensitivity` |
 | M | Calibración de Monte Carlo | M | M | **Implementado en la rama, sin commit (M.6)**; merge después del bloque 1. Factores en `functions/_shared/engine-params.json`. El texto de "Amplio" con la cobertura medida (M.4) va en el bloque 6 | Regla 3: factores `k50`/`k90` por horizonte en `ENGINE_PARAMS` |
@@ -805,4 +805,5 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 - **Fase 5 — `asset_prediction_audit`** crece en cada consulta de patrones (ya anotado en fase-2-plan, sección 9); se agrava mientras `loadShadowCorrelation` siga activo (punto I).
 - **Diseño de Premium — Monte Carlo por nivel:** requiere columna `tier` o tabla nueva en `asset_montecarlo_simulation` (cambio de esquema, 1.3).
 - **Universo de activos en una sola lista** (B2.5).
-- **Fase 8:** `alt` y captura de `homepage/assets/prob tomorrow.png` (E).
+- **Fase 8:** `alt` y captura de `homepage/assets/prob tomorrow.png` (E). El `alt` ("Escenario de referencia para mañana", `homepage/index.html:292`) se queda hasta regenerar la imagen.
+- **Fase 8 — revisión nativa del chino:** los textos de `homepage/locales/zh.json` (incluido "下一交易日预计波动幅度最大的三项资产。" del bloque 4) los revisa un hablante nativo antes del lanzamiento.

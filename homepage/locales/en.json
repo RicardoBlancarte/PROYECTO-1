@@ -40,7 +40,7 @@
     { "title": "Geopolitical Intelligence", "desc": "Every news item analyzed under two scenarios, continuity and change, to understand its possible impact." },
     { "title": "Influence Map", "desc": "The regions of the world that most often influence each asset." },
     { "title": "Risk Profile", "desc": "Choose a standard or wide range of scenarios, depending on how much risk you want to see." },
-    { "title": "Volatility Radar", "desc": "The 3 assets with the widest estimated move for tomorrow." }
+    { "title": "Volatility Radar", "desc": "The 3 assets with the widest estimated move for the next session." }
   ],
   "blocks": {
     "block2": { "line1": "Quantitative analysis tools, free", "line2": "Applied mathematics within everyone's reach", "tag": "In the name of mankind" },
