@@ -1,2 +1,3 @@
-# Los scripts de Bash necesitan finales LF aunque core.autocrlf=true (si no: $'': command not found)
+# Los scripts de Bash necesitan finales LF aunque core.autocrlf=true
+# (con CRLF, Bash falla con: $'\r': command not found).
 *.sh text eol=lf
