@@ -78,7 +78,7 @@
 | `docs/lanzamiento/*.md` de `main` (auditoría, planes, `winrate-plan.md`), `docs/lanzamiento/fase-2-migracion.sql`, `schema.sql`, `README.md`, `AGENTS.md`, `actualizar_automatico.py`, `montecarlo_engine.py`, `test_montecarlo_synthetic.py`, `.github/workflows/daily_update.yml`, `.dev.vars.example` (sin valores), `wrangler.toml`, `package.json`, `.gitignore` | `functions/**` (código de las Functions), `.git/`, `_routes.json`, archivos que no están en `main` |
 
 - También es público `homepage/assets/shanghai-hero.jpg.png`, la imagen original con los subtítulos retirados en #91.
-- Con el merge de la Fase 3 se publicarían además `docs/lanzamiento/fase-3-plan.md` (que describe estos hallazgos) y `functions/_shared/engine-params.json` (este puede seguir público).
+- Con el merge de la Fase 3 se publicarían además `docs/lanzamiento/fase-3-plan.md` (que describe estos hallazgos). **Corrección (2026-10-13):** `functions/_shared/engine-params.json` **no se publica**. Cloudflare Pages no sube la carpeta `functions/` como archivos estáticos: en el Preview, `/functions/_shared/engine-params.json` responde 200 con la página de inicio, no con el JSON. El motor lo lee del repo, así que no le afecta. Si el navegador necesita esas cifras (p. ej. los textos de "Estándar" y "Amplio" del bloque 6), tendrá que pedirlas a una Function, como `/api/tier-config` (bloque 2). La regla del middleware que lo permite no hace daño y se puede quitar.
 
 **GitHub Pages está ACTIVO** (`has_pages: true`): `ricardoblancarte.github.io/PROYECTO-1/` sirve el mismo repositorio (200 en `README.md`, `docs/lanzamiento/winrate-plan.md`, `schema.sql`, `actualizar_automatico.py`). **El middleware de Cloudflare no lo protege**: hay que apagarlo aparte (Settings → Pages → Unpublish), o hacer el repo privado (S3).
 
@@ -763,7 +763,7 @@ El usuario comparte `informe.md` y los CSV de salida; no contienen secretos.
 | **S** | **Seguridad (prioritario)** | S1, S2 | S-M | **Fusionado** (#7) y verificado en Producción; falta Access en Previews y repo privado | — |
 | 1 | Lecturas seguras + verificación de K | I, K | M | **Listo para merge** en `lanzamiento-f3-bloque1` (`842622b` + merge de `main`, `36a3b9b`). K verificado en la corrida #36. Pruebas del usuario en el Preview OK. **Orden: S (hecho) → bloque 1 → M**, después de la prueba de push de Oro | Regla 4: `correlation.js` devuelve todas las correlaciones |
 | L | Laboratorio (solo lectura) | L0, J2, N2, calibración | M | **Rondas 1 y 2 (L4) hechas** y validación de M (2026-10-12). **En pausa hasta la Fase 6a** (historial de noticias) | Regla 3: decide qué parámetros por nivel se activan |
-| 2 | Configuración por niveles | 1.2, 1.3 | S-M | — (N1 y N2 decididos) | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
+| 2 | Configuración por niveles | 1.2, 1.3 | S-M | **En rama `lanzamiento-f3-niveles`** (2026-10-13). Opción (b): el radar sigue en 3 para todos hasta el bloque 8; `radarSize` solo queda en la configuración. Valores idénticos a los del código; prueba de equivalencia de `patterns.js` y `/api/market` 36/36 y 16/16 | Reglas 1 y 3: `TIER_LIMITS`, `ENGINE_PARAMS`, `/api/public-config`, sustituir la tabla 1.1; sin cambio visible para Free |
 | 3 | Guardas en activos sin historial | B1, parte fija de D | S-M | — | — (el tope de alertas por nivel queda para la Fase 5, 1.5) |
 | 4 | Textos y limpieza | E, H | S | J3, H | Regla 1: textos con `radarSize` y `portfolioAssets` interpolados |
 | 5 | Patrones binarios | G | S-M | — | Reglas 1 y 3: `patternHorizons` y `patternWindows` desde la configuración |
@@ -779,6 +779,9 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 ---
 
 ## 7. Pendientes para fases posteriores
+
+- **Al activar Premium — esperar `/api/tier-config` antes de validar el tope** (bloque 2, 2026-10-13): mientras la configuración no llega (o si falla), el navegador usa los límites de Free. Un Premium con más de 5 activos ve "N/5 activos" y **no puede agregar** hasta que llega la respuesta (cacheada 5 min). Hoy no afecta a nadie real (todo es Free; solo pruebas gratuitas y modo admin). Antes de activar Premium: esperar la configuración antes de validar el tope en `addPortfolioAsset` (o reintentar al validar) y no mostrar el contador hasta tenerla.
+- **Bloque 2 — refrescar el contador al cambiar de nivel:** `setDevTier` y `startTrial` llaman a `applyTierGating`, que actualiza horizontes e historial pero no el contador "N/límite" del portafolio; se actualiza en el siguiente `renderPortfolio` (al seleccionar o agregar un activo). Ya era así antes del bloque 2. **Resuelto el 2026-10-13** en `lanzamiento-f3-niveles`: `applyTierGating` actualiza el contador.
 
 - **Fase 4 — llamadas repetidas a activos sin historial** (visto en el Preview el 2026-10-13; ya ocurre en `main`, no es una regresión). Al seleccionar Bitcoin, cada selección hace 3 llamadas a `/api/market/BTC-USD` (404) y 2 a `/api/escenarios?symbol=BTC-USD` (404): `renderPortfolio` → `renderPortfolioChart`, `loadPatterns` → `loadShadowCorrelation` → `renderPortfolioChart` y `obtenerHistoricoActivo`. A eso se suman la de `syncAssetDataWithSupabase` al arrancar y las de Markowitz con BTC en el portafolio (el usuario vio 8-10). Además `/api/patterns` responde 422 en cada selección. Propuesta:
   - guardar en caché por sesión los "sin historial" (404/422);
