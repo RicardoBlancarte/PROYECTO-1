@@ -15,3 +15,7 @@ __pycache__/
 # Archivos temporales
 *.tmp
 *.bak
+
+# QA local (scripts/verificar.sh y scripts/qa_navegador.py): reportes, capturas y estado del navegador
+qa-salida/
+.qa-estado/

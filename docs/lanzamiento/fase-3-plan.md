@@ -778,6 +778,54 @@ Cada diff de producción se muestra antes de aplicarlo; `git add` por ruta; sin 
 
 ---
 
+## QA. Herramientas de verificación (rama `lanzamiento-qa-tools`, 2026-10-16)
+
+Reemplazan los videos de verificación por pruebas automáticas que corren en la computadora del usuario. No tocan Producción ni la cascada. `scripts/` no se publica: el middleware responde 404 (verificado con `verificar.sh`).
+
+| Archivo | Qué hace |
+|---|---|
+| `scripts/verificar.sh` | Solo lectura con `curl`: 30 rutas del middleware (las 28 de S más `/scripts/*`), `/api/tier-config`, `/api/market/AAPL`, `/api/escenarios?symbol=AAPL` (con `baseCloseDate` igual al último cierre), `/api/winrate?all=1` sin clave y huellas de cada bloque fusionado. Tabla ✅/❌; código 1 si falla algo. |
+| `scripts/qa_navegador.py` | Playwright (Chromium sin ventana). Invitado QA con estado guardado; AAPL, Bitcoin, contador y tope de Free, horizontes de patrones, radar, tour, homepage es/en/zh, red (sin `/api/correlation`, patrones una vez por activo) y errores de consola conocidos o nuevos. Superadmin opcional con `ALGO_ADMIN_KEY`. Capturas y `reporte.md` en `qa-salida/`. |
+| `scripts/requirements-qa.txt` | `playwright==1.64.0` |
+| `.gitignore` | `qa-salida/` y `.qa-estado/` |
+
+**Instalación (una vez; fuera de OneDrive, en `%LOCALAPPDATA%lgo-qa`, ~843 MB con Chromium; se desinstala borrando esa carpeta):**
+```bash
+py -m venv "$LOCALAPPDATA/algo-qa/venv"
+"$LOCALAPPDATA/algo-qa/venv/Scripts/python" -m pip install -r scripts/requirements-qa.txt
+PLAYWRIGHT_BROWSERS_PATH=0 "$LOCALAPPDATA/algo-qa/venv/Scripts/python" -m playwright install chromium
+```
+
+**Uso (Git Bash, desde la raíz del repo):**
+```bash
+bash scripts/verificar.sh preview <rama> [--guardar]          # ~20-60 s
+bash scripts/verificar.sh produccion [--guardar]
+PY="$LOCALAPPDATA/algo-qa/venv/Scripts/python"
+"$PY" scripts/qa_navegador.py --rama <rama>                    # Preview; ~1-2 min
+"$PY" scripts/qa_navegador.py --produccion                     # solo lectura; ~20 s
+"$PY" scripts/qa_navegador.py --rama <rama> --con-noticias     # deja pasar /api/news (solo Preview)
+read -rs ALGO_ADMIN_KEY && export ALGO_ADMIN_KEY               # opcional: la clave no se ve al teclear
+"$PY" scripts/qa_navegador.py --rama <rama> --superadmin
+unset ALGO_ADMIN_KEY                                           # borra la clave de la terminal
+```
+
+**Qué escribe en Supabase cada corrida** (el Preview usa la base de producción):
+
+| Tabla | Preview, 1.ª corrida | Preview, siguientes | Producción (`--produccion`) |
+|---|---|---|---|
+| `privacy_consents` | 1 (correo QA) | 0 (estado en `.qa-estado/`) | 0 (POST simulado) |
+| `asset_prediction_audit` | 1 (AAPL diario; BTC responde 422 y no escribe) | 1 | 0 (`/api/patterns` simulado) |
+| `asset_pattern_snapshots` | hasta 2 upserts | hasta 2 | 0 |
+| `page_views` | 0 (`track-view` simulado) | 0 | 0 |
+| `asset_news_scores` | 0 (`/api/news` simulado; con `--con-noticias`, posible) | 0 | 0 |
+| Superadmin | 0 extra (patrones respondidos con la captura del invitado) | 0 | 0 |
+
+También se simula el `POST /cdn-cgi/rum` (Cloudflare Web Analytics), para que las corridas de QA no cuenten como visitas. Cualquier otra escritura (`POST`, `PATCH` o `DELETE` a `/api/*` o a Supabase) se aborta y se reporta como ❌.
+
+**Clave de superadmin:** solo se lee de `ALGO_ADMIN_KEY`; nunca se imprime, nunca se guarda (el contexto del superadmin no guarda estado), no se graban trazas ni video, y si aparece en un error se reemplaza por «oculta».
+
+**Prueba inicial (2026-10-16, por el agente):** `verificar.sh produccion` 43/43 en 22 s. `qa_navegador.py --produccion` 20 ✅, 0 ❌ y 2 omitidas (patrones, interceptados en Producción), en ~19 s. La primera versión marcaba ❌ el `POST /cdn-cgi/rum` de Cloudflare; ahora se simula.
+
 ## 7. Pendientes para fases posteriores
 
 - **Al activar Premium — esperar `/api/tier-config` antes de validar el tope** (bloque 2, 2026-10-13): mientras la configuración no llega (o si falla), el navegador usa los límites de Free. Un Premium con más de 5 activos ve "N/5 activos" y **no puede agregar** hasta que llega la respuesta (cacheada 5 min). Hoy no afecta a nadie real (todo es Free; solo pruebas gratuitas y modo admin). Antes de activar Premium: esperar la configuración antes de validar el tope en `addPortfolioAsset` (o reintentar al validar) y no mostrar el contador hasta tenerla.
