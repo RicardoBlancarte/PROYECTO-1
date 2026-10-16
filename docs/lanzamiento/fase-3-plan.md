@@ -809,6 +809,28 @@ read -rs ALGO_ADMIN_KEY && export ALGO_ADMIN_KEY               # opcional: la cl
 unset ALGO_ADMIN_KEY                                           # borra la clave de la terminal
 ```
 
+**Uso en PowerShell** (la terminal de VS Code). `bash` no está en el PATH de PowerShell, así que `verificar.sh` se corre con el Bash de Git:
+```powershell
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new()             # para ver bien ✅/❌ y los acentos
+& "C:\Program Files\Gitinash.exe" scripts/verificar.sh produccion --guardar
+& "C:\Program Files\Gitinash.exe" scripts/verificar.sh preview <rama>
+$PY = "$env:LOCALAPPDATAlgo-qaenv\Scripts\python.exe"
+& $PY scripts\qa_navegador.py --rama <rama>
+& $PY scripts\qa_navegador.py --produccion
+$clave = Read-Host -AsSecureString "Clave de superadmin"         # no se ve al teclear
+$env:ALGO_ADMIN_KEY = (New-Object System.Net.NetworkCredential('', $clave)).Password
+& $PY scripts\qa_navegador.py --rama <rama> --superadmin
+Remove-Item Env:ALGO_ADMIN_KEY; Remove-Variable clave            # borra la clave de la sesión
+```
+La clave queda solo en la variable de entorno de esa ventana de PowerShell (no en el historial: `Read-Host` no se guarda en PSReadLine) y se borra con la última línea. Instalación equivalente en PowerShell:
+```powershell
+py -m venv "$env:LOCALAPPDATAlgo-qaenv"
+& "$env:LOCALAPPDATAlgo-qaenv\Scripts\python.exe" -m pip install -r scriptsequirements-qa.txt
+$env:PLAYWRIGHT_BROWSERS_PATH = "0"; & "$env:LOCALAPPDATAlgo-qaenv\Scripts\python.exe" -m playwright install chromium
+```
+
+`.gitattributes` fija `*.sh text eol=lf`: con `core.autocrlf=true`, un checkout nuevo dejaría `verificar.sh` con CRLF y Bash fallaría (`$'': command not found`).
+
 **Qué escribe en Supabase cada corrida** (el Preview usa la base de producción):
 
 | Tabla | Preview, 1.ª corrida | Preview, siguientes | Producción (`--produccion`) |

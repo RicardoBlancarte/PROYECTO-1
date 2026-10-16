@@ -1,0 +1,2 @@
+# Los scripts de Bash necesitan finales LF aunque core.autocrlf=true (si no: $'': command not found)
+*.sh text eol=lf
