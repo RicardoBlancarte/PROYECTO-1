@@ -850,6 +850,39 @@ También se simula el `POST /cdn-cgi/rum` (Cloudflare Web Analytics), para que l
 
 ## 7. Pendientes para fases posteriores
 
+- **Bloque futuro (S) — `/api/patterns` se pide 2 o 3 veces por activo al cargar** (diagnóstico del 2026-10-16, solo lectura; visto con `qa_navegador.py` en el Preview: "AAPL daily: 2" sin superadmin y "AAPL daily: 3" con superadmin).
+  - **Es preexistente:** el mismo encadenamiento está en `de48a4e` (antes de la Fase 3), en `842622b` (bloque 1, antes del bloque 2) y en `main`. Los bloques de la Fase 3 no lo introdujeron.
+  - **Qué lo dispara, en orden:**
+    1. `bootGuest` (y `bootAdmin` y `boot`) → `selectAsset()` → `loadPatterns()`: no hay caché, sale la llamada 1.
+    2. En la misma pasada, `applyTierGating()` → `loadPatterns()`: la llamada 1 sigue en vuelo, y `loadPatterns` solo guarda en caché (`sessionStorage`, 60 min) **después** de recibir la respuesta, así que sale la llamada 2.
+    3. Cuando `syncAssetDataWithSupabase()` termina de cargar los precios de los ~35 activos, vuelve a llamar a `selectAsset()` → `loadPatterns()`. Si para entonces ya llegó alguna respuesta, usa la caché; si no, sale la **llamada 3**. Depende de los tiempos de red.
+  - **El "3" de la corrida con superadmin** casi seguro es el disparo 3 en la fase de invitado, no del superadmin: en el contexto del superadmin, `qa_navegador.py` responde `/api/patterns` con la respuesta capturada como invitado. Se comprobó que la captura funciona (`resp.text()` dentro del evento `response`, 0 errores).
+  - **Efecto real, no solo en QA:** cada visita escribe 2-3 filas en `asset_prediction_audit` (y otros tantos upserts en `asset_pattern_snapshots`) en vez de 1, lo que agrava el crecimiento sin límite ya anotado para la Fase 5.
+  - **Problema relacionado:** `loadPatterns` no revisa, después del `await`, si el usuario cambió de activo u horizonte. Con red lenta y un cambio rápido de activo, puede dibujar los patrones del activo anterior.
+  - **Arreglo mínimo propuesto (bloque futuro, tamaño S):** reutilizar la promesa en vuelo por símbolo, horizonte y nivel, y descartar respuestas viejas:
+    ```js
+    const patternRequests = new Map(); // `${símbolo}|${horizonte}|${nivel}` → Promise<datos | null>
+    function fetchPatterns(symbol, horizon, tier) {
+      const k = `${symbol}|${horizon}|${tier}`;
+      if (!patternRequests.has(k)) patternRequests.set(k,
+        fetch(`/api/patterns?symbol=${encodeURIComponent(symbol)}&tier=${tier}&horizon=${horizon}`)
+          .then(r => (r.ok ? r.json() : null)).catch(() => null)
+          .finally(() => patternRequests.delete(k)));
+      return patternRequests.get(k);
+    }
+    // En loadPatterns: const data = await fetchPatterns(symbol, horizon, effectiveTier());
+    // if (currentAssetKey !== key || $('pattern-horizon').value !== horizon) return;   // respuesta vieja
+    // data ? (writeCache(cacheKey, data), renderPatternRows(data)) : renderPatternRows(local);
+    ```
+    Los tres disparos comparten una sola petición (el tercero, si llega antes de la respuesta, también). **Resultado esperado: 1 llamada y 1 fila de auditoría por activo y horizonte en cada visita.** Sin cambios de servidor ni de esquema.
+  - **Cómo probarlo:**
+    - prueba local con `fetch` simulado lento: `loadPatterns` llamado 3 veces seguidas → 1 petición; un cambio de activo antes de la respuesta → no dibuja la respuesta vieja;
+    - en el Preview, `qa_navegador.py` debe mostrar "AAPL daily: 1".
+  - **Mejoras de la herramienta de QA, en el mismo bloque:**
+    - el reporte debe separar las llamadas a `/api/patterns` por fase (invitado o superadmin);
+    - las respuestas 422 (activo sin historial, sin escritura) no deben contarse como filas de `asset_prediction_audit`. Hoy el reporte sobrestima: "3 filas" cuando fueron 2 de AAPL más un 422 de BTC.
+
+
 - **Al activar Premium — esperar `/api/tier-config` antes de validar el tope** (bloque 2, 2026-10-13): mientras la configuración no llega (o si falla), el navegador usa los límites de Free. Un Premium con más de 5 activos ve "N/5 activos" y **no puede agregar** hasta que llega la respuesta (cacheada 5 min). Hoy no afecta a nadie real (todo es Free; solo pruebas gratuitas y modo admin). Antes de activar Premium: esperar la configuración antes de validar el tope en `addPortfolioAsset` (o reintentar al validar) y no mostrar el contador hasta tenerla.
 - **Bloque 2 — refrescar el contador al cambiar de nivel:** `setDevTier` y `startTrial` llaman a `applyTierGating`, que actualiza horizontes e historial pero no el contador "N/límite" del portafolio; se actualiza en el siguiente `renderPortfolio` (al seleccionar o agregar un activo). Ya era así antes del bloque 2. **Resuelto el 2026-10-13** en `lanzamiento-f3-niveles`: `applyTierGating` actualiza el contador.
 
