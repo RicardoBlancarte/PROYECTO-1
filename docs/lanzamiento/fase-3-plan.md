@@ -789,7 +789,7 @@ Reemplazan los videos de verificación por pruebas automáticas que corren en la
 | `scripts/requirements-qa.txt` | `playwright==1.64.0` |
 | `.gitignore` | `qa-salida/` y `.qa-estado/` |
 
-**Instalación (una vez; fuera de OneDrive, en `%LOCALAPPDATA%lgo-qa`, ~843 MB con Chromium; se desinstala borrando esa carpeta):**
+**Instalación (una vez; fuera de OneDrive, en `%LOCALAPPDATA%\algo-qa`, ~843 MB con Chromium; se desinstala borrando esa carpeta):**
 ```bash
 py -m venv "$LOCALAPPDATA/algo-qa/venv"
 "$LOCALAPPDATA/algo-qa/venv/Scripts/python" -m pip install -r scripts/requirements-qa.txt
